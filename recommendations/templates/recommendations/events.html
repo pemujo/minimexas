@@ -1,0 +1,467 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Events & Calendar - MiniMexas</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Custom Project CSS -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+<body>
+
+    <!-- REUSABLE NAVBAR -->
+    {% include 'recommendations/navbar.html' with active_page='events' %}
+
+    <!-- MAIN CONTAINER -->
+    <div class="container main-container pt-4 mb-5">
+
+        <!-- HEADER ROW -->
+        <div class="mb-4">
+            <div class="badge-pill-header mb-2">
+                <i class="bi bi-calendar-heart-fill text-warning me-2"></i>
+                <span>Community Calendar & Meetups</span>
+            </div>
+            <h1 class="h2 fw-bold text-dark mb-1">Upcoming Events & Gatherings</h1>
+            <p class="text-secondary small mb-0">
+                Stay connected with cultural festivals, tech mixers, family picnics, and gatherings across the San Francisco Bay Area.
+            </p>
+        </div>
+
+        <!-- FILTER & VIEW CONTROLS -->
+        <div class="card card-custom p-3 mb-4 shadow-sm">
+            <div class="row g-3 align-items-center justify-content-between">
+                
+                <!-- Search Box -->
+                <div class="col-md-5 col-lg-4">
+                    <div class="input-group search-input-group">
+                        <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" id="eventSearchInput" class="form-control" placeholder="Search events, locations, keywords...">
+                    </div>
+                </div>
+
+                <!-- Category Pills -->
+                <div class="col-md-7 col-lg-5">
+                    <div class="d-flex flex-wrap gap-1" id="categoryFilterContainer">
+                        <button type="button" class="btn btn-sm btn-outline-pill active filter-cat-btn" data-category="ALL">All</button>
+                        <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Cultural & Heritage">Cultural</button>
+                        <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Networking & Tech">Networking</button>
+                        <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Family & Outdoors">Outdoors</button>
+                        <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Culinary & Social">Culinary</button>
+                    </div>
+                </div>
+
+                <!-- View Switcher (List vs Calendar Grid) -->
+                <div class="col-auto ms-auto">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="View switch">
+                        <button type="button" class="btn btn-outline-secondary active" id="btnViewList" title="List View">
+                            <i class="bi bi-list-ul me-1"></i> List
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnViewCalendar" title="Calendar Grid View">
+                            <i class="bi bi-calendar3 me-1"></i> Month Grid
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- VIEW 1: UPCOMING EVENT CARDS LIST -->
+        <div id="eventsListView">
+            <div class="row g-4" id="eventsCardGrid">
+                {% for event in events %}
+                <div class="col-md-6 col-lg-4 event-card-wrapper" 
+                     data-title="{{ event.title|lower }}" 
+                     data-location="{{ event.location|lower }}" 
+                     data-category="{{ event.category }}"
+                     data-desc="{{ event.description|lower }}">
+                    
+                    <div class="event-item-card h-100 p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            
+                            <!-- Date Box & Category Header -->
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="event-date-box shadow-sm">
+                                        <span class="event-date-month">{{ event.start_datetime|date:"M" }}</span>
+                                        <span class="event-date-day">{{ event.day }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                            {{ event.category }}
+                                        </span>
+                                        <div class="text-muted small mt-1">
+                                            <i class="bi bi-clock me-1 text-primary"></i> {{ event.time_formatted }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Event Title -->
+                            <h5 class="fw-bold text-dark mb-2" style="font-size: 1.15rem; line-height: 1.3;">
+                                {{ event.title }}
+                            </h5>
+
+                            <!-- Location -->
+                            <div class="small mb-3 d-flex align-items-start text-secondary">
+                                <i class="bi bi-geo-alt-fill text-danger me-2 mt-1 flex-shrink-0"></i>
+                                <a href="{{ event.location_url }}" target="_blank" rel="noopener" class="text-decoration-none text-secondary hover-primary">
+                                    {{ event.location }}
+                                </a>
+                            </div>
+
+                            <!-- Description -->
+                            <p class="text-muted small mb-4" style="line-height: 1.5;">
+                                {{ event.description|truncatewords:28 }}
+                            </p>
+
+                        </div>
+
+                        <!-- Footer Actions -->
+                        <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
+                            <a href="{{ event.google_calendar_link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-pill" title="Add event to your Google Calendar">
+                                <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
+                            </a>
+                            <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
+                                    data-title="{{ event.title }}"
+                                    data-date="{{ event.date_formatted }}"
+                                    data-time="{{ event.time_formatted }}"
+                                    data-location="{{ event.location }}"
+                                    data-locurl="{{ event.location_url }}"
+                                    data-category="{{ event.category }}"
+                                    data-desc="{{ event.description }}"
+                                    data-organizer="{{ event.organizer }}"
+                                    data-gcal="{{ event.google_calendar_link }}">
+                                Details
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-5">
+                    <div class="card card-custom p-5">
+                        <i class="bi bi-calendar-x text-muted display-4 mb-3"></i>
+                        <h4 class="fw-bold text-dark">No Events Scheduled</h4>
+                        <p class="text-muted small mb-0">Check back soon for new community gatherings and celebrations.</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Empty Search State -->
+            <div id="noSearchResults" class="text-center py-5 d-none">
+                <div class="card card-custom p-5">
+                    <i class="bi bi-search text-muted display-5 mb-3"></i>
+                    <h5 class="fw-bold text-dark">No Matching Events Found</h5>
+                    <p class="text-muted small mb-3">Try adjusting your keywords or category filters.</p>
+                    <button id="resetSearchBtn" class="btn btn-sm btn-outline-pill mx-auto">Clear Filters</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: MONTHLY CALENDAR GRID -->
+        <div id="eventsCalendarView" class="d-none">
+            <div class="calendar-card">
+                
+                <!-- Calendar Header Bar -->
+                <div class="calendar-header-bar d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                        <h4 class="fw-bold mb-0 text-white" id="calendarMonthYearDisplay">Month Year</h4>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 py-1" id="btnCalToday">Today</button>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" id="btnCalPrev" style="width: 34px; height: 34px;">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle" id="btnCalNext" style="width: 34px; height: 34px;">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calendar Grid Container -->
+                <div class="calendar-grid-wrapper">
+                    <!-- Weekday Headers -->
+                    <div class="calendar-grid mb-2">
+                        <div class="calendar-day-header">Sun</div>
+                        <div class="calendar-day-header">Mon</div>
+                        <div class="calendar-day-header">Tue</div>
+                        <div class="calendar-day-header">Wed</div>
+                        <div class="calendar-day-header">Thu</div>
+                        <div class="calendar-day-header">Fri</div>
+                        <div class="calendar-day-header">Sat</div>
+                    </div>
+                    
+                    <!-- Day Cells Injected via JS -->
+                    <div class="calendar-grid" id="calendarGridBody"></div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- EVENT DETAILS MODAL -->
+    <div class="modal fade" id="eventDetailModal" tabindex="-1" aria-labelledby="eventDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
+                    <h5 class="modal-title fw-bold" id="modalEventTitle">Event Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <span id="modalEventCategory" class="badge category-tag tech mb-2">Category</span>
+                        <h4 class="fw-bold text-dark mb-1" id="modalEventHeading"></h4>
+                    </div>
+
+                    <div class="d-flex flex-column gap-2 mb-4 bg-light p-3 rounded-3 border">
+                        <div class="d-flex align-items-center text-secondary small">
+                            <i class="bi bi-calendar-date text-primary me-2 fs-6"></i>
+                            <span id="modalEventDate" class="fw-semibold text-dark"></span>
+                        </div>
+                        <div class="d-flex align-items-center text-secondary small">
+                            <i class="bi bi-clock text-primary me-2 fs-6"></i>
+                            <span id="modalEventTime"></span>
+                        </div>
+                        <div class="d-flex align-items-start text-secondary small">
+                            <i class="bi bi-geo-alt-fill text-danger me-2 fs-6 mt-1 flex-shrink-0"></i>
+                            <a id="modalEventLocUrl" href="#" target="_blank" rel="noopener" class="text-decoration-none text-dark fw-semibold">
+                                <span id="modalEventLocation"></span> <i class="bi bi-box-arrow-up-right ms-1 text-muted" style="font-size: 0.75rem;"></i>
+                            </a>
+                        </div>
+                        <div class="d-flex align-items-center text-secondary small">
+                            <i class="bi bi-person-circle text-primary me-2 fs-6"></i>
+                            <span>Organized by: <strong id="modalEventOrganizer" class="text-dark"></strong></span>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-dark mb-2">About This Event</h6>
+                    <p class="text-muted small mb-4" id="modalEventDescription" style="line-height: 1.6;"></p>
+
+                    <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                        <a id="modalEventGcalLink" href="#" target="_blank" rel="noopener" class="btn btn-google py-2 px-3 rounded-pill fw-semibold">
+                            <i class="bi bi-google me-1 text-primary"></i> Add to Google Calendar
+                        </a>
+                        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON DATA FOR JAVASCRIPT CALENDAR -->
+    <script id="eventsJsonData" type="application/json">
+        {{ events_json|safe }}
+    </script>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Interactive Calendar Logic & Search -->
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const eventsData = JSON.parse(document.getElementById("eventsJsonData").textContent || "[]");
+        
+        // --- View Switching (List vs Calendar Grid) ---
+        const btnViewList = document.getElementById("btnViewList");
+        const btnViewCalendar = document.getElementById("btnViewCalendar");
+        const eventsListView = document.getElementById("eventsListView");
+        const eventsCalendarView = document.getElementById("eventsCalendarView");
+
+        btnViewList.addEventListener("click", () => {
+            btnViewList.classList.add("active");
+            btnViewCalendar.classList.remove("active");
+            eventsListView.classList.remove("d-none");
+            eventsCalendarView.classList.add("d-none");
+        });
+
+        btnViewCalendar.addEventListener("click", () => {
+            btnViewCalendar.classList.add("active");
+            btnViewList.classList.remove("active");
+            eventsListView.classList.add("d-none");
+            eventsCalendarView.classList.remove("d-none");
+            renderCalendarMonth();
+        });
+
+        // --- Filtering & Search ---
+        const searchInput = document.getElementById("eventSearchInput");
+        const categoryButtons = document.querySelectorAll(".filter-cat-btn");
+        const eventCards = document.querySelectorAll(".event-card-wrapper");
+        const noSearchResults = document.getElementById("noSearchResults");
+        let activeCategory = "ALL";
+
+        function filterEvents() {
+            const query = (searchInput.value || "").trim().toLowerCase();
+            let visibleCount = 0;
+
+            eventCards.forEach(card => {
+                const title = card.getAttribute("data-title") || "";
+                const loc = card.getAttribute("data-location") || "";
+                const desc = card.getAttribute("data-desc") || "";
+                const category = card.getAttribute("data-category") || "";
+
+                const matchesQuery = !query || title.includes(query) || loc.includes(query) || desc.includes(query);
+                const matchesCat = activeCategory === "ALL" || category.toLowerCase() === activeCategory.toLowerCase();
+
+                if (matchesQuery && matchesCat) {
+                    card.style.display = "";
+                    visibleCount++;
+                } else {
+                    card.style.display = "none";
+                }
+            });
+
+            if (visibleCount === 0 && eventCards.length > 0) {
+                noSearchResults.classList.remove("d-none");
+            } else {
+                noSearchResults.classList.add("d-none");
+            }
+        }
+
+        searchInput.addEventListener("input", filterEvents);
+
+        categoryButtons.forEach(btn => {
+            btn.addEventListener("click", function() {
+                categoryButtons.forEach(b => b.classList.remove("active"));
+                this.classList.add("active");
+                activeCategory = this.getAttribute("data-category");
+                filterEvents();
+            });
+        });
+
+        document.getElementById("resetSearchBtn")?.addEventListener("click", () => {
+            searchInput.value = "";
+            activeCategory = "ALL";
+            categoryButtons.forEach(b => b.classList.remove("active"));
+            categoryButtons[0].classList.add("active");
+            filterEvents();
+        });
+
+        // --- Modal Event Details ---
+        const modal = new bootstrap.Modal(document.getElementById("eventDetailModal"));
+        const detailButtons = document.querySelectorAll(".view-details-btn");
+
+        function openModalForEvent(evt) {
+            document.getElementById("modalEventHeading").textContent = evt.title;
+            document.getElementById("modalEventCategory").textContent = evt.category;
+            document.getElementById("modalEventDate").textContent = evt.date_formatted || evt.date;
+            document.getElementById("modalEventTime").textContent = evt.time_formatted || evt.time;
+            document.getElementById("modalEventLocation").textContent = evt.location;
+            document.getElementById("modalEventLocUrl").href = evt.location_url || evt.locurl;
+            document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexas Events";
+            document.getElementById("modalEventDescription").textContent = evt.description || evt.desc;
+            document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal;
+            modal.show();
+        }
+
+        detailButtons.forEach(btn => {
+            btn.addEventListener("click", function() {
+                openModalForEvent(this.dataset);
+            });
+        });
+
+        // --- Monthly Calendar Grid Engine ---
+        let currentCalDate = new Date();
+
+        function renderCalendarMonth() {
+            const gridBody = document.getElementById("calendarGridBody");
+            const monthYearDisplay = document.getElementById("calendarMonthYearDisplay");
+            
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth(); // 0-11
+            
+            const monthNames = [
+                "January", "February", "March", "April", "May", "June", 
+                "July", "August", "September", "October", "November", "December"
+            ];
+            monthYearDisplay.textContent = `${monthNames[month]} ${year}`;
+
+            gridBody.innerHTML = "";
+
+            const firstDayIndex = new Date(year, month, 1).getDay(); // 0 (Sun) - 6 (Sat)
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const prevLastDay = new Date(year, month, 0).getDate();
+
+            const today = new Date();
+            const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+            // Previous month trailing days
+            for (let x = firstDayIndex; x > 0; x--) {
+                const dayNum = prevLastDay - x + 1;
+                const cell = document.createElement("div");
+                cell.className = "calendar-day-cell other-month";
+                cell.innerHTML = `<span class="day-number text-muted">${dayNum}</span>`;
+                gridBody.appendChild(cell);
+            }
+
+            // Current month days
+            for (let i = 1; i <= lastDay; i++) {
+                const cell = document.createElement("div");
+                const isToday = isCurrentMonth && today.getDate() === i;
+                cell.className = `calendar-day-cell ${isToday ? 'today' : ''}`;
+                
+                let html = `<span class="day-number">${i}</span>`;
+                
+                // Find events matching this day, month, year
+                const dayEvents = eventsData.filter(e => e.year === year && e.month === (month + 1) && e.day === i);
+                
+                dayEvents.forEach(e => {
+                    let catClass = "tech";
+                    if (e.category.includes("Cultural")) catClass = "cultural";
+                    else if (e.category.includes("Family") || e.category.includes("Outdoor")) catClass = "family";
+                    else if (e.category.includes("Culinary")) catClass = "culinary";
+
+                    html += `<a href="javascript:void(0)" class="calendar-event-chip ${catClass}" title="${e.title} (${e.time_formatted})">${e.title}</a>`;
+                });
+
+                cell.innerHTML = html;
+
+                // Add click listener for chips in this day cell
+                const chips = cell.querySelectorAll(".calendar-event-chip");
+                chips.forEach((chip, idx) => {
+                    chip.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        openModalForEvent(dayEvents[idx]);
+                    });
+                });
+
+                gridBody.appendChild(cell);
+            }
+
+            // Next month leading days to complete grid (42 cells standard)
+            const totalRendered = firstDayIndex + lastDay;
+            const remainingCells = (totalRendered % 7 === 0) ? 0 : 7 - (totalRendered % 7);
+            for (let j = 1; j <= remainingCells; j++) {
+                const cell = document.createElement("div");
+                cell.className = "calendar-day-cell other-month";
+                cell.innerHTML = `<span class="day-number text-muted">${j}</span>`;
+                gridBody.appendChild(cell);
+            }
+        }
+
+        document.getElementById("btnCalPrev").addEventListener("click", () => {
+            currentCalDate.setMonth(currentCalDate.getMonth() - 1);
+            renderCalendarMonth();
+        });
+
+        document.getElementById("btnCalNext").addEventListener("click", () => {
+            currentCalDate.setMonth(currentCalDate.getMonth() + 1);
+            renderCalendarMonth();
+        });
+
+        document.getElementById("btnCalToday").addEventListener("click", () => {
+            currentCalDate = new Date();
+            renderCalendarMonth();
+        });
+
+    });
+    </script>
+
+</body>
+</html>

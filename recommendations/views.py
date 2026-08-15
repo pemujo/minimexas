@@ -191,3 +191,39 @@ def notes_list_view(request):
         'error': error,
         'member_name': request.session.get('member_name', 'Member')
     })
+
+
+from .calendar_sync import fetch_community_events
+import json
+
+
+@member_required
+def events_view(request):
+    force_refresh = request.GET.get('refresh') == '1'
+    events = fetch_community_events(force_refresh=force_refresh)
+
+    # Prepare JSON serializable events for client-side interactive calendar navigation
+    events_payload = []
+    for e in events:
+        events_payload.append({
+            "id": e["id"],
+            "title": e["title"],
+            "year": e["year"],
+            "month": e["month"],
+            "day": e["day"],
+            "date_formatted": e["date_formatted"],
+            "time_formatted": e["time_formatted"],
+            "location": e["location"],
+            "location_url": e["location_url"],
+            "category": e["category"],
+            "description": e["description"],
+            "organizer": e["organizer"],
+            "google_calendar_link": e["google_calendar_link"],
+        })
+
+    return render(request, 'recommendations/events.html', {
+        'events': events,
+        'events_json': json.dumps(events_payload),
+        'member_name': request.session.get('member_name', 'Member')
+    })
+

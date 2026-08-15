@@ -24,6 +24,11 @@
                         <i class="bi bi-chat-heart me-1"></i> Recommendations
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if active_page == 'events' %}active{% endif %}" href="{% url 'events' %}">
+                        <i class="bi bi-calendar-event me-1"></i> Events
+                    </a>
+                </li>
                 {% if request.session.is_verified_member %}
                 <li class="nav-item ms-lg-3 mt-2 mt-lg-0 d-flex align-items-center gap-2">
                     <div class="user-badge-pill d-flex align-items-center">

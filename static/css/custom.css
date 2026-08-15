@@ -636,21 +636,26 @@ a:hover {
 }
 
 .banner-glass-card {
-    background: rgba(10, 15, 29, 0.78);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(10, 15, 29, 0.42);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: var(--radius-lg);
     padding: 1.75rem 2.25rem;
     max-width: 640px;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    margin-left: auto;
+    margin-right: 0;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
     pointer-events: auto;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 @media (max-width: 992px) {
     .banner-glass-card {
         max-width: 540px;
         padding: 1.5rem 1.75rem;
+        margin-left: auto;
+        margin-right: 0;
     }
 }
 
@@ -660,7 +665,7 @@ a:hover {
     }
     .banner-glass-card {
         padding: 1.25rem 1.25rem;
-        margin: 0;
+        margin: 0 auto;
         max-width: 100%;
         border-radius: var(--radius-md);
     }
@@ -743,8 +748,9 @@ a:hover {
 .carousel-indicators {
     z-index: 5;
     margin-bottom: 1.4rem;
-    justify-content: flex-end;
-    margin-right: 2rem;
+    justify-content: flex-start;
+    margin-left: 2rem;
+    margin-right: 0;
 }
 
 @media (max-width: 768px) {
@@ -768,5 +774,200 @@ a:hover {
     background-color: #38bdf8;
     width: 48px;
 }
+
+/* ==========================================================================
+   Events & Calendar Module Styles
+   ========================================================================== */
+.calendar-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.calendar-header-bar {
+    background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));
+    color: #ffffff;
+    padding: 1.25rem 1.5rem;
+}
+
+.calendar-grid-wrapper {
+    padding: 1.25rem;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+
+.calendar-day-header {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    padding: 8px 0;
+}
+
+.calendar-day-cell {
+    min-height: 96px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.calendar-day-cell:hover {
+    background: #ffffff;
+    border-color: var(--brand-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.calendar-day-cell.other-month {
+    background: #f8fafc;
+    opacity: 0.45;
+}
+
+.calendar-day-cell.today {
+    background: var(--brand-blue-50);
+    border-color: var(--brand-primary);
+    border-width: 1.5px;
+}
+
+.calendar-day-cell.today .day-number {
+    background: var(--brand-primary);
+    color: #ffffff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.day-number {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.calendar-event-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--brand-primary);
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    display: block;
+}
+
+.calendar-event-chip:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    color: #ffffff;
+}
+
+.calendar-event-chip.cultural {
+    background: #dc2626;
+}
+
+.calendar-event-chip.tech {
+    background: #2563eb;
+}
+
+.calendar-event-chip.family {
+    background: #059669;
+}
+
+.calendar-event-chip.culinary {
+    background: #d97706;
+}
+
+/* Event List Cards */
+.event-item-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+}
+
+.event-item-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--brand-blue-300);
+}
+
+.event-date-box {
+    width: 68px;
+    height: 72px;
+    background: var(--brand-navy-900);
+    color: #ffffff;
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.event-date-month {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #38bdf8;
+}
+
+.event-date-day {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.category-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+}
+
+.category-tag.cultural {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.category-tag.tech {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.category-tag.family {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.category-tag.culinary {
+    background: #fef3c7;
+    color: #92400e;
+}
+
 
 

@@ -86,7 +86,7 @@
                                         Bringing families and friends together for celebrations, picnics, networking, and cultural activities.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="#dashboard-portal" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'events' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-calendar-event me-1"></i> Upcoming Meetups
                                         </a>
                                         <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
@@ -134,31 +134,31 @@
                     </div>
                 </div>
 
-                <!-- Slide 4: Video Slide (Supports MP4 videos with poster fallback) -->
+                <!-- Slide 4: MiniMexas Community (Image) -->
                 <div class="carousel-item">
                     <div class="banner-media-container">
-                        <video class="d-block w-100 banner-media banner-video" autoplay muted loop playsinline poster="{% static 'images/banners/bay_area.png' %}">
-                            <source src="{% static 'videos/banner_loop.mp4' %}" type="video/mp4">
-                            <img src="{% static 'images/banners/bay_area.png' %}" alt="MiniMexas Community Video Banner">
-                        </video>
+                        <img src="{% static 'images/banners/minimexas.png' %}" class="d-block w-100 banner-media" alt="MiniMexas Community">
                         <div class="banner-overlay"></div>
                         
-                        <!-- Caption Safely Framed Inside Image/Video -->
+                        <!-- Caption Safely Framed Inside Image -->
                         <div class="banner-caption-container">
                             <div class="container">
                                 <div class="banner-glass-card">
                                     <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
-                                        <i class="bi bi-play-circle-fill text-danger me-2"></i> Community Highlights
+                                        <i class="bi bi-people-fill text-primary me-2"></i> MiniMexas Community
                                     </div>
                                     <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
-                                        Moments in Motion
+                                        Our Community in Action
                                     </h2>
                                     <p class="text-white-50 mb-3 small d-none d-sm-block">
-                                        Watch video highlights and memories. Upload custom MP4 video loops directly to your media gallery.
+                                        Celebrating our heritage, building relationships, and supporting each other across the Bay Area.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
-                                            <i class="bi bi-collection-play me-1"></i> View Portal
+                                        <a href="{% url 'events' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-calendar-event me-1"></i> Community Events
+                                        </a>
+                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-chat-heart me-1"></i> Recommendations
                                         </a>
                                     </div>
                                 </div>
@@ -220,9 +220,6 @@
                             </div>
                             <div>
                                 <h5 class="fw-bold mb-0 text-dark">Recommendations</h5>
-                                <small class="fw-semibold d-inline-flex align-items-center" style="color: var(--brand-primary);">
-                                    <span class="pulse-dot me-1" style="width: 6px; height: 6px;"></span> Live Sheets Sync
-                                </small>
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
@@ -235,9 +232,9 @@
                 </div>
             </div>
 
-            <!-- 2. Events & Meetups Module (Upcoming) -->
+            <!-- 2. Events & Meetups Module (Active) -->
             <div class="col-md-6 col-lg-4">
-                <div class="card card-custom card-dashed h-100 p-4 d-flex flex-column justify-content-between">
+                <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
                             <div class="feature-icon-box bg-amber-subtle me-3">
@@ -245,16 +242,15 @@
                             </div>
                             <div>
                                 <h5 class="fw-bold mb-0 text-dark">Events & Meetups</h5>
-                                <small class="text-muted">Coming Soon</small>
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
                             Stay up to date with cultural gatherings, family picnics, networking meetups, and local community activities in the Bay Area.
                         </p>
                     </div>
-                    <button class="btn btn-outline-pill disabled py-2 text-center" disabled>
-                        <i class="bi bi-hourglass-split me-1"></i> In Progress
-                    </button>
+                    <a href="{% url 'events' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
+                        Explore Events & Calendar <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
                 </div>
             </div>
 
