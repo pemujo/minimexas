@@ -1,11 +1,10 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to MiniMexas - Bay Area Community Hub</title>
+    <title>Welcome - MiniMexas Community Portal</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -14,71 +13,66 @@
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
 </head>
 
-<body class="bg-light">
+<body>
 
-    <div class="login-wrapper py-5">
+    <div class="login-wrapper">
         <div class="container" style="max-width: 1060px;">
-            <div class="row g-4 align-items-center justify-content-between">
+            <div class="row g-5 align-items-center justify-content-between">
 
                 <!-- Left Column: Community Overview & Value Proposition -->
                 <div class="col-lg-7 pe-lg-4">
 
-                    <div
-                        class="d-inline-flex align-items-center bg-white text-success px-3 py-1 rounded-pill shadow-sm mb-3 border">
+                    <div class="badge-pill-header mb-3">
                         <i class="bi bi-geo-alt-fill me-2 text-danger"></i>
-                        <span class="fw-semibold small">Bay Area Community</span>
+                        <span>Bay Area Community</span>
                     </div>
 
-                    <h1 class="display-5 fw-bold text-dark mb-3" style="letter-spacing: -0.5px;">
+                    <h1 class="display-5 fw-bold text-dark mb-3" style="letter-spacing: -0.03em;">
                         MiniMexas Community Hub
                     </h1>
 
-                    <p class="lead text-secondary mb-4">
-                        A private, member-driven portal built to connect, empower, and support our Mexican & Latino
-                        community across the Bay Area.
+                    <p class="text-secondary mb-4" style="font-size: 1.05rem;">
+                        A private, member-driven portal built to connect, empower, and support our community across the San Francisco Bay Area.
                     </p>
 
                     <!-- Feature Highlights -->
                     <div class="d-flex flex-column gap-3 mb-4">
 
                         <!-- Recommendations Item -->
-                        <div class="d-flex align-items-start bg-white p-3 rounded-4 shadow-sm border border-light">
+                        <div class="d-flex align-items-start feature-list-item">
                             <div class="feature-icon-box bg-emerald-subtle me-3">
                                 <i class="bi bi-chat-heart-fill"></i>
                             </div>
                             <div>
                                 <h6 class="fw-bold mb-1 text-dark">Trusted Recommendations</h6>
                                 <p class="text-muted small mb-0">
-                                    Browse vetted local services, doctors, restaurants, schools, and favorite spots
-                                    shared by our members.
+                                    Browse vetted local services, doctors, restaurants, schools, and favorite spots shared by members.
                                 </p>
                             </div>
                         </div>
 
                         <!-- Events Item -->
-                        <div class="d-flex align-items-start bg-white p-3 rounded-4 shadow-sm border border-light">
+                        <div class="d-flex align-items-start feature-list-item">
                             <div class="feature-icon-box bg-amber-subtle me-3">
                                 <i class="bi bi-calendar-event-fill"></i>
                             </div>
                             <div>
                                 <h6 class="fw-bold mb-1 text-dark">Local Events & Meetups</h6>
                                 <p class="text-muted small mb-0">
-                                    Stay up to date with cultural gatherings, family meetups, and community activities
-                                    happening near you.
+                                    Stay up to date with gatherings, family meetups, and community activities happening near you.
                                 </p>
                             </div>
                         </div>
 
                         <!-- Community Resources Item -->
-                        <div class="d-flex align-items-start bg-white p-3 rounded-4 shadow-sm border border-light">
+                        <div class="d-flex align-items-start feature-list-item">
                             <div class="feature-icon-box bg-blue-subtle me-3">
                                 <i class="bi bi-people-fill"></i>
                             </div>
                             <div>
                                 <h6 class="fw-bold mb-1 text-dark">Community Resources & Additions</h6>
                                 <p class="text-muted small mb-0">
-                                    Access shared planning tools, group notes, and helpful resources designed for our
-                                    community.
+                                    Access shared planning tools, group notes, and helpful resources designed for our community.
                                 </p>
                             </div>
                         </div>
@@ -86,7 +80,7 @@
                     </div>
 
                     <div class="small text-muted d-flex align-items-center">
-                        <i class="bi bi-shield-check text-success fs-5 me-2"></i>
+                        <i class="bi bi-shield-check fs-5 me-2" style="color: var(--brand-primary);"></i>
                         <span>Private & secure portal for verified WhatsApp group members.</span>
                     </div>
 
@@ -97,8 +91,8 @@
                     <div class="card login-card p-4 p-md-5 text-center">
 
                         <div class="mb-4">
-                            <div class="author-avatar bg-success text-white mx-auto mb-3"
-                                style="width: 60px; height: 60px; font-size: 1.6rem;">
+                            <div class="author-avatar mx-auto mb-3"
+                                style="width: 54px; height: 54px; font-size: 1.4rem;">
                                 <i class="bi bi-shield-lock-fill"></i>
                             </div>
                             <h3 class="fw-bold text-dark mb-1">Member Sign In</h3>
@@ -108,7 +102,7 @@
                         </div>
 
                         {% if error %}
-                        <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3 text-start d-flex align-items-center"
+                        <div class="alert alert-danger alert-custom py-2 px-3 small mb-3 text-start d-flex align-items-center"
                             role="alert">
                             <i class="bi bi-exclamation-circle-fill me-2 flex-shrink-0"></i>
                             <div>{{ error }}</div>
@@ -116,8 +110,8 @@
                         {% endif %}
 
                         <a href="{% url 'gmail_login' %}"
-                            class="btn btn-google fw-semibold py-3 w-100 rounded-pill d-flex align-items-center justify-content-center shadow-sm mb-3">
-                            <svg class="me-2" width="20" height="20" viewBox="0 0 18 18">
+                            class="btn btn-google py-3 w-100 rounded-pill d-flex align-items-center justify-content-center mb-3">
+                            <svg class="me-2" width="18" height="18" viewBox="0 0 18 18">
                                 <path fill="#4285F4"
                                     d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.617z" />
                                 <path fill="#34A853"
@@ -130,8 +124,8 @@
                             <span>Sign in with Google</span>
                         </a>
 
-                        <div class="mt-2 text-muted" style="font-size: 0.8rem;">
-                            Not a verified member yet? Reach out to the group admin to add your Gmail to the group list.
+                        <div class="text-muted" style="font-size: 0.8rem; line-height: 1.4;">
+                            Not a verified member yet? Contact your group admin to add your Gmail address to the group list.
                         </div>
 
                         {% if is_dev_mode %}
@@ -140,7 +134,7 @@
                                 <i class="bi bi-code-slash me-1"></i> Local Dev Testing
                             </div>
                             <a href="{% url 'dev_login' %}"
-                                class="btn btn-sm btn-success bg-gradient w-100 rounded-pill fw-semibold shadow-sm">
+                                class="btn btn-sm btn-primary-action w-100 rounded-pill py-2">
                                 <i class="bi bi-lightning-charge-fill me-1"></i> Quick Sign In (Dev Bypass)
                             </a>
                         </div>
@@ -156,5 +150,4 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
 </html>

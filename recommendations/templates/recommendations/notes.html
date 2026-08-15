@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Recommendations</title>
+    <title>Recommendations - MiniMexas</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -21,64 +21,94 @@
     <div class="container main-container mb-5">
         
         <!-- Header Row -->
-        <div class="d-flex justify-content-between align-items-end mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
             <div>
-                <h2 class="fw-bold mb-1">Shared Recommendations</h2>
-                <p class="text-muted mb-0">Live sync from Google Sheets</p>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h2 class="fw-bold mb-0">Shared Recommendations</h2>
+                </div>
+                <p class="text-muted mb-0 small">
+                    Live synchronized directory from Google Sheets
+                </p>
             </div>
-            <span class="badge bg-success bg-gradient px-3 py-2 rounded-pill fs-6 shadow-sm">
-                <i class="bi bi-bookmark-check-fill me-1"></i> {{ notes|length }} Recommendations
-            </span>
+            
+            <div class="d-flex align-items-center gap-3">
+                <span id="total-count-badge" class="count-badge">
+                    <i class="bi bi-bookmark-check-fill me-1" style="color: #60a5fa;"></i>
+                    <span id="visible-count">{{ notes|length }}</span>&nbsp;Items
+                </span>
+            </div>
         </div>
 
         {% if error %}
-            <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}
+            <div class="alert alert-danger alert-custom shadow-sm mb-4 d-flex align-items-center" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
+                <div>{{ error }}</div>
             </div>
         {% endif %}
+
+        <!-- Filter & Search Toolbar -->
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-3 mb-3">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="text" id="recommendationSearch" class="form-control" placeholder="Search by keyword, author, or category..." autocomplete="off">
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <select id="subjectFilter" class="form-select form-select-sm rounded-pill" style="max-width: 200px; font-size: 0.86rem; padding: 7px 14px; border-color: var(--border-subtle);">
+                    <option value="">All Categories</option>
+                </select>
+                <button id="resetFilters" class="btn btn-sm btn-outline-pill px-3 py-1 d-none" title="Clear filters">
+                    <i class="bi bi-x-circle me-1"></i> Clear
+                </button>
+            </div>
+        </div>
 
         <!-- Clean Card Wrapper -->
         <div class="card card-custom">
             <div class="table-responsive">
-                <table class="table table-hover table-custom align-middle mb-0">
+                <table id="recommendationsTable" class="table table-hover table-custom align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="width: 15%;">Date</th>
-                            <th style="width: 30%;">Subject</th>
+                            <th style="width: 14%;">Date</th>
+                            <th style="width: 22%;">Subject</th>
                             <th style="width: 20%;">Shared By</th>
-                            <th style="width: 35%;">Recommendation</th>
+                            <th style="width: 44%;">Recommendation</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="tableBody">
                         {% for row in notes %}
-                            <tr>
+                            <tr class="recommendation-row" data-subject="{{ row.Subject|default:''|lower }}" data-author="{{ row.Shared_By|default:''|lower }}" data-content="{{ row.Recommendation|default:''|lower }}">
                                 <td>
-                                    <span class="text-muted fw-semibold" style="font-size: 0.9rem;">
-                                        <i class="bi bi-calendar3 me-1 opacity-75"></i> {{ row.Date }}
+                                    <span class="date-badge">
+                                        <i class="bi bi-calendar3 me-1 opacity-75"></i> {{ row.Date|default:"—" }}
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="badge-subject">
-                                        {{ row.Subject }}
-                                    </span>
+                                    {% if row.Subject %}
+                                        <span class="badge-subject">
+                                            {{ row.Subject }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="author-avatar">
-                                            {{ row.Shared_By|slice:":1"|upper }}
+                                            {{ row.Shared_By|slice:":1"|upper|default:"?" }}
                                         </div>
-                                        <span class="fw-semibold">{{ row.Shared_By }}</span>
+                                        <span class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ row.Shared_By|default:"Group Member" }}</span>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="recommendation-text">{{ row.Recommendation|urlize|linebreaksbr }}</span>
+                                    <div class="recommendation-text">{{ row.Recommendation|urlize|linebreaksbr }}</div>
                                 </td>
                             </tr>
                         {% empty %}
-                            <tr>
+                            <tr id="serverEmptyRow">
                                 <td colspan="4" class="text-center py-5 text-muted">
                                     <i class="bi bi-journal-x fs-1 d-block mb-3 opacity-50"></i>
-                                    <h5>No recommendations found</h5>
+                                    <h6 class="fw-bold">No recommendations found</h6>
                                     <p class="small mb-0">Add entries to your Google Sheet to see them appear here.</p>
                                 </td>
                             </tr>
@@ -86,10 +116,107 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Empty Search State -->
+            <div id="noMatchState" class="text-center py-5 text-muted d-none">
+                <i class="bi bi-search fs-2 d-block mb-2 opacity-50"></i>
+                <h6 class="fw-bold text-dark mb-1">No matching recommendations found</h6>
+                <p class="small mb-3">Try adjusting your search terms or category filter.</p>
+                <button id="clearSearchBtn" class="btn btn-sm btn-outline-pill px-3 py-1">
+                    Clear Search
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Interactive Client-side Search & Filtering Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('recommendationSearch');
+            const subjectFilter = document.getElementById('subjectFilter');
+            const resetFiltersBtn = document.getElementById('resetFilters');
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+            const rows = Array.from(document.querySelectorAll('.recommendation-row'));
+            const visibleCountElem = document.getElementById('visible-count');
+            const noMatchState = document.getElementById('noMatchState');
+            const tableBody = document.getElementById('tableBody');
+
+            // Populate unique categories into select filter
+            const categories = new Set();
+            rows.forEach(row => {
+                const badge = row.querySelector('.badge-subject');
+                if (badge && badge.textContent.trim()) {
+                    categories.add(badge.textContent.trim());
+                }
+            });
+
+            Array.from(categories).sort().forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.toLowerCase();
+                opt.textContent = cat;
+                subjectFilter.appendChild(opt);
+            });
+
+            function filterRows() {
+                const query = searchInput.value.trim().toLowerCase();
+                const selectedCategory = subjectFilter.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    const subject = row.getAttribute('data-subject') || '';
+                    const author = row.getAttribute('data-author') || '';
+                    const content = row.getAttribute('data-content') || '';
+                    const textCombined = (subject + ' ' + author + ' ' + content + ' ' + row.textContent).toLowerCase();
+
+                    const matchesQuery = !query || textCombined.includes(query);
+                    const matchesCategory = !selectedCategory || subject.includes(selectedCategory);
+
+                    if (matchesQuery && matchesCategory) {
+                        row.style.display = '';
+                        visibleCount++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                visibleCountElem.textContent = visibleCount;
+
+                if (visibleCount === 0 && rows.length > 0) {
+                    noMatchState.classList.remove('d-none');
+                } else {
+                    noMatchState.classList.add('d-none');
+                }
+
+                if (query || selectedCategory) {
+                    resetFiltersBtn.classList.remove('d-none');
+                } else {
+                    resetFiltersBtn.classList.add('d-none');
+                }
+            }
+
+            function resetFilters() {
+                searchInput.value = '';
+                subjectFilter.value = '';
+                filterRows();
+                searchInput.focus();
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', filterRows);
+            }
+            if (subjectFilter) {
+                subjectFilter.addEventListener('change', filterRows);
+            }
+            if (resetFiltersBtn) {
+                resetFiltersBtn.addEventListener('click', resetFilters);
+            }
+            if (clearSearchBtn) {
+                clearSearchBtn.addEventListener('click', resetFilters);
+            }
+        });
+    </script>
 </body>
 </html>
