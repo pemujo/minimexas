@@ -14,36 +14,208 @@
 </head>
 <body>
 
-    <!-- IMPORT REUSABLE NAVBAR COMPONENT -->
+    <!-- REUSABLE STICKY NAVBAR -->
     {% include 'recommendations/navbar.html' with active_page='home' %}
 
-    <!-- Main Content Container -->
-    <div class="container main-container mb-5">
+    <!-- FULL-SCREEN HERO MEDIA CAROUSEL BANNER -->
+    <div class="fullscreen-banner-wrapper">
+        <div id="communityMediaCarousel" class="carousel slide carousel-fade fullscreen-carousel" data-bs-ride="carousel" data-bs-interval="6500" data-bs-pause="hover">
+            
+            <!-- Indicators / Slide Bars -->
+            <div class="carousel-indicators">
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="3" aria-label="Slide 4"></button>
+            </div>
+
+            <!-- Carousel Slides -->
+            <div class="carousel-inner">
+                
+                <!-- Slide 1: Bay Area Scenic Landscape (Image) -->
+                <div class="carousel-item active">
+                    <div class="banner-media-container">
+                        <img src="{% static 'images/banners/bay_area.png' %}" class="d-block w-100 banner-media" alt="San Francisco Bay Area Community">
+                        <div class="banner-overlay"></div>
+                        
+                        <!-- Caption Safely Framed Inside Image -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-geo-alt-fill text-danger me-2"></i> San Francisco Bay Area
+                                    </div>
+                                    <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        Connecting Our Local Community
+                                    </h2>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        Discover verified recommendations, local services, and favorite community spots across the Bay.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-compass me-1"></i> Explore Recommendations
+                                        </a>
+                                        <a href="#dashboard-portal" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-grid-fill me-1"></i> Portal Modules
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Slide 2: Community Gathering (Image) -->
+                <div class="carousel-item">
+                    <div class="banner-media-container">
+                        <img src="{% static 'images/banners/community_event.png' %}" class="d-block w-100 banner-media" alt="Community Gatherings & Events">
+                        <div class="banner-overlay"></div>
+                        
+                        <!-- Caption Safely Framed Inside Image -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-calendar-heart-fill text-warning me-2"></i> Culture, Family & Events
+                                    </div>
+                                    <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        Traditions, Gatherings & Meetups
+                                    </h2>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        Bringing families and friends together for celebrations, picnics, networking, and cultural activities.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="#dashboard-portal" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-calendar-event me-1"></i> Upcoming Meetups
+                                        </a>
+                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-chat-heart me-1"></i> Member Notes
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Slide 3: Culinary & Local Dining (Image) -->
+                <div class="carousel-item">
+                    <div class="banner-media-container">
+                        <img src="{% static 'images/banners/culinary.png' %}" class="d-block w-100 banner-media" alt="Vetted Food and Restaurants">
+                        <div class="banner-overlay"></div>
+                        
+                        <!-- Caption Safely Framed Inside Image -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-shop text-primary me-2"></i> Vetted Local Spots
+                                    </div>
+                                    <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        Authentic Flavors & Recommendations
+                                    </h2>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        From authentic culinary gems to trusted dentists, contractors, and schools — shared by people you know.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-search me-1"></i> Find Recommendations
+                                        </a>
+                                        <a href="#dashboard-portal" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-people me-1"></i> Community Hub
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Slide 4: Video Slide (Supports MP4 videos with poster fallback) -->
+                <div class="carousel-item">
+                    <div class="banner-media-container">
+                        <video class="d-block w-100 banner-media banner-video" autoplay muted loop playsinline poster="{% static 'images/banners/bay_area.png' %}">
+                            <source src="{% static 'videos/banner_loop.mp4' %}" type="video/mp4">
+                            <img src="{% static 'images/banners/bay_area.png' %}" alt="MiniMexas Community Video Banner">
+                        </video>
+                        <div class="banner-overlay"></div>
+                        
+                        <!-- Caption Safely Framed Inside Image/Video -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-play-circle-fill text-danger me-2"></i> Community Highlights
+                                    </div>
+                                    <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        Moments in Motion
+                                    </h2>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        Watch video highlights and memories. Upload custom MP4 video loops directly to your media gallery.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-collection-play me-1"></i> View Portal
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Navigation Controls -->
+            <button class="carousel-control-prev banner-nav-btn" type="button" data-bs-target="#communityMediaCarousel" data-bs-slide="prev">
+                <span class="banner-arrow-box" aria-hidden="true"><i class="bi bi-chevron-left"></i></span>
+                <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next banner-nav-btn" type="button" data-bs-target="#communityMediaCarousel" data-bs-slide="next">
+                <span class="banner-arrow-box" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+                <span class="visually-hidden">Next</span>
+            </button>
+
+            <!-- Bouncing Scroll Down Indicator -->
+            <a href="#dashboard-portal" class="hero-scroll-indicator" title="Scroll to dashboard">
+                <span>Explore</span>
+                <i class="bi bi-chevron-down fs-6"></i>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- MAIN PORTAL DASHBOARD SECTION (Under the Banner) -->
+    <div id="dashboard-portal" class="container main-container py-5">
         
-        <!-- Hero Header -->
-        <div class="text-center py-4 mb-4">
+        <!-- Welcome Header -->
+        <div class="text-center py-2 mb-5">
             <div class="badge-pill-header mb-3">
-                <i class="bi bi-geo-alt-fill me-2 text-danger"></i>
-                <span>Bay Area Community Hub</span>
+                <i class="bi bi-shield-check text-primary me-2"></i>
+                <span>Verified Member Portal</span>
             </div>
             
-            <h1 class="fw-bold text-dark display-6 mb-2">
+            <h2 class="fw-bold text-dark display-6 mb-2">
                 Welcome, {{ request.session.member_name|default:"Member" }}
-            </h1>
-            <p class="text-secondary mx-auto" style="max-width: 640px; font-size: 1.05rem;">
-                Your private portal for trusted recommendations, upcoming events, and shared community resources across the San Francisco Bay Area.
+            </h2>
+            <p class="text-secondary mx-auto mb-0" style="max-width: 640px; font-size: 1.05rem;">
+                Your private dashboard for trusted recommendations, upcoming events, and shared community resources across the San Francisco Bay Area.
             </p>
         </div>
 
         <!-- Modules Grid -->
-        <div class="row g-4 justify-content-center">
+        <div class="row g-4 justify-content-center mb-5">
             
             <!-- 1. Recommendation Module Card (Active) -->
             <div class="col-md-6 col-lg-4">
                 <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
-                            <div class="feature-icon-box bg-emerald-subtle me-3">
+                            <div class="feature-icon-box bg-blue-subtle me-3">
                                 <i class="bi bi-chat-heart-fill"></i>
                             </div>
                             <div>
@@ -91,7 +263,7 @@
                 <div class="card card-custom card-dashed h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
-                            <div class="feature-icon-box bg-blue-subtle me-3">
+                            <div class="feature-icon-box bg-indigo-subtle me-3">
                                 <i class="bi bi-people-fill"></i>
                             </div>
                             <div>
@@ -112,10 +284,10 @@
         </div>
 
         <!-- Bottom Community Note -->
-        <div class="text-center mt-5 pt-3">
+        <div class="text-center pt-2">
             <div class="card bg-white border p-3 rounded-4 d-inline-block shadow-sm mx-auto">
                 <span class="text-muted small">
-                    <i class="bi bi-info-circle-fill text-teal me-1" style="color: var(--brand-primary);"></i>
+                    <i class="bi bi-info-circle-fill me-1" style="color: var(--brand-primary);"></i>
                     Have a recommendation or want to suggest a new event? Share it in our WhatsApp group to have it synced here.
                 </span>
             </div>

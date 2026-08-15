@@ -559,3 +559,214 @@ a:hover {
     font-size: 0.9rem;
     border: 1px solid transparent;
 }
+
+/* ==========================================================================
+   Full-Screen Media Banner & Carousel (Images & Videos)
+   ========================================================================== */
+.fullscreen-banner-wrapper {
+    position: relative;
+    width: 100vw;
+    max-width: 100%;
+    height: calc(100vh - 65px);
+    min-height: 560px;
+    overflow: hidden;
+    background: var(--brand-navy-950);
+}
+
+@supports (height: 100dvh) {
+    .fullscreen-banner-wrapper {
+        height: calc(100dvh - 65px);
+    }
+}
+
+.fullscreen-carousel,
+.fullscreen-carousel .carousel-inner,
+.fullscreen-carousel .carousel-item {
+    height: 100%;
+    width: 100%;
+}
+
+.banner-media-container {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: var(--brand-navy-950);
+}
+
+.banner-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transform: scale(1.04);
+    transition: transform 7s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.carousel-item.active .banner-media {
+    transform: scale(1);
+}
+
+.banner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.banner-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, 
+        rgba(10, 15, 29, 0.3) 0%, 
+        rgba(10, 15, 29, 0.45) 45%, 
+        rgba(10, 15, 29, 0.92) 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+.banner-caption-container {
+    position: absolute;
+    bottom: 4.5rem;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.banner-glass-card {
+    background: rgba(10, 15, 29, 0.78);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem 2.25rem;
+    max-width: 640px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+}
+
+@media (max-width: 992px) {
+    .banner-glass-card {
+        max-width: 540px;
+        padding: 1.5rem 1.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .banner-caption-container {
+        bottom: 3.5rem;
+    }
+    .banner-glass-card {
+        padding: 1.25rem 1.25rem;
+        margin: 0;
+        max-width: 100%;
+        border-radius: var(--radius-md);
+    }
+}
+
+.hero-scroll-indicator {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(10, 15, 29, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    animation: bounceDown 2.4s infinite;
+}
+
+.hero-scroll-indicator:hover {
+    color: #38bdf8;
+    background: rgba(10, 15, 29, 0.85);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+@keyframes bounceDown {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateX(-50%) translateY(0);
+    }
+    40% {
+        transform: translateX(-50%) translateY(6px);
+    }
+    60% {
+        transform: translateX(-50%) translateY(3px);
+    }
+}
+
+.banner-nav-btn {
+    width: 60px;
+    opacity: 0.85;
+    z-index: 5;
+    transition: opacity 0.2s ease;
+}
+
+.banner-nav-btn:hover {
+    opacity: 1;
+}
+
+.banner-arrow-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(10, 15, 29, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 1.2rem;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.banner-arrow-box:hover {
+    background: var(--brand-primary);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.carousel-indicators {
+    z-index: 5;
+    margin-bottom: 1.4rem;
+    justify-content: flex-end;
+    margin-right: 2rem;
+}
+
+@media (max-width: 768px) {
+    .carousel-indicators {
+        justify-content: center;
+        margin-right: 0;
+        margin-bottom: 3.5rem;
+    }
+}
+
+.carousel-indicators [data-bs-target] {
+    width: 28px;
+    height: 4px;
+    border-radius: 4px;
+    border: none;
+    background-color: rgba(255, 255, 255, 0.4);
+    transition: all 0.25s ease;
+}
+
+.carousel-indicators .active {
+    background-color: #38bdf8;
+    width: 48px;
+}
+
+

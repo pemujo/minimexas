@@ -15,24 +15,168 @@
 
 <body>
 
-    <div class="login-wrapper">
+    <!-- TOP HEADER / NAVBAR FOR UNAUTHENTICATED USERS -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-whatsapp sticky-top mb-0">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'login_page' %}">
+                <div class="brand-icon-box me-2">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <span>MiniMexas <span class="fw-normal text-white-50 fs-6 ms-1">Portal</span></span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2">
+                <a href="#signin-section" class="btn btn-sm btn-outline-light rounded-pill px-3 py-1 fw-semibold">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- FULL-SCREEN HERO MEDIA CAROUSEL BANNER (2 Dedicated Unauthenticated Images) -->
+    <div class="fullscreen-banner-wrapper">
+        <div id="unauthMediaCarousel" class="carousel slide carousel-fade fullscreen-carousel" data-bs-ride="carousel" data-bs-interval="6500" data-bs-pause="hover">
+            
+            <!-- Indicators / Slide Bars -->
+            <div class="carousel-indicators">
+                <button type="button" data-bs-target="#unauthMediaCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+                <button type="button" data-bs-target="#unauthMediaCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+            </div>
+
+            <!-- Carousel Slides -->
+            <div class="carousel-inner">
+                
+                <!-- Slide 1: Welcoming Community Gathering (Image) -->
+                <div class="carousel-item active">
+                    <div class="banner-media-container">
+                        <img src="{% static 'images/banners/unauth_welcome.png' %}" class="d-block w-100 banner-media" alt="MiniMexas Bay Area Community Gathering">
+                        <div class="banner-overlay"></div>
+                        
+                        <!-- Caption Card Inside Image -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-geo-alt-fill text-danger me-2"></i> Private Bay Area Hub
+                                    </div>
+                                    <h1 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        MiniMexas Community Portal
+                                    </h1>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        A private, member-driven hub built to connect, empower, and support our Mexican community across the Bay Area.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{% url 'gmail_login' %}" class="btn btn-sm btn-google rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center">
+                                            <svg class="me-2" width="16" height="16" viewBox="0 0 18 18">
+                                                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.617z"/>
+                                                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
+                                                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                                                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+                                            </svg>
+                                            <span>Sign in with Google</span>
+                                        </a>
+                                        <a href="#signin-section" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-info-circle me-1"></i> Learn More
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Slide 2: Scenic SF Skyline & Coastal Twilight (Image) -->
+                <div class="carousel-item">
+                    <div class="banner-media-container">
+                        <img src="{% static 'images/banners/unauth_skyline.png' %}" class="d-block w-100 banner-media" alt="San Francisco Bay Skyline at Twilight">
+                        <div class="banner-overlay"></div>
+                        
+                        <!-- Caption Card Inside Image -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-shield-check text-primary me-2"></i> Verified Members Only
+                                    </div>
+                                    <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        Trusted Recommendations & Events
+                                    </h2>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        Access vetted local recommendations, meetup calendars, and community resources shared by verified group members.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{% url 'gmail_login' %}" class="btn btn-sm btn-google rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center">
+                                            <svg class="me-2" width="16" height="16" viewBox="0 0 18 18">
+                                                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.617z"/>
+                                                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
+                                                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                                                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+                                            </svg>
+                                            <span>Sign in with Google</span>
+                                        </a>
+                                        <a href="#signin-section" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-info-circle me-1"></i> Learn More
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Navigation Controls -->
+            <button class="carousel-control-prev banner-nav-btn" type="button" data-bs-target="#unauthMediaCarousel" data-bs-slide="prev">
+                <span class="banner-arrow-box" aria-hidden="true"><i class="bi bi-chevron-left"></i></span>
+                <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next banner-nav-btn" type="button" data-bs-target="#unauthMediaCarousel" data-bs-slide="next">
+                <span class="banner-arrow-box" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+                <span class="visually-hidden">Next</span>
+            </button>
+
+            <!-- Bouncing Scroll Down Indicator -->
+            <a href="#signin-section" class="hero-scroll-indicator" title="Scroll to sign in section">
+                <span>Sign In</span>
+                <i class="bi bi-chevron-down fs-6"></i>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- MAIN VALUE PROPOSITION & SIGN-IN SECTION (Under the Banner) -->
+    <div id="signin-section" class="py-5" style="background-color: var(--bg-canvas);">
         <div class="container" style="max-width: 1060px;">
+
+            {% if error %}
+            <div class="alert alert-danger alert-custom py-3 px-4 shadow-sm mb-4 d-flex align-items-center" role="alert">
+                <i class="bi bi-exclamation-triangle-fill fs-4 me-3 flex-shrink-0 text-danger"></i>
+                <div>
+                    <h6 class="fw-bold mb-1">Access Restricted</h6>
+                    <div class="small">{{ error }}</div>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="row g-5 align-items-center justify-content-between">
 
                 <!-- Left Column: Community Overview & Value Proposition -->
                 <div class="col-lg-7 pe-lg-4">
 
                     <div class="badge-pill-header mb-3">
-                        <i class="bi bi-geo-alt-fill me-2 text-danger"></i>
-                        <span>Bay Area Community</span>
+                        <i class="bi bi-shield-check text-primary me-2"></i>
+                        <span>Private Member Portal</span>
                     </div>
 
-                    <h1 class="display-5 fw-bold text-dark mb-3" style="letter-spacing: -0.03em;">
-                        MiniMexas Community Hub
-                    </h1>
+                    <h2 class="display-6 fw-bold text-dark mb-3" style="letter-spacing: -0.03em;">
+                        Built For Our Bay Area Community
+                    </h2>
 
                     <p class="text-secondary mb-4" style="font-size: 1.05rem;">
-                        A private, member-driven portal built to connect, empower, and support our community across the San Francisco Bay Area.
+                        A member-driven portal built to connect, empower, and support our community across the San Francisco Bay Area.
                     </p>
 
                     <!-- Feature Highlights -->
@@ -40,7 +184,7 @@
 
                         <!-- Recommendations Item -->
                         <div class="d-flex align-items-start feature-list-item">
-                            <div class="feature-icon-box bg-emerald-subtle me-3">
+                            <div class="feature-icon-box bg-blue-subtle me-3">
                                 <i class="bi bi-chat-heart-fill"></i>
                             </div>
                             <div>
@@ -66,11 +210,11 @@
 
                         <!-- Community Resources Item -->
                         <div class="d-flex align-items-start feature-list-item">
-                            <div class="feature-icon-box bg-blue-subtle me-3">
+                            <div class="feature-icon-box bg-indigo-subtle me-3">
                                 <i class="bi bi-people-fill"></i>
                             </div>
                             <div>
-                                <h6 class="fw-bold mb-1 text-dark">Community Resources & Additions</h6>
+                                <h6 class="fw-bold mb-1 text-dark">Community Resources & Tools</h6>
                                 <p class="text-muted small mb-0">
                                     Access shared planning tools, group notes, and helpful resources designed for our community.
                                 </p>
@@ -88,11 +232,11 @@
 
                 <!-- Right Column: Sign In Card -->
                 <div class="col-lg-5 col-md-8 mx-auto">
-                    <div class="card login-card p-4 p-md-5 text-center">
+                    <div class="card login-card p-4 p-md-5 text-center shadow-lg">
 
                         <div class="mb-4">
                             <div class="author-avatar mx-auto mb-3"
-                                style="width: 54px; height: 54px; font-size: 1.4rem;">
+                                style="width: 56px; height: 56px; font-size: 1.4rem;">
                                 <i class="bi bi-shield-lock-fill"></i>
                             </div>
                             <h3 class="fw-bold text-dark mb-1">Member Sign In</h3>
@@ -100,14 +244,6 @@
                                 Sign in with your verified Gmail account to access group recommendations and tools.
                             </p>
                         </div>
-
-                        {% if error %}
-                        <div class="alert alert-danger alert-custom py-2 px-3 small mb-3 text-start d-flex align-items-center"
-                            role="alert">
-                            <i class="bi bi-exclamation-circle-fill me-2 flex-shrink-0"></i>
-                            <div>{{ error }}</div>
-                        </div>
-                        {% endif %}
 
                         <a href="{% url 'gmail_login' %}"
                             class="btn btn-google py-3 w-100 rounded-pill d-flex align-items-center justify-content-center mb-3">
