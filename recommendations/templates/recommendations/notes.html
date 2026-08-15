@@ -1,0 +1,95 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Recommendations</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Project-Wide Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+<body>
+
+    <!-- IMPORT NAVBAR HERE -->
+    {% include 'recommendations/navbar.html' with active_page='recommendations' %}
+
+    <!-- Main Content Container -->
+    <div class="container main-container mb-5">
+        
+        <!-- Header Row -->
+        <div class="d-flex justify-content-between align-items-end mb-4">
+            <div>
+                <h2 class="fw-bold mb-1">Shared Recommendations</h2>
+                <p class="text-muted mb-0">Live sync from Google Sheets</p>
+            </div>
+            <span class="badge bg-success bg-gradient px-3 py-2 rounded-pill fs-6 shadow-sm">
+                <i class="bi bi-bookmark-check-fill me-1"></i> {{ notes|length }} Recommendations
+            </span>
+        </div>
+
+        {% if error %}
+            <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}
+            </div>
+        {% endif %}
+
+        <!-- Clean Card Wrapper -->
+        <div class="card card-custom">
+            <div class="table-responsive">
+                <table class="table table-hover table-custom align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Date</th>
+                            <th style="width: 30%;">Subject</th>
+                            <th style="width: 20%;">Shared By</th>
+                            <th style="width: 35%;">Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in notes %}
+                            <tr>
+                                <td>
+                                    <span class="text-muted fw-semibold" style="font-size: 0.9rem;">
+                                        <i class="bi bi-calendar3 me-1 opacity-75"></i> {{ row.Date }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge-subject">
+                                        {{ row.Subject }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="author-avatar">
+                                            {{ row.Shared_By|slice:":1"|upper }}
+                                        </div>
+                                        <span class="fw-semibold">{{ row.Shared_By }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="recommendation-text">{{ row.Recommendation|urlize|linebreaksbr }}</span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-5 text-muted">
+                                    <i class="bi bi-journal-x fs-1 d-block mb-3 opacity-50"></i>
+                                    <h5>No recommendations found</h5>
+                                    <p class="small mb-0">Add entries to your Google Sheet to see them appear here.</p>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

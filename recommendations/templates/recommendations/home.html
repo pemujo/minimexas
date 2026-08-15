@@ -1,0 +1,129 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Portal - MiniMexas</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Project-Wide Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+<body class="bg-light">
+
+    <!-- IMPORT REUSABLE NAVBAR COMPONENT -->
+    {% include 'recommendations/navbar.html' with active_page='home' %}
+
+    <!-- Main Content Container -->
+    <div class="container main-container mb-5">
+        
+        <!-- Hero Header -->
+        <div class="text-center py-4 mb-4">
+            <div class="d-inline-flex align-items-center bg-white text-success px-3 py-1 rounded-pill shadow-sm mb-3 border">
+                <i class="bi bi-geo-alt-fill me-2 text-danger"></i>
+                <span class="fw-semibold small">Bay Area Community Hub</span>
+            </div>
+            
+            <h1 class="fw-bold text-dark display-5 mb-2">
+                Welcome, {{ request.session.member_name|default:"Member" }}!
+            </h1>
+            <p class="lead text-secondary mx-auto" style="max-width: 680px;">
+                Your private space for trusted recommendations, upcoming events, and community resources across the San Francisco Bay Area.
+            </p>
+        </div>
+
+        <!-- Modules Grid -->
+        <div class="row g-4 justify-content-center">
+            
+            <!-- 1. Recommendation Module Card (Active) -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between shadow-sm">
+                    <div>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon-box bg-emerald-subtle me-3" style="width: 50px; height: 50px; font-size: 1.4rem;">
+                                <i class="bi bi-chat-heart-fill"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">Recommendations</h5>
+                                <small class="text-success fw-semibold">
+                                    <i class="bi bi-broadcast me-1"></i> Live Sheets Sync
+                                </small>
+                            </div>
+                        </div>
+                        <p class="text-secondary mb-4 small">
+                            Browse vetted local services, doctors, restaurants, schools, and favorite spots shared directly across our WhatsApp group.
+                        </p>
+                    </div>
+                    <a href="{% url 'recommendations:notes_list' %}" class="btn btn-success bg-gradient fw-bold py-2 rounded-pill shadow-sm">
+                        View Recommendations <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 2. Events & Meetups Module (Upcoming) -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card card-custom h-100 p-4 border-dashed bg-white d-flex flex-column justify-content-between shadow-sm">
+                    <div>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon-box bg-amber-subtle me-3" style="width: 50px; height: 50px; font-size: 1.4rem;">
+                                <i class="bi bi-calendar-event-fill"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">Events & Meetups</h5>
+                                <small class="text-muted">Coming Soon</small>
+                            </div>
+                        </div>
+                        <p class="text-secondary mb-4 small">
+                            Stay up to date with cultural gatherings, family picnics, networking meetups, and local community activities in the Bay Area.
+                        </p>
+                    </div>
+                    <button class="btn btn-outline-secondary disabled fw-semibold py-2 rounded-pill">
+                        <i class="bi bi-hourglass-split me-1"></i> In Progress
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Community Resources & Tools Module (Upcoming) -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card card-custom h-100 p-4 border-dashed bg-white d-flex flex-column justify-content-between shadow-sm">
+                    <div>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon-box bg-blue-subtle me-3" style="width: 50px; height: 50px; font-size: 1.4rem;">
+                                <i class="bi bi-people-fill"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">Community Tools</h5>
+                                <small class="text-muted">Coming Soon</small>
+                            </div>
+                        </div>
+                        <p class="text-secondary mb-4 small">
+                            Shared resources, newcomer guides, group documents, and collective planning tools designed to support our community.
+                        </p>
+                    </div>
+                    <button class="btn btn-outline-secondary disabled fw-semibold py-2 rounded-pill">
+                        <i class="bi bi-hourglass-split me-1"></i> In Progress
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Community Note -->
+        <div class="text-center mt-5 pt-3">
+            <div class="card bg-white border p-3 rounded-4 d-inline-block shadow-sm mx-auto">
+                <span class="text-muted small">
+                    <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                    Have a recommendation or want to suggest a new event? Share it in our WhatsApp group to have it synced here.
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
