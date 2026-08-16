@@ -76,14 +76,15 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
         credentials.refresh(Request())
         token = credentials.token
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        # Fetch from up to 1 year in the past to allow viewing past events
+        past_window = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)
         api_url = f"https://www.googleapis.com/calendar/v3/calendars/{quote_plus(calendar_id)}/events"
         headers = {"Authorization": f"Bearer {token}"}
         params = {
             "singleEvents": "true",
             "orderBy": "startTime",
-            "timeMin": now_iso,
-            "maxResults": 100,
+            "timeMin": past_window.isoformat(),
+            "maxResults": 250,
         }
 
         response = requests.get(api_url, headers=headers, params=params, timeout=10)
@@ -94,6 +95,7 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
         data = response.json()
         items = data.get("items", [])
         events = []
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
 
         for idx, item in enumerate(items):
             start_raw = item.get("start", {}).get("dateTime") or item.get("start", {}).get("date")
@@ -116,6 +118,13 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
             elif any(k in summary.lower() for k in ["taco", "dinner", "food", "brunch", "drinks"]):
                 category = "Culinary & Social"
 
+            # Check if event has ended
+            is_past = False
+            if hasattr(end_dt, 'tzinfo') and end_dt.tzinfo is not None:
+                is_past = end_dt < now_utc
+            elif isinstance(end_dt, datetime.datetime):
+                is_past = end_dt < datetime.datetime.now()
+
             events.append({
                 "id": item.get("id", f"gcal_{idx}"),
                 "title": summary,
@@ -132,6 +141,7 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
                 "year": start_dt.year,
                 "month": start_dt.month,
                 "day": start_dt.day,
+                "is_past": is_past,
             })
 
         return events

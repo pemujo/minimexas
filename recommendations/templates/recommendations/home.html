@@ -352,27 +352,26 @@
                 </div>
             </div>
 
-            <!-- 3. Community Resources & Tools Module (Upcoming) -->
+            <!-- 3. Member Profile & Region Module (Active) -->
             <div class="col-md-6 col-lg-4">
-                <div class="card card-custom card-dashed h-100 p-4 d-flex flex-column justify-content-between">
+                <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
                             <div class="feature-icon-box bg-indigo-subtle me-3">
-                                <i class="bi bi-people-fill"></i>
+                                <i class="bi bi-person-gear"></i>
                             </div>
                             <div>
-                                <h5 class="fw-bold mb-0 text-dark">Community Tools</h5>
-                                <small class="text-muted">Coming Soon</small>
+                                <h5 class="fw-bold mb-0 text-dark">Member Profile</h5>
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.72rem;">Location & Region</span>
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Shared resources, newcomer guides, group documents, and collective planning tools designed
-                            to support our community.
+                            Add your contact details and Bay Area region (SF, Peninsula, South Bay, East Bay) to help organizers coordinate events near you.
                         </p>
                     </div>
-                    <button class="btn btn-outline-pill disabled py-2 text-center" disabled>
-                        <i class="bi bi-hourglass-split me-1"></i> In Progress
-                    </button>
+                    <a href="{% url 'profile' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
+                        Manage Profile & Region <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
                 </div>
             </div>
 

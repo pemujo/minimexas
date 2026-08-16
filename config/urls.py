@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.contrib import admin
 from django.urls import path, include
 from recommendations.views import (
     home_view, 
@@ -8,13 +7,18 @@ from recommendations.views import (
     google_callback_view, 
     dev_login_view,
     logout_view,
-    events_view
+    events_view,
+    profile_view,
+    organizer_dashboard_view,
+    export_members_csv_view
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('', home_view, name='home'),
     path('events/', events_view, name='events'),
+    path('profile/', profile_view, name='profile'),
+    path('organizers/', organizer_dashboard_view, name='organizer_dashboard'),
+    path('organizers/export/', export_members_csv_view, name='export_members_csv'),
     path('login/', login_page_view, name='login_page'),
     path('auth/google/', gmail_login_view, name='gmail_login'),
     path('auth/callback/', google_callback_view, name='google_callback'),

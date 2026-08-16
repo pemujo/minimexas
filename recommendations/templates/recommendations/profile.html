@@ -1,0 +1,333 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile & Account - MiniMexitas Community</title>
+    <meta name="description" content="Manage your MiniMexitas profile, account information, and Bay Area region preferences for community event planning.">
+    
+    <!-- OpenGraph / Social Meta Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="My Profile - MiniMexitas Community Portal">
+    <meta property="og:description" content="Manage your MiniMexitas profile and Bay Area location details.">
+    <meta property="og:image" content="{% static 'images/minimexitas_og.png' %}">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS & Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    {% include 'recommendations/navbar.html' %}
+
+    <main class="container py-4 py-md-5">
+
+        <!-- Page Header & Breadcrumb -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <nav aria-label="breadcrumb" class="mb-2">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted">Home</a></li>
+                        <li class="breadcrumb-item active text-dark fw-semibold" aria-current="page">My Profile</li>
+                    </ol>
+                </nav>
+                <div class="d-flex flex-column flex-md-row md-align-items-center justify-content-between gap-2">
+                    <div>
+                        <h2 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                            <i class="bi bi-person-gear text-primary"></i> Member Account & Profile
+                        </h2>
+                        <p class="text-muted small mb-0">
+                            Keep your contact information and Bay Area region up to date to help organizers plan future events near you.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flash Success Notification -->
+        {% if success_message %}
+        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm d-flex align-items-center mb-4" role="alert" style="background-color: #ecfdf5; border-left: 4px solid #10b981 !important;">
+            <i class="bi bi-check-circle-fill text-success fs-5 me-2"></i>
+            <div>
+                <strong class="text-success">Success!</strong> {{ success_message }}
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <div class="row g-4">
+            
+            <!-- Left Sidebar: Profile Overview & Community Insights -->
+            <div class="col-lg-4">
+                
+                <!-- Profile Identity Card -->
+                <div class="profile-card mb-4">
+                    <div class="profile-card-header text-center py-4">
+                        <div class="profile-avatar-circle mx-auto mb-3">
+                            {{ profile.full_name|default:member_name|slice:":1"|upper }}
+                        </div>
+                        <h4 class="fw-bold mb-1 text-white">{{ profile.full_name|default:member_name }}</h4>
+                        <div class="badge bg-white bg-opacity-25 text-white fw-semibold rounded-pill px-3 py-1 text-truncate" style="max-width: 90%;">
+                            <i class="bi bi-google me-1"></i> {{ profile.email }}
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-3">
+                            <label class="text-muted small text-uppercase fw-semibold mb-1 d-block">Membership Status</label>
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-shield-check me-1"></i> Verified Community Member
+                            </span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="text-muted small text-uppercase fw-semibold mb-1 d-block">Your Region</label>
+                            {% if profile.region %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ profile.get_region_display }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Region not set
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if profile.city %}
+                        <div class="mb-3">
+                            <label class="text-muted small text-uppercase fw-semibold mb-1 d-block">City / Neighborhood</label>
+                            <div class="text-dark fw-medium small">
+                                <i class="bi bi-building me-1 text-secondary"></i> {{ profile.city }}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="pt-3 border-top text-muted" style="font-size: 0.78rem;">
+                            <i class="bi bi-clock-history me-1"></i> Last updated {{ profile.updated_at|date:"M d, Y, g:i a" }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Why Region Matters Card -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4" style="background: linear-gradient(145deg, #f8fafc, #edf4ff); border: 1px solid #dbeafe !important;">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                                <i class="bi bi-map-fill"></i>
+                            </div>
+                            <h6 class="fw-bold text-dark mb-0">Why We Ask for Your Region</h6>
+                        </div>
+                        <p class="text-muted small mb-0" style="line-height: 1.55;">
+                            MiniMexitas members are spread across the San Francisco Bay Area. Telling us where you live helps our organizers schedule <strong>picnics, cultural celebrations, and dinners</strong> at central, accessible venues for everyone.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Community Region Insights -->
+                {% if region_stats %}
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold text-dark mb-3 d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-pie-chart-fill text-primary me-2"></i> Member Distribution</span>
+                            <span class="badge bg-light text-muted border font-monospace">{{ total_region_responses }} responses</span>
+                        </h6>
+                        <div class="d-flex flex-column gap-3">
+                            {% for stat in region_stats %}
+                            <div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="fw-medium text-dark">{{ stat.region_label }}</span>
+                                    <span class="text-muted font-monospace">{{ stat.percentage }}% ({{ stat.count }})</span>
+                                </div>
+                                <div class="region-progress-bar">
+                                    <div class="region-progress-fill" style="width: {{ stat.percentage }}%;"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+
+            <!-- Right Column: Profile Edit Form -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
+                    
+                    <form method="POST" action="{% url 'profile' %}">
+                        {% csrf_token %}
+
+                        <!-- Section 1: Contact & Personal Details -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center">
+                                <i class="bi bi-person-badge text-primary me-2"></i> Personal Details
+                            </h5>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="fullNameInput" class="form-label-custom">
+                                        <span>Full Name <span class="text-danger">*</span></span>
+                                    </label>
+                                    <input type="text" class="form-control" id="fullNameInput" name="full_name" value="{{ profile.full_name }}" required placeholder="e.g., Maria Gonzalez">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="emailInput" class="form-label-custom">
+                                        <span>Google Email</span>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.72rem;">Verified</span>
+                                    </label>
+                                    <input type="email" class="form-control bg-light text-muted" id="emailInput" value="{{ profile.email }}" readonly disabled>
+                                    <div class="form-text" style="font-size: 0.78rem;">Email verified via Google Sign-In.</div>
+                                </div>
+
+                                <div class="col-md-12">
+                                    <label for="phoneInput" class="form-label-custom">
+                                        <span>WhatsApp / Mobile Phone</span>
+                                        <span class="text-muted fw-normal small">Optional</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-whatsapp text-success"></i></span>
+                                        <input type="tel" class="form-control" id="phoneInput" name="phone_number" value="{{ profile.phone_number }}" placeholder="e.g., +1 (415) 555-0123">
+                                    </div>
+                                    <div class="form-text" style="font-size: 0.78rem;">Used by community organizers for event notifications & WhatsApp group coordination.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 text-muted opacity-25">
+
+                        <!-- Section 2: Bay Area Region & Location (Key Feature) -->
+                        <div class="mb-4">
+                            <div class="profile-region-highlight mb-3">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="bi bi-geo-alt-fill text-danger fs-5"></i>
+                                    <h5 class="fw-bold text-dark mb-0">Bay Area Region & Location</h5>
+                                    <span class="badge bg-primary text-white ms-auto">Event Planning Key</span>
+                                </div>
+                                <p class="text-secondary small mb-3">
+                                    Select the general region where you reside. This helps us decide where to host gatherings, picnics, playdates, and dinners.
+                                </p>
+
+                                <div class="row g-3">
+                                    <div class="col-md-7">
+                                        <label for="regionSelect" class="form-label-custom">
+                                            <span>Bay Area Region <span class="text-danger">*</span></span>
+                                        </label>
+                                        <select class="form-select border-primary" id="regionSelect" name="region" required>
+                                            <option value="" {% if not profile.region %}selected{% endif %} disabled>-- Select Your Bay Area Region --</option>
+                                            {% for code, name in region_choices %}
+                                            <option value="{{ code }}" {% if profile.region == code %}selected{% endif %}>{{ name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-5">
+                                        <label for="cityInput" class="form-label-custom">
+                                            <span>City or Neighborhood</span>
+                                            <span class="text-muted fw-normal small">Optional</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="cityInput" name="city" value="{{ profile.city }}" placeholder="e.g., Sunnyvale, Mission SF, Berkeley">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 text-muted opacity-25">
+
+                        <!-- Section 3: Community & Event Preferences -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center">
+                                <i class="bi bi-balloon-heart text-danger me-2"></i> Family & Event Interests
+                            </h5>
+
+                            <div class="mb-3">
+                                <label for="familyInfoInput" class="form-label-custom">
+                                    <span>Family & Kids Details</span>
+                                    <span class="text-muted fw-normal small">Optional</span>
+                                </label>
+                                <input type="text" class="form-control" id="familyInfoInput" name="family_info" value="{{ profile.family_info }}" placeholder="e.g., 2 kids (ages 3 and 6), expecting, or no kids">
+                                <div class="form-text" style="font-size: 0.78rem;">Helps us design age-appropriate activities and kid-friendly park meetups.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label-custom mb-2">
+                                    <span>What kinds of events are you interested in?</span>
+                                </label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <input type="checkbox" class="btn-check" id="int_cultural" name="interests" value="Cultural & Traditional Celebrations" {% if "Cultural" in profile.interests %}checked{% endif %}>
+                                    <label class="interest-checkbox-label" for="int_cultural">
+                                        <i class="bi bi-star me-1"></i> Cultural Celebrations (Día de Muertos, Posadas)
+                                    </label>
+
+                                    <input type="checkbox" class="btn-check" id="int_family" name="interests" value="Family & Kids Outings" {% if "Family" in profile.interests %}checked{% endif %}>
+                                    <label class="interest-checkbox-label" for="int_family">
+                                        <i class="bi bi-people me-1"></i> Family & Park Days
+                                    </label>
+
+                                    <input type="checkbox" class="btn-check" id="int_culinary" name="interests" value="Culinary & Dining" {% if "Culinary" in profile.interests or "Dining" in profile.interests %}checked{% endif %}>
+                                    <label class="interest-checkbox-label" for="int_culinary">
+                                        <i class="bi bi-cup-hot me-1"></i> Food, Taquerías & Mezcal
+                                    </label>
+
+                                    <input type="checkbox" class="btn-check" id="int_tech" name="interests" value="Tech & Professional Networking" {% if "Tech" in profile.interests or "Networking" in profile.interests %}checked{% endif %}>
+                                    <label class="interest-checkbox-label" for="int_tech">
+                                        <i class="bi bi-briefcase me-1"></i> Tech & Networking
+                                    </label>
+
+                                    <input type="checkbox" class="btn-check" id="int_outdoors" name="interests" value="Outdoors & Hikes" {% if "Outdoors" in profile.interests or "Hikes" in profile.interests %}checked{% endif %}>
+                                    <label class="interest-checkbox-label" for="int_outdoors">
+                                        <i class="bi bi-tree me-1"></i> Outdoors & Hiking
+                                    </label>
+
+                                    <input type="checkbox" class="btn-check" id="int_arts" name="interests" value="Arts, Workshops & Crafts" {% if "Arts" in profile.interests or "Crafts" in profile.interests %}checked{% endif %}>
+                                    <label class="interest-checkbox-label" for="int_arts">
+                                        <i class="bi bi-palette me-1"></i> Arts & Workshops
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="bioInput" class="form-label-custom">
+                                    <span>About You / Notes</span>
+                                    <span class="text-muted fw-normal small">Optional</span>
+                                </label>
+                                <textarea class="form-control" id="bioInput" name="bio" rows="3" placeholder="Tell us a little about where in Mexico you are from, what you do in the Bay Area, or any ideas you'd love to share!">{{ profile.bio }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="pt-3 border-top d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                            <span class="text-muted small">
+                                <i class="bi bi-lock-fill text-secondary me-1"></i> Your details are visible only to verified group members.
+                            </span>
+                            <button type="submit" class="btn btn-primary-action px-4 py-2 fw-semibold">
+                                <i class="bi bi-check2-circle me-1"></i> Save Profile Details
+                            </button>
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Site Footer -->
+    {% include 'recommendations/footer.html' %}
+
+    <!-- Bootstrap 5 JavaScript Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

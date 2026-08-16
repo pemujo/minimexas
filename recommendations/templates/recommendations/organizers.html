@@ -1,0 +1,362 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizer Dashboard - MiniMexitas Community</title>
+    <meta name="description" content="Organizer & Admin dashboard for MiniMexitas event planning and member region analytics.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS & Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+<body class="bg-light">
+
+    <!-- Top Navigation Bar -->
+    {% include 'recommendations/navbar.html' %}
+
+    <main class="container py-4 py-md-5">
+
+        <!-- Page Header & Actions -->
+        <div class="row mb-4 align-items-center justify-content-between g-3">
+            <div class="col-lg-8">
+                <nav aria-label="breadcrumb" class="mb-2">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted">Home</a></li>
+                        <li class="breadcrumb-item active text-dark fw-semibold" aria-current="page">Organizer Dashboard</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark border border-warning px-2 py-1 fw-bold font-monospace" style="font-size: 0.75rem;">
+                        <i class="bi bi-shield-lock-fill me-1"></i> ORGANIZER PORTAL
+                    </span>
+                    <h2 class="fw-bold text-dark mb-0">Community Insights & Event Planning</h2>
+                </div>
+                <p class="text-muted small mb-0">
+                    Review member region preferences to choose the best meetup locations and access the verified community directory.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <a href="{% url 'export_members_csv' %}" class="btn btn-outline-dark rounded-pill px-3 py-2 fw-semibold shadow-sm">
+                    <i class="bi bi-file-earmark-spreadsheet-fill text-success me-1"></i> Export Members CSV
+                </a>
+            </div>
+        </div>
+
+        <!-- 4 KPI Metrics Row -->
+        <div class="row g-3 mb-4">
+            
+            <div class="col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="feature-icon-box bg-blue-subtle text-primary">
+                            <i class="bi bi-people-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Total Members</div>
+                            <div class="fs-3 fw-bold text-dark">{{ total_members }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="feature-icon-box bg-green-subtle text-success">
+                            <i class="bi bi-geo-alt-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Regions Specified</div>
+                            <div class="fs-3 fw-bold text-dark">{{ total_with_region }} <span class="fs-6 fw-normal text-muted">/ {{ total_members }}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="feature-icon-box bg-amber-subtle text-warning">
+                            <i class="bi bi-star-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Top Bay Region</div>
+                            <div class="fs-6 fw-bold text-dark text-truncate" style="max-width: 140px;" title="{{ top_region }}">{{ top_region }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="feature-icon-box bg-indigo-subtle text-indigo" style="background-color: #ede9fe; color: #7c3aed;">
+                            <i class="bi bi-whatsapp fs-4 text-success"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">WhatsApp Listed</div>
+                            <div class="fs-3 fw-bold text-dark">{{ total_with_phone }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Regional Distribution Bar Chart / Analysis -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-12">
+                <div class="card border-0 shadow-sm rounded-4 bg-white p-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between md-align-items-center mb-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-1">
+                                <i class="bi bi-pie-chart-fill text-primary me-2"></i> Bay Area Region Breakdown
+                            </h5>
+                            <p class="text-muted small mb-0">Use this geographic breakdown to plan park picnics, dinners, and events where the majority of members reside.</p>
+                        </div>
+                        <span class="badge bg-light text-muted border px-3 py-2 mt-2 mt-md-0 font-monospace">{{ total_with_region }} Members mapped</span>
+                    </div>
+
+                    {% if region_stats %}
+                    <div class="row g-3 pt-2">
+                        {% for stat in region_stats %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 rounded-3 border bg-light bg-opacity-50">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold text-dark small text-truncate" style="max-width: 75%;">{{ stat.region_label }}</span>
+                                    <span class="badge bg-primary rounded-pill font-monospace">{{ stat.count }}</span>
+                                </div>
+                                <div class="region-progress-bar mb-1" style="height: 8px;">
+                                    <div class="region-progress-fill" style="width: {{ stat.percentage }}%;"></div>
+                                </div>
+                                <div class="text-end text-muted" style="font-size: 0.72rem;">{{ stat.percentage }}% of registered members</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-geo fs-1 text-secondary mb-2 d-block"></i>
+                        <p class="mb-0">No member regions recorded yet. Members can set their region on their <a href="{% url 'profile' %}">Profile page</a>.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Members Directory Table Card -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white p-4">
+            
+            <!-- Table Header & Live Search Bar -->
+            <div class="row g-3 justify-content-between align-items-center mb-3">
+                <div class="col-md-4">
+                    <h5 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-person-lines-fill text-primary"></i> Member Directory
+                        <span class="badge bg-secondary bg-opacity-10 text-dark border font-monospace">{{ total_members }}</span>
+                    </h5>
+                </div>
+                
+                <div class="col-md-8">
+                    <div class="row g-2">
+                        <div class="col-sm-6 col-md-5">
+                            <select id="directoryRegionFilter" class="form-select form-select-sm">
+                                <option value="">All Bay Regions</option>
+                                {% for code, name in region_choices %}
+                                <option value="{{ name }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6 col-md-7">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-search"></i></span>
+                                <input type="text" id="directorySearchInput" class="form-control border-start-0" placeholder="Search by name, email, city, or interests...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Responsive Table -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="membersTable">
+                    <thead class="table-light text-muted small text-uppercase">
+                        <tr>
+                            <th scope="col" style="min-width: 180px;">Member</th>
+                            <th scope="col" style="min-width: 160px;">Bay Area Region</th>
+                            <th scope="col" style="min-width: 120px;">City</th>
+                            <th scope="col" style="min-width: 140px;">WhatsApp / Phone</th>
+                            <th scope="col" style="min-width: 160px;">Interests & Family</th>
+                            <th scope="col" style="min-width: 100px;">Role</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for p in profiles %}
+                        <tr class="member-row" 
+                            data-name="{{ p.full_name|lower }}" 
+                            data-email="{{ p.email|lower }}" 
+                            data-region="{{ p.get_region_display|lower }}" 
+                            data-city="{{ p.city|lower }}" 
+                            data-interests="{{ p.interests|lower }}" 
+                            data-family="{{ p.family_info|lower }}">
+                            
+                            <!-- Member Name & Email -->
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="rounded-circle bg-primary bg-opacity-10 text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; min-width: 34px; font-size: 0.85rem;">
+                                        {{ p.full_name|default:p.email|slice:":1"|upper }}
+                                    </div>
+                                    <div class="text-truncate" style="max-width: 170px;">
+                                        <div class="fw-bold text-dark">{{ p.full_name|default:"Unnamed Member" }}</div>
+                                        <div class="text-muted" style="font-size: 0.75rem;">{{ p.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Region -->
+                            <td>
+                                {% if p.region %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1">
+                                    <i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ p.get_region_display }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted fst-italic">Not specified</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- City -->
+                            <td>
+                                {% if p.city %}
+                                <span class="text-dark fw-medium">{{ p.city }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Phone -->
+                            <td>
+                                {% if p.phone_number %}
+                                <a href="https://wa.me/{{ p.phone_number|cut:' '|cut:'-'|cut:'('|cut:')'|cut:'+' }}" target="_blank" class="text-decoration-none d-inline-flex align-items-center text-success fw-medium">
+                                    <i class="bi bi-whatsapp me-1"></i> {{ p.phone_number }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Interests & Family -->
+                            <td>
+                                {% if p.family_info %}
+                                <div class="text-dark fw-medium mb-1"><i class="bi bi-people me-1 text-secondary"></i> {{ p.family_info }}</div>
+                                {% endif %}
+                                {% if p.interests %}
+                                <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-tag-fill me-1 text-primary"></i> {{ p.interests }}</div>
+                                {% endif %}
+                                {% if not p.family_info and not p.interests %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Role -->
+                            <td>
+                                {% if p.is_admin %}
+                                <span class="badge bg-warning text-dark border border-warning rounded-pill px-2 py-1">
+                                    <i class="bi bi-shield-fill-check me-1"></i> Admin
+                                </span>
+                                {% else %}
+                                <span class="badge bg-light text-muted border rounded-pill px-2 py-1">Member</span>
+                                {% endif %}
+                            </td>
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                No registered member profiles found yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- No results message for dynamic filter -->
+            <div id="noResultsMessage" class="text-center py-4 text-muted d-none">
+                <i class="bi bi-search fs-3 text-secondary mb-2 d-block"></i>
+                <p class="mb-0">No members match your search filter.</p>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Site Footer -->
+    {% include 'recommendations/footer.html' %}
+
+    <!-- Bootstrap 5 JavaScript Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Directory Live Filtering Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('directorySearchInput');
+            const regionFilter = document.getElementById('directoryRegionFilter');
+            const rows = document.querySelectorAll('.member-row');
+            const noResults = document.getElementById('noResultsMessage');
+
+            function filterRows() {
+                const query = searchInput.value.toLowerCase().trim();
+                const selectedRegion = regionFilter.value.toLowerCase().trim();
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    const name = row.getAttribute('data-name') || '';
+                    const email = row.getAttribute('data-email') || '';
+                    const region = row.getAttribute('data-region') || '';
+                    const city = row.getAttribute('data-city') || '';
+                    const interests = row.getAttribute('data-interests') || '';
+                    const family = row.getAttribute('data-family') || '';
+
+                    const matchesSearch = !query || 
+                        name.includes(query) || 
+                        email.includes(query) || 
+                        region.includes(query) || 
+                        city.includes(query) || 
+                        interests.includes(query) || 
+                        family.includes(query);
+
+                    const matchesRegion = !selectedRegion || region.includes(selectedRegion);
+
+                    if (matchesSearch && matchesRegion) {
+                        row.style.display = '';
+                        visibleCount++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                if (noResults) {
+                    if (visibleCount === 0 && rows.length > 0) {
+                        noResults.classList.remove('d-none');
+                    } else {
+                        noResults.classList.add('d-none');
+                    }
+                }
+            }
+
+            if (searchInput) searchInput.addEventListener('input', filterRows);
+            if (regionFilter) regionFilter.addEventListener('change', filterRows);
+        });
+    </script>
+
+</body>
+</html>

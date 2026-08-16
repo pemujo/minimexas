@@ -94,87 +94,191 @@
             </div>
         </div>
 
-        <!-- VIEW 1: UPCOMING EVENT CARDS LIST -->
+        <!-- VIEW 1: UPCOMING & PAST EVENT CARDS LIST -->
         <div id="eventsListView">
-            <div class="row g-4" id="eventsCardGrid">
-                {% for event in events %}
-                <div class="col-md-6 col-lg-4 event-card-wrapper" 
-                     data-title="{{ event.title|lower }}" 
-                     data-location="{{ event.location|lower }}" 
-                     data-category="{{ event.category }}"
-                     data-desc="{{ event.description|lower }}">
-                    
-                    <div class="event-item-card h-100 p-4 d-flex flex-column justify-content-between">
-                        <div>
-                            
-                            <!-- Date Box & Category Header -->
-                            <div class="d-flex align-items-center justify-content-between mb-3">
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="event-date-box shadow-sm">
-                                        <span class="event-date-month">{{ event.start_datetime|date:"M" }}</span>
-                                        <span class="event-date-day">{{ event.day }}</span>
-                                    </div>
-                                    <div>
-                                        <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
-                                            {{ event.category }}
-                                        </span>
-                                        <div class="text-muted small mt-1">
-                                            <i class="bi bi-clock me-1 text-primary"></i> {{ event.time_formatted }}
+            
+            <!-- Section 1: Upcoming Events -->
+            <div class="mb-5">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <h4 class="fw-bold text-dark mb-0 d-flex align-items-center">
+                        <i class="bi bi-calendar2-check text-primary me-2"></i> Upcoming Events
+                        <span class="badge count-badge ms-2">{{ upcoming_events|length }}</span>
+                    </h4>
+                </div>
+
+                <div class="row g-4" id="upcomingEventsCardGrid">
+                    {% for event in upcoming_events %}
+                    <div class="col-md-6 col-lg-4 event-card-wrapper" 
+                         data-title="{{ event.title|lower }}" 
+                         data-location="{{ event.location|lower }}" 
+                         data-category="{{ event.category }}"
+                         data-desc="{{ event.description|lower }}">
+                        
+                        <div class="event-item-card h-100 p-4 d-flex flex-column justify-content-between">
+                            <div>
+                                
+                                <!-- Date Box & Category Header -->
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="event-date-box shadow-sm">
+                                            <span class="event-date-month">{{ event.start_datetime|date:"M" }}</span>
+                                            <span class="event-date-day">{{ event.day }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                                {{ event.category }}
+                                            </span>
+                                            <div class="text-muted small mt-1">
+                                                <i class="bi bi-clock me-1 text-primary"></i> {{ event.time_formatted }}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Event Title -->
+                                <h5 class="fw-bold text-dark mb-2" style="font-size: 1.15rem; line-height: 1.3;">
+                                    {{ event.title }}
+                                </h5>
+
+                                <!-- Location -->
+                                <div class="small mb-3 d-flex align-items-start text-secondary">
+                                    <i class="bi bi-geo-alt-fill text-danger me-2 mt-1 flex-shrink-0"></i>
+                                    <a href="{{ event.location_url }}" target="_blank" rel="noopener" class="text-decoration-none text-secondary hover-primary">
+                                        {{ event.location }}
+                                    </a>
+                                </div>
+
+                                <!-- Description -->
+                                <p class="text-muted small mb-4" style="line-height: 1.5;">
+                                    {{ event.description|truncatewords:28 }}
+                                </p>
+
                             </div>
 
-                            <!-- Event Title -->
-                            <h5 class="fw-bold text-dark mb-2" style="font-size: 1.15rem; line-height: 1.3;">
-                                {{ event.title }}
-                            </h5>
-
-                            <!-- Location -->
-                            <div class="small mb-3 d-flex align-items-start text-secondary">
-                                <i class="bi bi-geo-alt-fill text-danger me-2 mt-1 flex-shrink-0"></i>
-                                <a href="{{ event.location_url }}" target="_blank" rel="noopener" class="text-decoration-none text-secondary hover-primary">
-                                    {{ event.location }}
+                            <!-- Footer Actions -->
+                            <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
+                                <a href="{{ event.google_calendar_link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-pill" title="Add event to your Google Calendar">
+                                    <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
                                 </a>
+                                <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
+                                        data-title="{{ event.title }}"
+                                        data-date="{{ event.date_formatted }}"
+                                        data-time="{{ event.time_formatted }}"
+                                        data-location="{{ event.location }}"
+                                        data-locurl="{{ event.location_url }}"
+                                        data-category="{{ event.category }}"
+                                        data-desc="{{ event.description }}"
+                                        data-organizer="{{ event.organizer }}"
+                                        data-gcal="{{ event.google_calendar_link }}">
+                                    Details
+                                </button>
                             </div>
 
-                            <!-- Description -->
-                            <p class="text-muted small mb-4" style="line-height: 1.5;">
-                                {{ event.description|truncatewords:28 }}
-                            </p>
-
                         </div>
-
-                        <!-- Footer Actions -->
-                        <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
-                            <a href="{{ event.google_calendar_link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-pill" title="Add event to your Google Calendar">
-                                <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
-                            </a>
-                            <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
-                                    data-title="{{ event.title }}"
-                                    data-date="{{ event.date_formatted }}"
-                                    data-time="{{ event.time_formatted }}"
-                                    data-location="{{ event.location }}"
-                                    data-locurl="{{ event.location_url }}"
-                                    data-category="{{ event.category }}"
-                                    data-desc="{{ event.description }}"
-                                    data-organizer="{{ event.organizer }}"
-                                    data-gcal="{{ event.google_calendar_link }}">
-                                Details
-                            </button>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center py-5">
+                        <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
+                            <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
+                            <h5 class="fw-bold text-dark">No Upcoming Events</h5>
+                            <p class="text-muted small mb-0">Check back soon for new community gatherings and celebrations.</p>
                         </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
 
+            <!-- Section 2: Past Events -->
+            <div class="past-events-section pt-4 border-top">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div>
+                        <h4 class="fw-bold text-dark mb-1 d-flex align-items-center">
+                            <i class="bi bi-clock-history text-secondary me-2"></i> Past Events
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 ms-2 rounded-pill fw-semibold">{{ past_events|length }}</span>
+                        </h4>
+                        <p class="text-muted small mb-0">A look back at our past community gatherings, workshops, and celebrations.</p>
                     </div>
                 </div>
-                {% empty %}
-                <div class="col-12 text-center py-5">
-                    <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
-                        <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
-                        <h5 class="fw-bold text-dark">No Events Scheduled</h5>
-                        <p class="text-muted small mb-0">Check back soon for new community gatherings and celebrations.</p>
+
+                <div class="row g-4" id="pastEventsCardGrid">
+                    {% for event in past_events %}
+                    <div class="col-md-6 col-lg-4 event-card-wrapper" 
+                         data-title="{{ event.title|lower }}" 
+                         data-location="{{ event.location|lower }}" 
+                         data-category="{{ event.category }}"
+                         data-desc="{{ event.description|lower }}">
+                        
+                        <div class="event-item-card past-event-item-card h-100 p-4 d-flex flex-column justify-content-between">
+                            <div>
+                                
+                                <!-- Date Box & Category Header -->
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="event-date-box past-event-date-box shadow-sm">
+                                            <span class="event-date-month">{{ event.start_datetime|date:"M" }}</span>
+                                            <span class="event-date-day">{{ event.day }}</span>
+                                        </div>
+                                        <div>
+                                            <div class="d-flex align-items-center gap-1 mb-1">
+                                                <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                                    {{ event.category }}
+                                                </span>
+                                                <span class="badge bg-light text-secondary border" style="font-size: 0.7rem;">Concluded</span>
+                                            </div>
+                                            <div class="text-muted small">
+                                                <i class="bi bi-calendar-check me-1 text-secondary"></i> {{ event.start_datetime|date:"M d, Y" }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Event Title -->
+                                <h5 class="fw-bold text-dark mb-2" style="font-size: 1.15rem; line-height: 1.3;">
+                                    {{ event.title }}
+                                </h5>
+
+                                <!-- Location -->
+                                <div class="small mb-3 d-flex align-items-start text-secondary">
+                                    <i class="bi bi-geo-alt-fill text-muted me-2 mt-1 flex-shrink-0"></i>
+                                    <a href="{{ event.location_url }}" target="_blank" rel="noopener" class="text-decoration-none text-secondary hover-primary">
+                                        {{ event.location }}
+                                    </a>
+                                </div>
+
+                                <!-- Description -->
+                                <p class="text-muted small mb-4" style="line-height: 1.5;">
+                                    {{ event.description|truncatewords:28 }}
+                                </p>
+
+                            </div>
+
+                            <!-- Footer Actions -->
+                            <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
+                                <span class="text-muted small"><i class="bi bi-check2-circle text-success me-1"></i> Concluded</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary px-3 view-details-btn" 
+                                        data-title="{{ event.title }}"
+                                        data-date="{{ event.date_formatted }}"
+                                        data-time="{{ event.time_formatted }}"
+                                        data-location="{{ event.location }}"
+                                        data-locurl="{{ event.location_url }}"
+                                        data-category="{{ event.category }}"
+                                        data-desc="{{ event.description }}"
+                                        data-organizer="{{ event.organizer }}"
+                                        data-gcal="{{ event.google_calendar_link }}">
+                                    View Details
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
+                    {% empty %}
+                    <div class="col-12 text-center py-4">
+                        <div class="p-4 rounded-3 bg-light border text-center text-muted small mx-auto" style="max-width: 440px;">
+                            <i class="bi bi-clock-history me-1"></i> No past events on record.
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
 
             <!-- Empty Search State -->

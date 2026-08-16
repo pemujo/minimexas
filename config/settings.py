@@ -158,14 +158,19 @@ def _get_google_sa_info():
 
     raw_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if raw_json:
+        data = None
         try:
-            return json.loads(raw_json)
+            data = json.loads(raw_json)
         except Exception:
             try:
                 decoded = base64.b64decode(raw_json).decode("utf-8")
-                return json.loads(decoded)
+                data = json.loads(decoded)
             except Exception:
                 pass
+        if data and isinstance(data, dict):
+            if not data.get("client_email", "").strip():
+                print("[WARNING] GOOGLE_SERVICE_ACCOUNT_JSON has an empty/blank 'client_email'. Please add your service account email to .env.")
+            return data
 
     sa_email = os.environ.get("GOOGLE_SA_CLIENT_EMAIL")
     sa_key = os.environ.get("GOOGLE_SA_PRIVATE_KEY")
@@ -198,6 +203,10 @@ GOOGLE_SERVICE_ACCOUNT_INFO = _get_google_sa_info()
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", None)
+
+# Portal Admin & Organizer configuration (comma-separated list of organizer emails)
+_admin_emails_env = os.environ.get("ADMIN_EMAILS", "")
+ADMIN_EMAILS = [e.strip().lower() for e in _admin_emails_env.split(",") if e.strip()]
 
 # Production Security Hardening
 if not DEBUG:
