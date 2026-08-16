@@ -5,21 +5,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Welcome to the MiniMexas Member Portal. Connect with fellow Bay Area community members, access verified recommendations, and discover local meetups.">
+    <title>Member Sign In - MiniMexitas Portal</title>
+    <meta name="description" content="Welcome to the MiniMexitas Member Portal. Connect with fellow Bay Area community members, access verified recommendations, and discover local meetups.">
     <!-- Open Graph / WhatsApp -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="MiniMexas Community Portal">
-    <meta property="og:description" content="Private member portal for the MiniMexas Bay Area Community. Sign in to access vetted recommendations and meetups.">
+    <meta property="og:title" content="MiniMexitas Community Portal">
+    <meta property="og:description" content="Private member portal for the MiniMexitas Bay Area Community. Sign in to access vetted recommendations and meetups.">
     <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:secure_url" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="397">
     <meta property="og:image:height" content="360">
-    <meta property="og:image:alt" content="MiniMexas Logo">
+    <meta property="og:image:alt" content="MiniMexitas Logo">
     <!-- Twitter -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="MiniMexas Community Portal">
-    <meta name="twitter:description" content="Private member portal for the MiniMexas Bay Area Community.">
+    <meta name="twitter:title" content="MiniMexitas Community Portal">
+    <meta name="twitter:description" content="Private member portal for the MiniMexitas Bay Area Community.">
     <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <!-- Mobile PWA & Theme -->
     <meta name="theme-color" content="#0a0f1d">
@@ -43,8 +44,8 @@
     <nav class="navbar navbar-expand-lg navbar-dark navbar-whatsapp sticky-top mb-0">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="{% url 'login_page' %}">
-                <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="brand-logo-img me-2">
-                <span>MiniMexas <span class="fw-normal text-white-50 fs-6 ms-1">Portal</span></span>
+                <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="brand-logo-img me-2">
+                <span>MiniMexitas <span class="fw-normal text-white-50 fs-6 ms-1">Portal</span></span>
             </a>
 
             <div class="d-flex align-items-center gap-2">
@@ -75,7 +76,7 @@
                 <div class="carousel-item active">
                     <div class="banner-media-container">
                         <img src="{% static 'images/banners/welcome.png' %}" class="d-block w-100 banner-media"
-                            alt="MiniMexas Bay Area Community Gathering">
+                            alt="MiniMexitas Bay Area Community Gathering">
                         <div class="banner-overlay"></div>
 
                         <!-- Caption Card Inside Image -->
@@ -87,7 +88,7 @@
                                         <i class="bi bi-geo-alt-fill text-danger me-2"></i> Private Bay Area Hub
                                     </div>
                                     <h1 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
-                                        MiniMexas Community Portal
+                                        MiniMexitas Community Portal
                                     </h1>
                                     <p class="text-white-50 mb-3 small d-none d-sm-block">
                                         A private, member-driven hub built to connect, empower, and support our Mexican
@@ -285,7 +286,7 @@
                     <div class="card login-card p-4 p-md-5 text-center shadow-lg">
 
                         <div class="mb-4">
-                            <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="login-logo-img">
+                            <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="login-logo-img">
                             <h3 class="fw-bold text-dark mb-1">Member Sign In</h3>
                             <p class="text-muted small mb-0">
                                 Sign in with your verified Gmail account to access group recommendations and tools.

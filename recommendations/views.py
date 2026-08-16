@@ -154,7 +154,7 @@ def dev_login_view(request):
     
     request.session['is_verified_member'] = True
     request.session['member_name'] = request.GET.get('name', 'Developer Member')
-    request.session['member_email'] = request.GET.get('email', 'dev@minimexas.local')
+    request.session['member_email'] = request.GET.get('email', 'dev@minimexitas.local')
     request.session.set_expiry(60 * 60 * 24 * 30)
     return redirect('home')
 

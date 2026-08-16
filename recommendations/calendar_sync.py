@@ -127,7 +127,7 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
                 "location_url": f"https://www.google.com/maps/search/?api=1&query={quote_plus(location)}",
                 "category": category,
                 "description": description,
-                "organizer": item.get("organizer", {}).get("displayName") or "MiniMexas Events",
+                "organizer": item.get("organizer", {}).get("displayName") or "MiniMexitas Events",
                 "google_calendar_link": get_google_calendar_add_url(summary, start_dt, end_dt, description, location),
                 "year": start_dt.year,
                 "month": start_dt.month,

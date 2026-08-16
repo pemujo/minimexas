@@ -1,7 +1,7 @@
 {
-  "name": "MiniMexas Community Portal",
-  "short_name": "MiniMexas",
-  "description": "Private member portal for the MiniMexas Bay Area Community.",
+  "name": "MiniMexitas Community Portal",
+  "short_name": "MiniMexitas",
+  "description": "Private member portal for the MiniMexitas Bay Area Community.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0f1d",

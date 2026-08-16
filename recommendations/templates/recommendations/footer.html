@@ -1,53 +1,26 @@
 {% load static %}
 <!-- Reusable Site Footer -->
-<footer class="site-footer mt-auto py-5 border-top border-dark-subtle">
+<footer class="site-footer mt-auto py-4 border-top border-dark-subtle">
     <div class="container">
-        <div class="row g-4 align-items-center justify-content-between">
+        <div class="row align-items-center justify-content-between g-3">
             <!-- Brand Column -->
-            <div class="col-lg-5 col-md-6">
-                <div class="d-flex align-items-center mb-3">
-                    <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="footer-logo me-2">
-                    <span class="fs-5 fw-bold text-white">MiniMexas <span class="fw-normal text-white-50 fs-6">Community Portal</span></span>
+            <div class="col-md-8">
+                <div class="d-flex align-items-center mb-2">
+                    <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="footer-logo me-2">
+                    <span class="fs-5 fw-bold text-white">MiniMexitas <span class="fw-normal text-white-50 fs-6">Community Portal</span></span>
                 </div>
-                <p class="text-white-50 small mb-3" style="max-width: 380px; line-height: 1.6;">
+                <p class="text-white-50 small mb-2" style="max-width: 540px; line-height: 1.6;">
                     Connecting, empowering, and celebrating our local Bay Area community through trusted member recommendations, family meetups, and shared resources.
                 </p>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge rounded-pill bg-white bg-opacity-10 text-white-50 px-3 py-2 fw-normal border border-white border-opacity-10">
+                <div class="d-flex align-items-center">
+                    <span class="badge rounded-pill bg-white bg-opacity-10 text-white-50 px-3 py-1 fw-normal border border-white border-opacity-10">
                         <i class="bi bi-shield-lock-fill text-success me-1"></i> Private WhatsApp Member Portal
                     </span>
                 </div>
             </div>
 
-            <!-- Quick Links -->
-            <div class="col-lg-3 col-md-3 col-6">
-                <h6 class="text-white fw-bold mb-3 text-uppercase fs-7" style="letter-spacing: 0.05em;">Portal Navigation</h6>
-                <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small">
-                    <li><a href="{% url 'home' %}" class="footer-link"><i class="bi bi-chevron-right me-1 text-primary"></i> Home Dashboard</a></li>
-                    <li><a href="{% url 'recommendations:notes_list' %}" class="footer-link"><i class="bi bi-chevron-right me-1 text-primary"></i> Recommendations</a></li>
-                    <li><a href="{% url 'events' %}" class="footer-link"><i class="bi bi-chevron-right me-1 text-primary"></i> Community Events</a></li>
-                </ul>
-            </div>
-
-            <!-- Community & Info -->
-            <div class="col-lg-3 col-md-3 col-6">
-                <h6 class="text-white fw-bold mb-3 text-uppercase fs-7" style="letter-spacing: 0.05em;">San Francisco Bay</h6>
-                <p class="text-white-50 small mb-2">
-                    <i class="bi bi-geo-alt-fill text-danger me-1"></i> Serving SF, Peninsula, South Bay & East Bay
-                </p>
-                <p class="text-white-50 small mb-0">
-                    <i class="bi bi-heart-fill text-danger me-1"></i> Built with pride for our community
-                </p>
-            </div>
-        </div>
-
-        <hr class="border-secondary border-opacity-25 my-4">
-
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 text-white-50 small">
-            <div>
-                &copy; {% now "Y" %} MiniMexas Community. All rights reserved.
-            </div>
-            <div class="d-flex gap-3">
+            <!-- Back to Top -->
+            <div class="col-md-4 text-md-end text-start mt-3 mt-md-0">
                 <a href="#top" class="footer-link-subtle" title="Back to top">
                     <i class="bi bi-arrow-up-circle me-1"></i> Back to top
                 </a>

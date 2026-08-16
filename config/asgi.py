@@ -1,5 +1,5 @@
 """
-ASGI config for minimexas project.
+ASGI config for minimexitas project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

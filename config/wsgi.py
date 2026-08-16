@@ -1,5 +1,5 @@
 """
-WSGI config for minimexas project.
+WSGI config for minimexitas project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

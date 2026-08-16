@@ -4,21 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Discover upcoming community events, celebrations, and gatherings organized by MiniMexas in the Bay Area.">
+    <title>Community Events & Calendar - MiniMexitas</title>
+    <meta name="description" content="Discover upcoming community events, celebrations, and gatherings organized by MiniMexitas in the Bay Area.">
     <!-- Open Graph / WhatsApp -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Community Events & Calendar - MiniMexas">
+    <meta property="og:title" content="Community Events & Calendar - MiniMexitas">
     <meta property="og:description" content="Discover upcoming community events, celebrations, and meetups in the San Francisco Bay Area.">
     <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:secure_url" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="397">
     <meta property="og:image:height" content="360">
-    <meta property="og:image:alt" content="MiniMexas Logo">
+    <meta property="og:image:alt" content="MiniMexitas Logo">
     <!-- Twitter -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Community Events - MiniMexas">
-    <meta name="twitter:description" content="Discover upcoming community events and meetups for MiniMexas members.">
+    <meta name="twitter:title" content="Community Events - MiniMexitas">
+    <meta name="twitter:description" content="Discover upcoming community events and meetups for MiniMexitas members.">
     <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <!-- Mobile PWA & Theme -->
     <meta name="theme-color" content="#0a0f1d">
@@ -168,7 +169,7 @@
                 {% empty %}
                 <div class="col-12 text-center py-5">
                     <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
-                        <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="empty-state-logo">
+                        <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
                         <h5 class="fw-bold text-dark">No Events Scheduled</h5>
                         <p class="text-muted small mb-0">Check back soon for new community gatherings and celebrations.</p>
                     </div>
@@ -179,7 +180,7 @@
             <!-- Empty Search State -->
             <div id="noSearchResults" class="text-center py-5 d-none">
                 <div class="branded-empty-state mx-auto" style="max-width: 440px;">
-                    <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="empty-state-logo">
+                    <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
                     <h5 class="fw-bold text-dark mb-1">No Matching Events Found</h5>
                     <p class="text-muted small mb-3">Try adjusting your keywords or category filters.</p>
                     <button id="resetSearchBtn" class="btn btn-sm btn-outline-pill mx-auto">
@@ -379,7 +380,7 @@
             document.getElementById("modalEventTime").textContent = evt.time_formatted || evt.time;
             document.getElementById("modalEventLocation").textContent = evt.location;
             document.getElementById("modalEventLocUrl").href = evt.location_url || evt.locurl;
-            document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexas Events";
+            document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexitas Events";
             document.getElementById("modalEventDescription").textContent = evt.description || evt.desc;
             document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal;
             modal.show();
