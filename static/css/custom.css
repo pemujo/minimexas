@@ -147,6 +147,29 @@ a:hover {
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
+.brand-logo-img {
+    height: 38px;
+    width: auto;
+    max-width: 48px;
+    object-fit: contain;
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.navbar-brand:hover .brand-logo-img {
+    transform: scale(1.05);
+}
+
+.login-logo-img {
+    height: 72px;
+    width: auto;
+    max-width: 140px;
+    object-fit: contain;
+    display: inline-block;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+}
+
 .navbar-nav .nav-link {
     color: rgba(241, 245, 249, 0.8) !important;
     font-weight: 500;
@@ -618,9 +641,9 @@ a:hover {
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, 
-        rgba(10, 15, 29, 0.3) 0%, 
-        rgba(10, 15, 29, 0.45) 45%, 
-        rgba(10, 15, 29, 0.92) 100%
+        rgba(10, 15, 29, 0.05) 0%, 
+        rgba(10, 15, 29, 0.15) 50%, 
+        rgba(10, 15, 29, 0.45) 100%
     );
     pointer-events: none;
     z-index: 1;
@@ -636,18 +659,18 @@ a:hover {
 }
 
 .banner-glass-card {
-    background: rgba(10, 15, 29, 0.42);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(10, 15, 29, 0.12);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-lg);
     padding: 1.75rem 2.25rem;
     max-width: 640px;
     margin-left: auto;
     margin-right: 0;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     pointer-events: auto;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 @media (max-width: 992px) {
@@ -969,5 +992,93 @@ a:hover {
     color: #92400e;
 }
 
+/* ==========================================================================
+   Site Footer Styling
+   ========================================================================== */
+.site-footer {
+    background: var(--brand-navy-900);
+    color: #94a3b8;
+    position: relative;
+    z-index: 10;
+}
 
+.footer-logo {
+    height: 38px;
+    width: auto;
+    max-width: 48px;
+    object-fit: contain;
+    border-radius: 6px;
+}
 
+.footer-link {
+    color: #94a3b8;
+    text-decoration: none;
+    transition: color 0.18s ease;
+}
+
+.footer-link:hover {
+    color: #38bdf8;
+    text-decoration: none;
+}
+
+.footer-link-subtle {
+    color: #64748b;
+    text-decoration: none;
+    transition: color 0.18s ease;
+}
+
+.footer-link-subtle:hover {
+    color: #cbd5e1;
+}
+
+.fs-7 {
+    font-size: 0.8rem;
+}
+
+/* ==========================================================================
+   Branded Empty States
+   ========================================================================== */
+.branded-empty-state {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    border: 1px dashed #cbd5e1;
+}
+
+.empty-state-logo {
+    height: 56px;
+    width: auto;
+    object-fit: contain;
+    opacity: 0.75;
+    margin-bottom: 1.25rem;
+    filter: grayscale(20%);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.branded-empty-state:hover .empty-state-logo {
+    transform: scale(1.06);
+    opacity: 1;
+    filter: none;
+}
+
+/* ==========================================================================
+   Print & PDF Export Styling
+   ========================================================================== */
+@media print {
+    .navbar, .fullscreen-banner-wrapper, .site-footer, .btn, .search-container, .hero-scroll-indicator, .carousel-control-prev, .carousel-control-next, .carousel-indicators {
+        display: none !important;
+    }
+    
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .print-header {
+        display: block !important;
+        margin-bottom: 2rem;
+        border-bottom: 2px solid #000000;
+        padding-bottom: 1rem;
+    }
+}

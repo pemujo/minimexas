@@ -4,7 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recommendations - MiniMexas</title>
+    <meta name="description" content="Explore vetted community recommendations from MiniMexas members in the San Francisco Bay Area.">
+    <!-- Open Graph / WhatsApp -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Community Recommendations - MiniMexas">
+    <meta property="og:description" content="Explore vetted community recommendations from MiniMexas members across the Bay Area.">
+    <meta property="og:image" content="{% static 'images/minimexitas_logo.png' %}">
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Community Recommendations - MiniMexas">
+    <meta name="twitter:description" content="Explore vetted community recommendations from MiniMexas members across the Bay Area.">
+    <meta name="twitter:image" content="{% static 'images/minimexitas_logo.png' %}">
+    <!-- Mobile PWA & Theme -->
+    <meta name="theme-color" content="#0a0f1d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/minimexitas_logo.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/minimexitas_logo.png' %}">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -106,10 +124,12 @@
                             </tr>
                         {% empty %}
                             <tr id="serverEmptyRow">
-                                <td colspan="4" class="text-center py-5 text-muted">
-                                    <i class="bi bi-journal-x fs-1 d-block mb-3 opacity-50"></i>
-                                    <h6 class="fw-bold">No recommendations found</h6>
-                                    <p class="small mb-0">Add entries to your Google Sheet to see them appear here.</p>
+                                <td colspan="4" class="text-center py-5">
+                                    <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
+                                        <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="empty-state-logo">
+                                        <h6 class="fw-bold text-dark">No recommendations found</h6>
+                                        <p class="small text-muted mb-0">Add entries to your Google Sheet to see them appear here.</p>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -117,17 +137,22 @@
                 </table>
             </div>
 
-            <!-- Empty Search State -->
-            <div id="noMatchState" class="text-center py-5 text-muted d-none">
-                <i class="bi bi-search fs-2 d-block mb-2 opacity-50"></i>
-                <h6 class="fw-bold text-dark mb-1">No matching recommendations found</h6>
-                <p class="small mb-3">Try adjusting your search terms or category filter.</p>
-                <button id="clearSearchBtn" class="btn btn-sm btn-outline-pill px-3 py-1">
-                    Clear Search
-                </button>
+            <!-- Branded Empty Search State -->
+            <div id="noMatchState" class="text-center py-5 d-none">
+                <div class="branded-empty-state mx-auto" style="max-width: 440px;">
+                    <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexas Logo" class="empty-state-logo">
+                    <h6 class="fw-bold text-dark mb-1">No matching recommendations found</h6>
+                    <p class="small text-muted mb-3">Try adjusting your search terms or category filter.</p>
+                    <button id="clearSearchBtn" class="btn btn-sm btn-outline-pill px-3 py-1">
+                        <i class="bi bi-x-circle me-1"></i> Clear Search
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- FOOTER COMPONENT -->
+    {% include 'recommendations/footer.html' %}
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

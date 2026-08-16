@@ -1,10 +1,29 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Portal - MiniMexas</title>
+    <meta name="description" content="Private community portal for MiniMexas members in the San Francisco Bay Area. Discover recommendations, events, and shared community tools.">
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MiniMexas Community Portal">
+    <meta property="og:description" content="Private member portal for the MiniMexas Bay Area Community. Discover vetted recommendations, events, and resources.">
+    <meta property="og:image" content="{% static 'images/minimexitas_logo.png' %}">
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="MiniMexas Community Portal">
+    <meta name="twitter:description" content="Private member portal for the MiniMexas Bay Area Community.">
+    <meta name="twitter:image" content="{% static 'images/minimexitas_logo.png' %}">
+    <!-- Mobile PWA & Theme -->
+    <meta name="theme-color" content="#0a0f1d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/minimexitas_logo.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/minimexitas_logo.png' %}">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -12,6 +31,7 @@
     <!-- Project-Wide Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
 </head>
+
 <body>
 
     <!-- REUSABLE STICKY NAVBAR -->
@@ -19,43 +39,55 @@
 
     <!-- FULL-SCREEN HERO MEDIA CAROUSEL BANNER -->
     <div class="fullscreen-banner-wrapper">
-        <div id="communityMediaCarousel" class="carousel slide carousel-fade fullscreen-carousel" data-bs-ride="carousel" data-bs-interval="6500" data-bs-pause="hover">
-            
+        <div id="communityMediaCarousel" class="carousel slide carousel-fade fullscreen-carousel"
+            data-bs-ride="carousel" data-bs-interval="5000" data-bs-pause="hover">
+
             <!-- Indicators / Slide Bars -->
             <div class="carousel-indicators">
-                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
-                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
-                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
-                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="3" aria-label="Slide 4"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="0" class="active"
+                    aria-current="true" aria-label="Slide 1"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="1"
+                    aria-label="Slide 2"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="2"
+                    aria-label="Slide 3"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="3"
+                    aria-label="Slide 4"></button>
+                <button type="button" data-bs-target="#communityMediaCarousel" data-bs-slide-to="4"
+                    aria-label="Slide 5"></button>
             </div>
 
             <!-- Carousel Slides -->
             <div class="carousel-inner">
-                
+
                 <!-- Slide 1: Bay Area Scenic Landscape (Image) -->
                 <div class="carousel-item active">
                     <div class="banner-media-container">
-                        <img src="{% static 'images/banners/bay_area.png' %}" class="d-block w-100 banner-media" alt="San Francisco Bay Area Community">
+                        <img src="{% static 'images/banners/welcome.png' %}" class="d-block w-100 banner-media"
+                            alt="San Francisco Bay Area Community">
                         <div class="banner-overlay"></div>
-                        
+
                         <!-- Caption Safely Framed Inside Image -->
                         <div class="banner-caption-container">
                             <div class="container">
                                 <div class="banner-glass-card">
-                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm"
+                                        style="font-size: 0.8rem; font-weight: 600;">
                                         <i class="bi bi-geo-alt-fill text-danger me-2"></i> San Francisco Bay Area
                                     </div>
                                     <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
                                         Connecting Our Local Community
                                     </h2>
                                     <p class="text-white-50 mb-3 small d-none d-sm-block">
-                                        Discover verified recommendations, local services, and favorite community spots across the Bay.
+                                        Discover verified recommendations, local services, and favorite community spots
+                                        across the Bay.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'recommendations:notes_list' %}"
+                                            class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-compass me-1"></i> Explore Recommendations
                                         </a>
-                                        <a href="#dashboard-portal" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="#dashboard-portal"
+                                            class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-grid-fill me-1"></i> Portal Modules
                                         </a>
                                     </div>
@@ -69,27 +101,33 @@
                 <!-- Slide 2: Community Gathering (Image) -->
                 <div class="carousel-item">
                     <div class="banner-media-container">
-                        <img src="{% static 'images/banners/community_event.png' %}" class="d-block w-100 banner-media" alt="Community Gatherings & Events">
+                        <img src="{% static 'images/banners/community_event.png' %}" class="d-block w-100 banner-media"
+                            alt="Community Gatherings & Events">
                         <div class="banner-overlay"></div>
-                        
+
                         <!-- Caption Safely Framed Inside Image -->
                         <div class="banner-caption-container">
                             <div class="container">
                                 <div class="banner-glass-card">
-                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
-                                        <i class="bi bi-calendar-heart-fill text-warning me-2"></i> Culture, Family & Events
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm"
+                                        style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-calendar-heart-fill text-warning me-2"></i> Culture, Family &
+                                        Events
                                     </div>
                                     <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
                                         Traditions, Gatherings & Meetups
                                     </h2>
                                     <p class="text-white-50 mb-3 small d-none d-sm-block">
-                                        Bringing families and friends together for celebrations, picnics, networking, and cultural activities.
+                                        Bringing families and friends together for celebrations, picnics, networking,
+                                        and cultural activities.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'events' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'events' %}"
+                                            class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-calendar-event me-1"></i> Upcoming Meetups
                                         </a>
-                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'recommendations:notes_list' %}"
+                                            class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-chat-heart me-1"></i> Member Notes
                                         </a>
                                     </div>
@@ -103,27 +141,32 @@
                 <!-- Slide 3: Culinary & Local Dining (Image) -->
                 <div class="carousel-item">
                     <div class="banner-media-container">
-                        <img src="{% static 'images/banners/culinary.png' %}" class="d-block w-100 banner-media" alt="Vetted Food and Restaurants">
+                        <img src="{% static 'images/banners/culinary.png' %}" class="d-block w-100 banner-media"
+                            alt="Vetted Food and Restaurants">
                         <div class="banner-overlay"></div>
-                        
+
                         <!-- Caption Safely Framed Inside Image -->
                         <div class="banner-caption-container">
                             <div class="container">
                                 <div class="banner-glass-card">
-                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm"
+                                        style="font-size: 0.8rem; font-weight: 600;">
                                         <i class="bi bi-shop text-primary me-2"></i> Vetted Local Spots
                                     </div>
                                     <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
                                         Authentic Flavors & Recommendations
                                     </h2>
                                     <p class="text-white-50 mb-3 small d-none d-sm-block">
-                                        From authentic culinary gems to trusted dentists, contractors, and schools — shared by people you know.
+                                        From authentic culinary gems to trusted dentists, contractors, and schools —
+                                        shared by people you know.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'recommendations:notes_list' %}"
+                                            class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-search me-1"></i> Find Recommendations
                                         </a>
-                                        <a href="#dashboard-portal" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="#dashboard-portal"
+                                            class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-people me-1"></i> Community Hub
                                         </a>
                                     </div>
@@ -137,28 +180,71 @@
                 <!-- Slide 4: MiniMexas Community (Image) -->
                 <div class="carousel-item">
                     <div class="banner-media-container">
-                        <img src="{% static 'images/banners/minimexas.png' %}" class="d-block w-100 banner-media" alt="MiniMexas Community">
+                        <img src="{% static 'images/banners/minimexas.png' %}" class="d-block w-100 banner-media"
+                            alt="MiniMexas Community">
                         <div class="banner-overlay"></div>
-                        
+
                         <!-- Caption Safely Framed Inside Image -->
                         <div class="banner-caption-container">
                             <div class="container">
                                 <div class="banner-glass-card">
-                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm" style="font-size: 0.8rem; font-weight: 600;">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm"
+                                        style="font-size: 0.8rem; font-weight: 600;">
                                         <i class="bi bi-people-fill text-primary me-2"></i> MiniMexas Community
                                     </div>
                                     <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
                                         Our Community in Action
                                     </h2>
                                     <p class="text-white-50 mb-3 small d-none d-sm-block">
-                                        Celebrating our heritage, building relationships, and supporting each other across the Bay Area.
+                                        Celebrating our heritage, building relationships, and supporting each other
+                                        across the Bay Area.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'events' %}" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'events' %}"
+                                            class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-calendar-event me-1"></i> Community Events
                                         </a>
-                                        <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                        <a href="{% url 'recommendations:notes_list' %}"
+                                            class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
                                             <i class="bi bi-chat-heart me-1"></i> Recommendations
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Slide 5: San Francisco Bay Area (Image) -->
+                <div class="carousel-item">
+                    <div class="banner-media-container">
+                        <img src="{% static 'images/banners/bay_area.png' %}" class="d-block w-100 banner-media"
+                            alt="San Francisco Bay Area Horizons">
+                        <div class="banner-overlay"></div>
+
+                        <!-- Caption Safely Framed Inside Image -->
+                        <div class="banner-caption-container">
+                            <div class="container">
+                                <div class="banner-glass-card">
+                                    <div class="d-inline-flex align-items-center bg-white text-dark mb-2 px-3 py-1 rounded-pill shadow-sm"
+                                        style="font-size: 0.8rem; font-weight: 600;">
+                                        <i class="bi bi-water text-info me-2"></i> Bay Area & Horizons
+                                    </div>
+                                    <h2 class="fw-bold text-white mb-2 fs-3" style="letter-spacing: -0.02em;">
+                                        San Francisco Bay Landscapes
+                                    </h2>
+                                    <p class="text-white-50 mb-3 small d-none d-sm-block">
+                                        Connecting our community across San Francisco, Peninsula, South Bay, and East Bay.
+                                    </p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{% url 'recommendations:notes_list' %}"
+                                             class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-compass me-1"></i> Explore Recommendations
+                                        </a>
+                                        <a href="#dashboard-portal"
+                                            class="btn btn-sm btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                                            <i class="bi bi-grid-fill me-1"></i> Portal Modules
                                         </a>
                                     </div>
                                 </div>
@@ -171,11 +257,13 @@
             </div>
 
             <!-- Navigation Controls -->
-            <button class="carousel-control-prev banner-nav-btn" type="button" data-bs-target="#communityMediaCarousel" data-bs-slide="prev">
+            <button class="carousel-control-prev banner-nav-btn" type="button" data-bs-target="#communityMediaCarousel"
+                data-bs-slide="prev">
                 <span class="banner-arrow-box" aria-hidden="true"><i class="bi bi-chevron-left"></i></span>
                 <span class="visually-hidden">Previous</span>
             </button>
-            <button class="carousel-control-next banner-nav-btn" type="button" data-bs-target="#communityMediaCarousel" data-bs-slide="next">
+            <button class="carousel-control-next banner-nav-btn" type="button" data-bs-target="#communityMediaCarousel"
+                data-bs-slide="next">
                 <span class="banner-arrow-box" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
                 <span class="visually-hidden">Next</span>
             </button>
@@ -191,25 +279,26 @@
 
     <!-- MAIN PORTAL DASHBOARD SECTION (Under the Banner) -->
     <div id="dashboard-portal" class="container main-container py-5">
-        
+
         <!-- Welcome Header -->
         <div class="text-center py-2 mb-5">
             <div class="badge-pill-header mb-3">
                 <i class="bi bi-shield-check text-primary me-2"></i>
                 <span>Verified Member Portal</span>
             </div>
-            
+
             <h2 class="fw-bold text-dark display-6 mb-2">
                 Welcome, {{ request.session.member_name|default:"Member" }}
             </h2>
             <p class="text-secondary mx-auto mb-0" style="max-width: 640px; font-size: 1.05rem;">
-                Your private dashboard for trusted recommendations, upcoming events, and shared community resources across the San Francisco Bay Area.
+                Your private dashboard for trusted recommendations, upcoming events, and shared community resources
+                across the San Francisco Bay Area.
             </p>
         </div>
 
         <!-- Modules Grid -->
         <div class="row g-4 justify-content-center mb-5">
-            
+
             <!-- 1. Recommendation Module Card (Active) -->
             <div class="col-md-6 col-lg-4">
                 <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
@@ -223,10 +312,12 @@
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Browse vetted local services, doctors, restaurants, schools, and favorite spots shared directly across our WhatsApp group.
+                            Browse vetted local services, doctors, restaurants, schools, and favorite spots shared
+                            directly across our WhatsApp group.
                         </p>
                     </div>
-                    <a href="{% url 'recommendations:notes_list' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
+                    <a href="{% url 'recommendations:notes_list' %}"
+                        class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
                         View Recommendations <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -245,7 +336,8 @@
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Stay up to date with cultural gatherings, family picnics, networking meetups, and local community activities in the Bay Area.
+                            Stay up to date with cultural gatherings, family picnics, networking meetups, and local
+                            community activities in the Bay Area.
                         </p>
                     </div>
                     <a href="{% url 'events' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
@@ -268,7 +360,8 @@
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Shared resources, newcomer guides, group documents, and collective planning tools designed to support our community.
+                            Shared resources, newcomer guides, group documents, and collective planning tools designed
+                            to support our community.
                         </p>
                     </div>
                     <button class="btn btn-outline-pill disabled py-2 text-center" disabled>
@@ -284,14 +377,19 @@
             <div class="card bg-white border p-3 rounded-4 d-inline-block shadow-sm mx-auto">
                 <span class="text-muted small">
                     <i class="bi bi-info-circle-fill me-1" style="color: var(--brand-primary);"></i>
-                    Have a recommendation or want to suggest a new event? Share it in our WhatsApp group to have it synced here.
+                    Have a recommendation or want to suggest a new event? Share it in our WhatsApp group to have it
+                    synced here.
                 </span>
             </div>
         </div>
 
     </div>
 
+    <!-- FOOTER COMPONENT -->
+    {% include 'recommendations/footer.html' %}
+
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>
