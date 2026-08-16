@@ -204,10 +204,6 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", None)
 
-# Portal Admin & Organizer configuration (comma-separated list of organizer emails)
-_admin_emails_env = os.environ.get("ADMIN_EMAILS", "")
-ADMIN_EMAILS = [e.strip().lower() for e in _admin_emails_env.split(",") if e.strip()]
-
 # Production Security Hardening
 if not DEBUG:
     SESSION_COOKIE_SECURE = True

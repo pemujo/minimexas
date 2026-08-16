@@ -143,23 +143,21 @@ def google_callback_view(request):
             'error': 'The Google account email is not verified by Google.'
         })
 
-    # 3. Check if Gmail is in allowed Google Sheet list
+    # 3. Check if Gmail is in allowed Google Sheet list and read Role
     allowed, member_name, is_admin = is_gmail_allowed(user_email)
 
     if allowed:
         request.session['is_verified_member'] = True
         request.session['member_email'] = user_email
         request.session['is_admin'] = is_admin
+
         profile, _ = MemberProfile.objects.get_or_create(
             email=user_email,
             defaults={'full_name': member_name or 'Member', 'is_admin': is_admin}
         )
-        if is_admin and not profile.is_admin:
-            profile.is_admin = True
+        if profile.is_admin != is_admin:
+            profile.is_admin = is_admin
             profile.save()
-        elif profile.is_admin and not is_admin:
-            # If profile has is_admin flag stored in database, respect it
-            request.session['is_admin'] = True
 
         display_name = profile.full_name or member_name or 'Member'
         request.session['member_name'] = display_name

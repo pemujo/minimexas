@@ -135,7 +135,14 @@ def sync_profile_to_google_sheet(profile):
             while len(current_row) < len(headers):
                 current_row.append('')
 
+            # Preserve existing role in Google Sheet if already defined
+            role_col_idx = col_map.get('role', None)
+            existing_role = current_row[role_col_idx] if role_col_idx is not None and role_col_idx < len(current_row) else ''
+
             for header_name, val in field_values.items():
+                if header_name == 'role':
+                    # The website NEVER alters the Role column in Google Sheets
+                    continue
                 if header_name in col_map:
                     idx = col_map[header_name]
                     if idx < len(current_row):
@@ -145,11 +152,14 @@ def sync_profile_to_google_sheet(profile):
             worksheet.update(values=[current_row], range_name=f"A{target_row_idx}:{end_letter}{target_row_idx}")
             logger.info(f"Successfully updated profile for {profile.email} at Google Sheet row {target_row_idx}.")
         else:
-            # Append new row matching header order
+            # Append new row matching header order (new members default to 'Member' role)
             new_row = []
             for h in headers:
                 key = h.strip().lower()
-                new_row.append(field_values.get(key, ''))
+                if key == 'role':
+                    new_row.append('Member')
+                else:
+                    new_row.append(field_values.get(key, ''))
             worksheet.append_row(new_row)
             logger.info(f"Successfully appended new profile row for {profile.email} to Google Sheet.")
 
