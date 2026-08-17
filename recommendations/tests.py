@@ -15,6 +15,8 @@ from recommendations.sheets import (
     sync_profile_to_google_sheet,
     sync_pending_request_to_google_sheet,
     update_pending_request_status_in_google_sheet,
+    sync_audit_log_to_google_sheet,
+    backfill_audit_logs_to_google_sheet,
     delete_profile_from_google_sheet,
     reconcile_members_with_google_sheet,
 )
@@ -350,6 +352,54 @@ class SheetsSyncTestCase(TestCase):
         req = MembershipRequest(email="error@gmail.com", full_name="Error User")
         res = sync_pending_request_to_google_sheet(req)
         self.assertFalse(res)
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_audit_log_to_google_sheet_appends_row(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Timestamp', 'Action', 'Target Member', 'Target Email', 'Performed By', 'Admin Email', 'Notes']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        log = MembershipAuditLog(
+            action=MembershipAuditLog.ACTION_APPROVED,
+            target_email="audit.target@gmail.com",
+            target_name="Audit Target",
+            actor_name="Admin Maria",
+            actor_email="admin@gmail.com",
+            notes="Approved after interview"
+        )
+        res = sync_audit_log_to_google_sheet(log)
+        self.assertTrue(res)
+        mock_ws.append_row.assert_called_once()
+        args, _ = mock_ws.append_row.call_args
+        self.assertIn("Request Approved", args[0])
+        self.assertIn("audit.target@gmail.com", args[0])
+        self.assertIn("Admin Maria", args[0])
+
+    def test_sync_audit_log_none_returns_false(self):
+        self.assertFalse(sync_audit_log_to_google_sheet(None))
+
+    @patch('recommendations.sheets.sync_audit_log_to_google_sheet')
+    def test_backfill_audit_logs_to_google_sheet(self, mock_sync):
+        mock_sync.return_value = True
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_SUBMITTED,
+            target_email="backfill1@gmail.com",
+            target_name="Backfill 1"
+        )
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_APPROVED,
+            target_email="backfill2@gmail.com",
+            target_name="Backfill 2"
+        )
+        count = backfill_audit_logs_to_google_sheet()
+        self.assertGreaterEqual(count, 2)
 
 
 class CalendarSyncTestCase(TestCase):

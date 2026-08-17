@@ -86,6 +86,8 @@ def _get_worksheet_case_insensitive(sh, target_name):
             return ws
         if target_clean in ('members',) and title_clean in ('miembros', 'socios', 'directorio'):
             return ws
+        if target_clean in ('auditlog', 'auditlogs') and title_clean in ('auditlog', 'auditlogs', 'bitacora', 'auditoria', 'registro', 'audit'):
+            return ws
     return None
 
 
@@ -408,6 +410,77 @@ def update_pending_request_status_in_google_sheet(email, status_display, reviewe
     except Exception as e:
         logger.warning(f"Failed to update pending request status in Google Sheet: {e}")
         return False
+
+
+def sync_audit_log_to_google_sheet(log_entry):
+    """
+    Appends an immutable audit log record to the 'Audit_Log' tab in Google Sheets.
+    Creates the tab with standard headers if it does not already exist.
+    """
+    if not log_entry:
+        return False
+
+    try:
+        from datetime import datetime
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = _get_worksheet_case_insensitive(sh, "Audit_Log")
+        if not worksheet:
+            worksheet = sh.add_worksheet(title="Audit_Log", rows=100, cols=7)
+
+        all_values = worksheet.get_all_values()
+        expected_headers = ['Timestamp', 'Action', 'Target Member', 'Target Email', 'Performed By', 'Admin Email', 'Notes']
+
+        if not all_values:
+            worksheet.update(values=[expected_headers], range_name='A1:G1')
+            all_values = [expected_headers]
+
+        headers = all_values[0]
+        missing_cols = [col for col in expected_headers if col.lower() not in [h.strip().lower() for h in headers]]
+        if missing_cols:
+            new_headers = headers + missing_cols
+            end_letter = chr(64 + len(new_headers)) if len(new_headers) <= 26 else 'Z'
+            worksheet.update(values=[new_headers], range_name=f"A1:{end_letter}1")
+            headers = new_headers
+
+        timestamp_str = log_entry.created_at.strftime("%Y-%m-%d %H:%M") if log_entry.created_at else datetime.now().strftime("%Y-%m-%d %H:%M")
+        action_display = log_entry.get_action_display() if hasattr(log_entry, 'get_action_display') else str(log_entry.action).title()
+
+        field_values = {
+            'timestamp': timestamp_str,
+            'action': action_display,
+            'target member': log_entry.target_name,
+            'target email': log_entry.target_email,
+            'performed by': log_entry.actor_name,
+            'admin email': log_entry.actor_email,
+            'notes': log_entry.notes or '',
+        }
+
+        new_row = []
+        for h in headers:
+            key = h.strip().lower()
+            new_row.append(field_values.get(key, ''))
+
+        worksheet.append_row(new_row)
+        logger.info(f"Successfully appended audit log entry for {log_entry.target_email} ({action_display}) to Google Sheet.")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to sync audit log entry to Google Sheet: {e}")
+        return False
+
+
+def backfill_audit_logs_to_google_sheet():
+    """
+    Backfills all existing SQLite MembershipAuditLog entries into the Google Sheets 'Audit_Log' tab.
+    """
+    from recommendations.models import MembershipAuditLog
+    logs = MembershipAuditLog.objects.all().order_by('created_at')
+    count = 0
+    for log_entry in logs:
+        if sync_audit_log_to_google_sheet(log_entry):
+            count += 1
+    return count
 
 
 def delete_profile_from_google_sheet(email):

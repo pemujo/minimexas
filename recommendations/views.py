@@ -14,6 +14,7 @@ from .sheets import (
     sync_profile_to_google_sheet,
     sync_pending_request_to_google_sheet,
     update_pending_request_status_in_google_sheet,
+    sync_audit_log_to_google_sheet,
     delete_profile_from_google_sheet,
     reconcile_members_with_google_sheet,
 )
@@ -416,7 +417,7 @@ def profile_delete_self_view(request):
 
     if user_email:
         # Audit log before deletion
-        MembershipAuditLog.objects.create(
+        audit_entry = MembershipAuditLog.objects.create(
             action=MembershipAuditLog.ACTION_DELETED,
             target_email=user_email,
             target_name=user_name,
@@ -424,6 +425,10 @@ def profile_delete_self_view(request):
             actor_email=user_email,
             notes="Account self-deleted by member."
         )
+        try:
+            sync_audit_log_to_google_sheet(audit_entry)
+        except Exception as e:
+            logger.warning(f"Failed to sync audit log for self-removal ({user_email}) to Google Sheet: {e}")
 
         # Delete profile and requests from database
         MemberProfile.objects.filter(email__iexact=user_email).delete()
@@ -585,7 +590,7 @@ def join_request_view(request):
                     )
 
                     # Log to MembershipAuditLog
-                    MembershipAuditLog.objects.create(
+                    audit_entry = MembershipAuditLog.objects.create(
                         action=MembershipAuditLog.ACTION_SUBMITTED,
                         target_email=email,
                         target_name=full_name,
@@ -593,6 +598,10 @@ def join_request_view(request):
                         actor_email=email,
                         notes=f"Referral: {referral_source} | Phone: {phone_number} | Region: {region} {f'({city})' if city else ''}".strip()
                     )
+                    try:
+                        sync_audit_log_to_google_sheet(audit_entry)
+                    except Exception as e:
+                        logger.warning(f"Failed to sync submission audit log for {email} to Google Sheet: {e}")
 
                     # Send notification email to all admins
                     try:
@@ -772,7 +781,7 @@ def organizer_approve_request_view(request, request_id):
 
     # Audit Log Entry
     admin_email = request.session.get('member_email', '')
-    MembershipAuditLog.objects.create(
+    audit_entry = MembershipAuditLog.objects.create(
         action=MembershipAuditLog.ACTION_APPROVED,
         target_email=req.email,
         target_name=req.full_name,
@@ -780,6 +789,10 @@ def organizer_approve_request_view(request, request_id):
         actor_email=admin_email,
         notes="Membership request approved."
     )
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to sync audit log for approval ({req.email}) to Google Sheet: {e}")
 
     # Set session flash data for confirmation alert & direct WhatsApp button
     request.session['approved_flash_name'] = req.full_name or req.email
@@ -827,7 +840,7 @@ def organizer_reject_request_view(request, request_id):
 
     # Audit Log Entry
     admin_email = request.session.get('member_email', '')
-    MembershipAuditLog.objects.create(
+    audit_entry = MembershipAuditLog.objects.create(
         action=MembershipAuditLog.ACTION_REJECTED,
         target_email=req.email,
         target_name=req.full_name,
@@ -835,6 +848,10 @@ def organizer_reject_request_view(request, request_id):
         actor_email=admin_email,
         notes=req.review_notes or "Membership request declined."
     )
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to sync audit log for rejection ({req.email}) to Google Sheet: {e}")
 
     # Update Pending_Requests tab in Google Sheets
     try:
@@ -885,7 +902,7 @@ def organizer_direct_add_member_view(request):
     # Audit Log Entry
     actor_name = request.session.get('member_name', 'Organizer')
     actor_email = request.session.get('member_email', '')
-    MembershipAuditLog.objects.create(
+    audit_entry = MembershipAuditLog.objects.create(
         action=MembershipAuditLog.ACTION_DIRECT_ADDED,
         target_email=email,
         target_name=full_name,
@@ -893,6 +910,10 @@ def organizer_direct_add_member_view(request):
         actor_email=actor_email,
         notes=f"Added directly by admin. Role: {role} | Phone: {phone_number}"
     )
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to sync audit log for direct add ({email}) to Google Sheet: {e}")
 
     try:
         sync_profile_to_google_sheet(profile)
@@ -925,7 +946,7 @@ def organizer_delete_member_view(request, member_id):
     # Audit Log Entry
     actor_name = request.session.get('member_name', 'Organizer')
     actor_email = request.session.get('member_email', '')
-    MembershipAuditLog.objects.create(
+    audit_entry = MembershipAuditLog.objects.create(
         action=MembershipAuditLog.ACTION_DELETED,
         target_email=target_email,
         target_name=target_name,
@@ -933,6 +954,10 @@ def organizer_delete_member_view(request, member_id):
         actor_email=actor_email,
         notes="Member deleted from directory and Google Sheets by organizer."
     )
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to sync audit log for deletion ({target_email}) to Google Sheet: {e}")
 
     # 1. Delete profile from database
     profile.delete()
