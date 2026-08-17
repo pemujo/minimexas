@@ -93,6 +93,7 @@ class AuthHelpersTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         # Admin user check
@@ -129,6 +130,7 @@ class AuthHelpersTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         allowed, name, is_admin = is_gmail_allowed('   carlos@gmail.com   ')
@@ -188,6 +190,7 @@ class SheetsSyncTestCase(TestCase):
         mock_sh.sheet1 = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         results = fetch_recommendations()
@@ -212,6 +215,7 @@ class SheetsSyncTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         profile = MemberProfile(
@@ -240,6 +244,7 @@ class SheetsSyncTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         profile = MemberProfile(
@@ -272,6 +277,7 @@ class SheetsSyncTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         req = MembershipRequest(
@@ -299,6 +305,7 @@ class SheetsSyncTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         req = MembershipRequest(
@@ -327,6 +334,7 @@ class SheetsSyncTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_client
 
         res = update_pending_request_status_in_google_sheet('target@gmail.com', 'Declined', 'Admin Maria', review_notes='Outside Bay Area')
@@ -1578,6 +1586,7 @@ class MemberDeletionTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_gc = MagicMock()
         mock_gc.open.return_value = mock_sh
+        mock_gc.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_gc
 
         success = delete_profile_from_google_sheet("diego.rivera@gmail.com")
@@ -1595,6 +1604,7 @@ class MemberDeletionTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_gc = MagicMock()
         mock_gc.open.return_value = mock_sh
+        mock_gc.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_gc
 
         success = delete_profile_from_google_sheet("absent.user@gmail.com")
@@ -1635,6 +1645,7 @@ class ReconciliationSyncTestCase(TestCase):
         mock_sh.worksheet.return_value = mock_ws
         mock_gc = MagicMock()
         mock_gc.open.return_value = mock_sh
+        mock_gc.open_by_key.return_value = mock_sh
         mock_get_client.return_value = mock_gc
 
         result = reconcile_members_with_google_sheet()
@@ -1707,31 +1718,18 @@ class ReconciliationSyncTestCase(TestCase):
 class OpenGoogleSpreadsheetConfigTestCase(TestCase):
     def test_open_by_sheet_key_when_configured(self):
         mock_gc = MagicMock()
-        with override_settings(GOOGLE_SHEET_KEY="1abc_test_sheet_key_123", GOOGLE_SHEET_NAME="Default Name"):
+        with override_settings(GOOGLE_SHEET_KEY="1abc_test_sheet_key_123"):
             open_google_spreadsheet(mock_gc)
             mock_gc.open_by_key.assert_called_once_with("1abc_test_sheet_key_123")
-            mock_gc.open.assert_not_called()
-            mock_gc.open_by_url.assert_not_called()
 
-    def test_open_by_sheet_url_when_configured(self):
+    def test_open_raises_value_error_when_key_is_missing(self):
         mock_gc = MagicMock()
-        with override_settings(GOOGLE_SHEET_KEY="", GOOGLE_SHEET_URL="https://docs.google.com/spreadsheets/d/test_url_key/edit", GOOGLE_SHEET_NAME="Default Name"):
-            open_google_spreadsheet(mock_gc)
-            mock_gc.open_by_url.assert_called_once_with("https://docs.google.com/spreadsheets/d/test_url_key/edit")
-            mock_gc.open.assert_not_called()
-            mock_gc.open_by_key.assert_not_called()
+        with override_settings(GOOGLE_SHEET_KEY=""):
+            with patch.dict('os.environ', {'GOOGLE_SHEET_KEY': '', 'GOOGLE_SHEET_ID': ''}):
+                with self.assertRaises(ValueError) as ctx:
+                    open_google_spreadsheet(mock_gc)
+                self.assertIn("GOOGLE_SHEET_KEY is not configured", str(ctx.exception))
 
-    def test_open_by_custom_sheet_name_when_configured(self):
-        mock_gc = MagicMock()
-        with override_settings(GOOGLE_SHEET_KEY="", GOOGLE_SHEET_URL="", GOOGLE_SHEET_NAME="MiniMexitas Production"):
-            open_google_spreadsheet(mock_gc)
-            mock_gc.open.assert_called_once_with("MiniMexitas Production")
-
-    def test_open_defaults_to_whatsapp_recommendations_when_unset(self):
-        mock_gc = MagicMock()
-        with override_settings(GOOGLE_SHEET_KEY="", GOOGLE_SHEET_URL="", GOOGLE_SHEET_NAME=""):
-            open_google_spreadsheet(mock_gc)
-            mock_gc.open.assert_called_once_with("WhatsApp Recommendations")
 
 
 

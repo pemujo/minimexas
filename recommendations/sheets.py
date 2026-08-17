@@ -48,22 +48,14 @@ def get_gspread_client():
 
 def open_google_spreadsheet(gc):
     """
-    Opens the configured Google Spreadsheet based on settings/environment variables:
-    1. GOOGLE_SHEET_KEY / GOOGLE_SHEET_ID (by unique spreadsheet key)
-    2. GOOGLE_SHEET_URL (by full spreadsheet URL)
-    3. GOOGLE_SHEET_NAME (by spreadsheet title, defaults to 'WhatsApp Recommendations')
+    Opens the target Google Spreadsheet using the GOOGLE_SHEET_KEY (or GOOGLE_SHEET_ID)
+    environment variable.
     """
     sheet_key = getattr(settings, 'GOOGLE_SHEET_KEY', '') or os.environ.get('GOOGLE_SHEET_KEY', os.environ.get('GOOGLE_SHEET_ID', ''))
     if sheet_key and str(sheet_key).strip():
         return gc.open_by_key(str(sheet_key).strip())
 
-    sheet_url = getattr(settings, 'GOOGLE_SHEET_URL', '') or os.environ.get('GOOGLE_SHEET_URL', '')
-    if sheet_url and str(sheet_url).strip():
-        return gc.open_by_url(str(sheet_url).strip())
-
-    sheet_name = getattr(settings, 'GOOGLE_SHEET_NAME', '') or os.environ.get('GOOGLE_SHEET_NAME', 'WhatsApp Recommendations')
-    target_name = str(sheet_name).strip() if sheet_name else 'WhatsApp Recommendations'
-    return gc.open(target_name)
+    raise ValueError("GOOGLE_SHEET_KEY is not configured in .env or environment variables.")
 
 
 def fetch_recommendations():
