@@ -58,15 +58,46 @@ def open_google_spreadsheet(gc):
     raise ValueError("GOOGLE_SHEET_KEY is not configured in .env or environment variables.")
 
 
+def _get_worksheet_case_insensitive(sh, target_name):
+    """
+    Finds a worksheet in spreadsheet `sh` matching target_name.
+    Tries exact title first, then searches all worksheets case-insensitively.
+    """
+    try:
+        ws = sh.worksheet(target_name)
+        if ws:
+            return ws
+    except Exception:
+        pass
+
+    target_clean = str(target_name).strip().lower().replace("_", "").replace(" ", "")
+    try:
+        worksheets = sh.worksheets()
+    except Exception:
+        return None
+
+    for ws in worksheets:
+        title = getattr(ws, 'title', '')
+        title_clean = str(title).strip().lower().replace("_", "").replace(" ", "")
+        if title_clean == target_clean:
+            return ws
+        # Semantic aliases
+        if target_clean in ('pendingrequests', 'requests') and title_clean in ('solicitudes', 'pendientes', 'solicitudespendientes'):
+            return ws
+        if target_clean in ('members',) and title_clean in ('miembros', 'socios', 'directorio'):
+            return ws
+    return None
+
+
 def fetch_recommendations():
     """
     Fetches rows from the Google Sheet and returns normalized dictionaries.
     """
     gc = get_gspread_client()
     sh = open_google_spreadsheet(gc)
-    worksheet = sh.sheet1
+    worksheet = getattr(sh, 'sheet1', None) or _get_worksheet_case_insensitive(sh, "Recomendaciones")
     
-    raw_records = worksheet.get_all_records()
+    raw_records = worksheet.get_all_records() if worksheet else []
     return [_normalize_record_keys(row) for row in raw_records]
 
 
@@ -85,9 +116,8 @@ def sync_profile_to_google_sheet(profile):
         gc = get_gspread_client()
         sh = open_google_spreadsheet(gc)
 
-        try:
-            worksheet = sh.worksheet("Members")
-        except Exception:
+        worksheet = _get_worksheet_case_insensitive(sh, "Members")
+        if not worksheet:
             worksheet = sh.add_worksheet(title="Members", rows=100, cols=10)
 
         # Get all current values in the sheet
@@ -197,9 +227,8 @@ def sync_pending_request_to_google_sheet(request_obj):
         gc = get_gspread_client()
         sh = open_google_spreadsheet(gc)
 
-        try:
-            worksheet = sh.worksheet("Pending_Requests")
-        except Exception:
+        worksheet = _get_worksheet_case_insensitive(sh, "Pending_Requests")
+        if not worksheet:
             worksheet = sh.add_worksheet(title="Pending_Requests", rows=100, cols=11)
 
         all_values = worksheet.get_all_values()
@@ -282,31 +311,52 @@ def sync_pending_request_to_google_sheet(request_obj):
 def update_pending_request_status_in_google_sheet(email, status_display, reviewed_by="", review_notes=""):
     """
     Updates the status, reviewer, and optional review notes in the 'Pending_Requests' tab when an organizer approves or declines.
+    If a database record exists, syncs the full model. Otherwise, performs in-place worksheet update/append.
     """
     if not email:
         return False
     try:
         from datetime import datetime
+        from recommendations.models import MembershipRequest
+        
+        req_obj = MembershipRequest.objects.filter(email__iexact=email.strip().lower()).first()
+        if req_obj:
+            if status_display.lower() in ('approved', 'aprobado'):
+                req_obj.status = MembershipRequest.STATUS_APPROVED
+            elif status_display.lower() in ('declined', 'rejected', 'rechazado'):
+                req_obj.status = MembershipRequest.STATUS_REJECTED
+            if reviewed_by:
+                req_obj.reviewed_by = reviewed_by
+            if review_notes:
+                req_obj.review_notes = review_notes
+            return sync_pending_request_to_google_sheet(req_obj)
+
         gc = get_gspread_client()
         sh = open_google_spreadsheet(gc)
-        try:
-            worksheet = sh.worksheet("Pending_Requests")
-        except Exception:
-            return False
+        worksheet = _get_worksheet_case_insensitive(sh, "Pending_Requests")
+        if not worksheet:
+            worksheet = sh.add_worksheet(title="Pending_Requests", rows=100, cols=11)
 
         all_values = worksheet.get_all_values()
+        expected_headers = ['Name', 'Gmail', 'Phone', 'Region', 'City', 'Referral Source', 'Status', 'Submitted At', 'Reviewed By', 'Reviewed At', 'Review Notes']
+
         if not all_values:
-            return False
+            worksheet.update(values=[expected_headers], range_name='A1:K1')
+            all_values = [expected_headers]
 
         headers = all_values[0]
+        missing_cols = [col for col in expected_headers if col.lower() not in [h.strip().lower() for h in headers]]
+        if missing_cols:
+            new_headers = headers + missing_cols
+            end_letter = chr(64 + len(new_headers)) if len(new_headers) <= 26 else 'Z'
+            worksheet.update(values=[new_headers], range_name=f"A1:{end_letter}1")
+            headers = new_headers
+
         col_map = {h.strip().lower(): idx for idx, h in enumerate(headers)}
         status_col_idx = col_map.get('status')
         reviewed_by_col_idx = col_map.get('reviewed by')
         reviewed_at_col_idx = col_map.get('reviewed at')
         review_notes_col_idx = col_map.get('review notes')
-
-        if status_col_idx is None:
-            return False
 
         clean_target_email = email.strip().lower()
         target_row_idx = None
@@ -318,24 +368,42 @@ def update_pending_request_status_in_google_sheet(email, status_display, reviewe
             if target_row_idx:
                 break
 
-        if not target_row_idx:
-            return False
+        if target_row_idx:
+            current_row = all_values[target_row_idx - 1]
+            while len(current_row) < len(headers):
+                current_row.append('')
 
-        current_row = all_values[target_row_idx - 1]
-        while len(current_row) < len(headers):
-            current_row.append('')
+            if status_col_idx is not None:
+                current_row[status_col_idx] = status_display
+            if reviewed_by_col_idx is not None:
+                current_row[reviewed_by_col_idx] = reviewed_by
+            if reviewed_at_col_idx is not None:
+                current_row[reviewed_at_col_idx] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if review_notes_col_idx is not None and review_notes:
+                current_row[review_notes_col_idx] = review_notes
 
-        current_row[status_col_idx] = status_display
-        if reviewed_by_col_idx is not None:
-            current_row[reviewed_by_col_idx] = reviewed_by
-        if reviewed_at_col_idx is not None:
-            current_row[reviewed_at_col_idx] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        if review_notes_col_idx is not None and review_notes:
-            current_row[review_notes_col_idx] = review_notes
+            end_letter = chr(64 + len(headers)) if len(headers) <= 26 else 'Z'
+            worksheet.update(values=[current_row], range_name=f"A{target_row_idx}:{end_letter}{target_row_idx}")
+            logger.info(f"Updated pending request status for {email} to {status_display} in Google Sheet.")
+        else:
+            new_row = []
+            for h in headers:
+                key = h.strip().lower()
+                if key in ('gmail', 'email'):
+                    new_row.append(email)
+                elif key == 'status':
+                    new_row.append(status_display)
+                elif key == 'reviewed by':
+                    new_row.append(reviewed_by)
+                elif key == 'reviewed at':
+                    new_row.append(datetime.now().strftime("%Y-%m-%d %H:%M"))
+                elif key == 'review notes':
+                    new_row.append(review_notes)
+                else:
+                    new_row.append('')
+            worksheet.append_row(new_row)
+            logger.info(f"Appended request status for {email} to {status_display} in Google Sheet.")
 
-        end_letter = chr(64 + len(headers)) if len(headers) <= 26 else 'Z'
-        worksheet.update(values=[current_row], range_name=f"A{target_row_idx}:{end_letter}{target_row_idx}")
-        logger.info(f"Updated pending request status for {email} to {status_display} in Google Sheet.")
         return True
     except Exception as e:
         logger.warning(f"Failed to update pending request status in Google Sheet: {e}")
@@ -357,9 +425,8 @@ def delete_profile_from_google_sheet(email):
         gc = get_gspread_client()
         sh = open_google_spreadsheet(gc)
 
-        try:
-            worksheet = sh.worksheet("Members")
-        except Exception:
+        worksheet = _get_worksheet_case_insensitive(sh, "Members")
+        if not worksheet:
             logger.warning("Members worksheet not found when attempting to delete profile.")
             return True
 
@@ -413,9 +480,8 @@ def reconcile_members_with_google_sheet():
         gc = get_gspread_client()
         sh = open_google_spreadsheet(gc)
 
-        try:
-            worksheet = sh.worksheet("Members")
-        except Exception:
+        worksheet = _get_worksheet_case_insensitive(sh, "Members")
+        if not worksheet:
             logger.warning("Members worksheet not found during reconciliation.")
             return {
                 'success': False,

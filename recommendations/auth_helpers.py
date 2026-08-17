@@ -1,6 +1,6 @@
 import logging
 from django.conf import settings
-from .sheets import get_gspread_client, open_google_spreadsheet
+from .sheets import get_gspread_client, open_google_spreadsheet, _get_worksheet_case_insensitive
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,9 @@ def is_gmail_allowed(user_email):
         gc = get_gspread_client()
         sh = open_google_spreadsheet(gc)
         
-        worksheet = sh.worksheet("Members")
+        worksheet = _get_worksheet_case_insensitive(sh, "Members")
+        if not worksheet:
+            return False, None, False
         records = worksheet.get_all_records()
         
         for row in records:
