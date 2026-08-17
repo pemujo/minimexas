@@ -6,11 +6,12 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils import timezone
 from .sheets import fetch_recommendations, sync_profile_to_google_sheet
 from .auth_helpers import is_gmail_allowed
-from .models import MemberProfile
+from .models import MemberProfile, MembershipRequest
 
 logger = logging.getLogger(__name__)
 
@@ -166,8 +167,24 @@ def google_callback_view(request):
         request.session.set_expiry(60 * 60 * 24 * 30)  # Logged in for 30 days
         return redirect('home')
     else:
-        error_msg = f"The Gmail account ({user_email}) is not listed as an active group member."
-        return render(request, 'recommendations/login.html', {'error': error_msg})
+        # Check if there is a pending or recent request for this email
+        pending_req = MembershipRequest.objects.filter(
+            email=user_email, 
+            status=MembershipRequest.STATUS_PENDING
+        ).first()
+
+        if pending_req:
+            error_msg = f"Your membership request for ({user_email}) was received on {pending_req.created_at.strftime('%b %d, %Y')} and is currently pending organizer approval. We will notify you once approved!"
+            is_pending = True
+        else:
+            error_msg = f"The Gmail account ({user_email}) is not registered in our verified member directory."
+            is_pending = False
+
+        return render(request, 'recommendations/login.html', {
+            'error': error_msg,
+            'is_pending_request': is_pending,
+            'unregistered_email': user_email,
+        })
 
 
 def login_page_view(request):
@@ -270,6 +287,7 @@ def profile_view(request):
     )
 
     success_message = None
+    error_message = None
 
     if request.method == 'POST':
         full_name = request.POST.get('full_name', '').strip()
@@ -279,33 +297,40 @@ def profile_view(request):
         family_info = request.POST.get('family_info', '').strip()
         bio = request.POST.get('bio', '').strip()
 
-        # Handle selected interests checkboxes
-        selected_interests = request.POST.getlist('interests')
-        custom_interests = request.POST.get('interests_custom', '').strip()
-        if custom_interests and custom_interests not in selected_interests:
-            selected_interests.append(custom_interests)
-        interests_str = ", ".join(selected_interests)
+        # Full name and Phone number are mandatory
+        phone_digits = "".join(ch for ch in phone_number if ch.isdigit())
+        if not full_name:
+            error_message = "Please provide your full name."
+        elif not phone_number or len(phone_digits) < 10:
+            error_message = "A valid WhatsApp phone number (minimum 10 digits, e.g., +52 55 1234 5678 or +1 415 555 1234) is required."
+        else:
+            # Handle selected interests checkboxes
+            selected_interests = request.POST.getlist('interests')
+            custom_interests = request.POST.get('interests_custom', '').strip()
+            if custom_interests and custom_interests not in selected_interests:
+                selected_interests.append(custom_interests)
+            interests_str = ", ".join(selected_interests)
 
-        profile.full_name = full_name or profile.full_name
-        profile.phone_number = phone_number
-        profile.region = region
-        profile.city = city
-        profile.family_info = family_info
-        profile.interests = interests_str
-        profile.bio = bio
-        profile.save()
+            profile.full_name = full_name or profile.full_name
+            profile.phone_number = phone_number
+            profile.region = region
+            profile.city = city
+            profile.family_info = family_info
+            profile.interests = interests_str
+            profile.bio = bio
+            profile.save()
 
-        # Update session member name if changed
-        if profile.full_name:
-            request.session['member_name'] = profile.full_name
+            # Update session member name if changed
+            if profile.full_name:
+                request.session['member_name'] = profile.full_name
 
-        # Securely sync profile changes to Google Sheet
-        try:
-            sync_profile_to_google_sheet(profile)
-        except Exception as sync_err:
-            logger.warning(f"Google Sheet sync warning: {sync_err}")
+            # Securely sync profile changes to Google Sheet
+            try:
+                sync_profile_to_google_sheet(profile)
+            except Exception as sync_err:
+                logger.warning(f"Google Sheet sync warning: {sync_err}")
 
-        success_message = "Your profile and region details have been updated successfully!"
+            success_message = "Your profile and region details have been updated successfully!"
 
     # Parse selected interests for checkbox states in the UI
     current_interests = [i.strip() for i in profile.interests.split(",") if i.strip()] if profile.interests else []
@@ -332,17 +357,53 @@ def profile_view(request):
         'region_stats': region_stats,
         'total_region_responses': total_profiles,
         'success_message': success_message,
+        'error_message': error_message,
         'member_name': request.session.get('member_name', 'Member'),
         'member_email': member_email,
         'active_page': 'profile',
     })
 
 
+def get_whatsapp_url(phone):
+    """
+    Constructs a direct WhatsApp messaging URL (https://wa.me/<digits>)
+    from a member's phone number string.
+
+    Supports:
+    - Mexico (+52, +52 1, 52XXXXXXXXXX, etc.)
+    - United States & Canada (+1, 10-digit local format)
+    - International numbers (+34, +54, +57, +44, etc.)
+    - Strips international exit codes (011, 00)
+    """
+    if not phone:
+        return ""
+    raw = str(phone).strip()
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if not digits:
+        return ""
+
+    # Remove standard international exit dialing prefixes (011 from US or 00 international)
+    if digits.startswith("011"):
+        digits = digits[3:]
+    elif digits.startswith("00"):
+        digits = digits[2:]
+
+    # Mexico numbers (+52, +52 1, 52...)
+    if digits.startswith("52"):
+        return f"https://wa.me/{digits}"
+
+    # Standard 10-digit number without country code defaults to North America (+1)
+    if len(digits) == 10:
+        digits = "1" + digits
+
+    return f"https://wa.me/{digits}"
+
+
 @member_required
 def member_directory_view(request):
     """
-    Public community directory accessible to all verified members.
-    For member privacy, Phone numbers, Gmail addresses, and Roles are strictly excluded.
+    Community directory accessible to all verified members.
+    Includes direct WhatsApp messaging links for connected members.
     """
     profiles = MemberProfile.objects.all().order_by('full_name', 'id')
     total_members = profiles.count()
@@ -362,7 +423,7 @@ def member_directory_view(request):
                 'percentage': pct,
             })
 
-    # Prepare privacy-safe list (phone, gmail, and role strictly omitted)
+    # Prepare member list with WhatsApp messaging links
     member_list = []
     for p in profiles:
         interests_list = [i.strip() for i in p.interests.split(',') if i.strip()] if p.interests else []
@@ -376,6 +437,7 @@ def member_directory_view(request):
             'interests_list': interests_list,
             'interests_raw': p.interests,
             'bio': p.bio,
+            'whatsapp_url': get_whatsapp_url(p.phone_number),
             'updated_at': p.updated_at,
         })
 
@@ -391,6 +453,68 @@ def member_directory_view(request):
     })
 
 
+def join_request_view(request):
+    """
+    Public form for prospective members to request access to MiniMexitas.
+    Submitted requests are placed in 'pending' status for organizer review.
+    """
+    if is_authenticated_member(request):
+        return redirect('home')
+
+    error_message = None
+    success_submitted = False
+    submitted_email = ""
+
+    if request.method == 'POST':
+        full_name = request.POST.get('full_name', '').strip()
+        email = request.POST.get('email', '').strip().lower()
+        phone_number = request.POST.get('phone_number', '').strip()
+        region = request.POST.get('region', '').strip()
+        city = request.POST.get('city', '').strip()
+        referral_source = request.POST.get('referral_source', '').strip()
+
+        # Validation
+        phone_digits = "".join(ch for ch in phone_number if ch.isdigit())
+        if not full_name:
+            error_message = "Please enter your full name."
+        elif not email or '@' not in email or '.' not in email.split('@')[-1]:
+            error_message = "Please enter a valid Google / Gmail address."
+        elif not phone_number or len(phone_digits) < 10:
+            error_message = "Please enter a valid WhatsApp phone number (minimum 10 digits, e.g. +52 55 1234 5678 or +1 415 555 1234)."
+        elif not region:
+            error_message = "Please select your primary Bay Area region."
+        elif not referral_source:
+            error_message = "Please let us know how you heard about MiniMexitas or who referred you."
+        else:
+            # Check if user is already an approved member
+            if MemberProfile.objects.filter(email=email).exists():
+                error_message = f"An account for ({email}) is already registered! You can sign in directly using your Google account."
+            else:
+                # Check if there is already a pending request
+                existing_req = MembershipRequest.objects.filter(email=email).order_by('-created_at').first()
+                if existing_req and existing_req.status == MembershipRequest.STATUS_PENDING:
+                    error_message = f"A membership request for ({email}) has already been submitted and is currently awaiting organizer review. We will contact you soon!"
+                else:
+                    MembershipRequest.objects.create(
+                        full_name=full_name,
+                        email=email,
+                        phone_number=phone_number,
+                        region=region,
+                        city=city,
+                        referral_source=referral_source,
+                        status=MembershipRequest.STATUS_PENDING
+                    )
+                    success_submitted = True
+                    submitted_email = email
+
+    return render(request, 'recommendations/join.html', {
+        'region_choices': MemberProfile.REGION_CHOICES,
+        'error_message': error_message,
+        'success_submitted': success_submitted,
+        'submitted_email': submitted_email,
+    })
+
+
 @admin_required
 def organizer_dashboard_view(request):
     profiles = MemberProfile.objects.all().order_by('-updated_at')
@@ -398,6 +522,25 @@ def organizer_dashboard_view(request):
     total_members = profiles.count()
     total_with_region = profiles.exclude(region='').count()
     total_with_phone = profiles.exclude(phone_number='').count()
+
+    # Pending & reviewed membership requests
+    pending_requests_qs = MembershipRequest.objects.filter(status=MembershipRequest.STATUS_PENDING).order_by('-created_at')
+    pending_requests = []
+    for pr in pending_requests_qs:
+        pending_requests.append({
+            'id': pr.id,
+            'full_name': pr.full_name,
+            'email': pr.email,
+            'phone_number': pr.phone_number,
+            'region_label': pr.get_region_display() if pr.region else '',
+            'city': pr.city,
+            'referral_source': pr.referral_source,
+            'whatsapp_url': get_whatsapp_url(pr.phone_number),
+            'created_at': pr.created_at,
+        })
+    pending_count = len(pending_requests)
+
+    reviewed_requests = MembershipRequest.objects.exclude(status=MembershipRequest.STATUS_PENDING).order_by('-reviewed_at')[:20]
 
     # Calculate region distribution stats across all registered members
     counts = MemberProfile.objects.exclude(region='').values('region').annotate(count=Count('region')).order_by('-count')
@@ -417,17 +560,130 @@ def organizer_dashboard_view(request):
                 'percentage': pct,
             })
 
+    # Flash messages from query params
+    action_message = None
+    if request.GET.get('approved'):
+        action_message = "Membership request approved successfully! Member added to directory and synced to Google Sheets."
+    elif request.GET.get('declined'):
+        action_message = "Membership request declined."
+    elif request.GET.get('added'):
+        action_message = "New member added directly and synced to Google Sheets!"
+
     return render(request, 'recommendations/organizers.html', {
         'profiles': profiles,
         'total_members': total_members,
         'total_with_region': total_with_region,
         'total_with_phone': total_with_phone,
+        'pending_requests': pending_requests,
+        'pending_count': pending_count,
+        'reviewed_requests': reviewed_requests,
         'region_stats': region_stats,
         'top_region': top_region,
         'region_choices': MemberProfile.REGION_CHOICES,
+        'action_message': action_message,
         'member_name': request.session.get('member_name', 'Organizer'),
         'active_page': 'organizers',
     })
+
+
+@admin_required
+def organizer_approve_request_view(request, request_id):
+    if request.method != 'POST':
+        return redirect('organizer_dashboard')
+
+    req = get_object_or_404(MembershipRequest, id=request_id, status=MembershipRequest.STATUS_PENDING)
+    reviewer = request.session.get('member_name') or request.session.get('member_email', 'Organizer')
+
+    req.status = MembershipRequest.STATUS_APPROVED
+    req.reviewed_by = reviewer
+    req.reviewed_at = timezone.now()
+    req.save()
+
+    # Create / update MemberProfile
+    profile, created = MemberProfile.objects.get_or_create(
+        email=req.email.strip().lower(),
+        defaults={
+            'full_name': req.full_name,
+            'phone_number': req.phone_number,
+            'region': req.region,
+            'city': req.city,
+            'is_admin': False
+        }
+    )
+    if not created:
+        profile.full_name = req.full_name or profile.full_name
+        profile.phone_number = req.phone_number or profile.phone_number
+        profile.region = req.region or profile.region
+        profile.city = req.city or profile.city
+        profile.save()
+
+    # Sync to Google Sheets
+    try:
+        sync_profile_to_google_sheet(profile)
+    except Exception as e:
+        logger.warning(f"Failed to sync approved member to Google Sheet: {e}")
+
+    return redirect(reverse('organizer_dashboard') + '?approved=1')
+
+
+@admin_required
+def organizer_reject_request_view(request, request_id):
+    if request.method != 'POST':
+        return redirect('organizer_dashboard')
+
+    req = get_object_or_404(MembershipRequest, id=request_id, status=MembershipRequest.STATUS_PENDING)
+    reviewer = request.session.get('member_name') or request.session.get('member_email', 'Organizer')
+
+    req.status = MembershipRequest.STATUS_REJECTED
+    req.reviewed_by = reviewer
+    req.reviewed_at = timezone.now()
+    req.review_notes = request.POST.get('review_notes', '').strip()
+    req.save()
+
+    return redirect(reverse('organizer_dashboard') + '?declined=1')
+
+
+@admin_required
+def organizer_direct_add_member_view(request):
+    if request.method != 'POST':
+        return redirect('organizer_dashboard')
+
+    full_name = request.POST.get('full_name', '').strip()
+    email = request.POST.get('email', '').strip().lower()
+    phone_number = request.POST.get('phone_number', '').strip()
+    phone_digits = "".join(ch for ch in phone_number if ch.isdigit())
+    region = request.POST.get('region', '').strip()
+    city = request.POST.get('city', '').strip()
+    role = request.POST.get('role', 'Member').strip()
+    is_admin = (role.lower() in ('admin', 'organizer'))
+
+    if not email or '@' not in email or not full_name or len(phone_digits) < 10:
+        return redirect('organizer_dashboard')
+
+    profile, _ = MemberProfile.objects.get_or_create(
+        email=email,
+        defaults={
+            'full_name': full_name,
+            'phone_number': phone_number,
+            'region': region,
+            'city': city,
+            'is_admin': is_admin
+        }
+    )
+    profile.full_name = full_name or profile.full_name
+    profile.phone_number = phone_number or profile.phone_number
+    profile.region = region or profile.region
+    profile.city = city or profile.city
+    profile.is_admin = is_admin
+    profile.save()
+
+    try:
+        sync_profile_to_google_sheet(profile)
+    except Exception as e:
+        logger.warning(f"Failed to sync direct added member to Google Sheet: {e}")
+
+    return redirect(reverse('organizer_dashboard') + '?added=1')
+
 
 
 

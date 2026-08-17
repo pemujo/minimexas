@@ -65,6 +65,17 @@
         </div>
         {% endif %}
 
+        <!-- Flash Error Notification -->
+        {% if error_message %}
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm d-flex align-items-center mb-4" role="alert" style="background-color: #fef2f2; border-left: 4px solid #ef4444 !important;">
+            <i class="bi bi-exclamation-triangle-fill text-danger fs-5 me-2"></i>
+            <div>
+                <strong class="text-danger">Action Required:</strong> {{ error_message }}
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
         <div class="row g-4">
             
             <!-- Left Sidebar: Profile Overview & Community Insights -->
@@ -191,14 +202,13 @@
 
                                 <div class="col-md-12">
                                     <label for="phoneInput" class="form-label-custom">
-                                        <span>WhatsApp / Mobile Phone</span>
-                                        <span class="text-muted fw-normal small">Optional</span>
+                                        <span>WhatsApp / Mobile Phone <span class="text-danger">*</span></span>
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-light text-muted"><i class="bi bi-whatsapp text-success"></i></span>
-                                        <input type="tel" class="form-control" id="phoneInput" name="phone_number" value="{{ profile.phone_number }}" placeholder="e.g., +1 (415) 555-0123">
+                                        <input type="tel" class="form-control" id="phoneInput" name="phone_number" value="{{ profile.phone_number }}" required placeholder="e.g., +52 55 1234 5678 or +1 (415) 555-0123">
                                     </div>
-                                    <div class="form-text" style="font-size: 0.78rem;">Used by community organizers for event notifications & WhatsApp group coordination.</div>
+                                    <div class="form-text" style="font-size: 0.78rem;">Mandatory for member-to-member WhatsApp connection & event coordination (Mexico +52 and US +1 supported).</div>
                                 </div>
                             </div>
                         </div>

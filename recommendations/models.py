@@ -60,3 +60,55 @@ class MemberProfile(models.Model):
     def __str__(self):
         region_display = self.get_region_display() if self.region else 'No region set'
         return f"{self.full_name or self.email} ({region_display})"
+
+
+class MembershipRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending Approval'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Declined'),
+    ]
+
+    full_name = models.CharField(max_length=150, verbose_name="Full Name")
+    email = models.EmailField(db_index=True, verbose_name="Google / Gmail Address")
+    phone_number = models.CharField(max_length=50, verbose_name="WhatsApp / Phone Number")
+    region = models.CharField(
+        max_length=50, 
+        choices=MemberProfile.REGION_CHOICES, 
+        blank=True, 
+        default='', 
+        verbose_name="Bay Area Region"
+    )
+    city = models.CharField(
+        max_length=100, 
+        blank=True, 
+        verbose_name="City / Neighborhood"
+    )
+    referral_source = models.TextField(
+        blank=True, 
+        verbose_name="Referral Source / How did you hear about MiniMexitas?"
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default=STATUS_PENDING, 
+        db_index=True,
+        verbose_name="Status"
+    )
+    reviewed_by = models.CharField(max_length=150, blank=True, verbose_name="Reviewed By")
+    reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name="Reviewed At")
+    review_notes = models.TextField(blank=True, verbose_name="Internal Review Notes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Membership Request"
+        verbose_name_plural = "Membership Requests"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.full_name} ({self.email}) - {self.get_status_display()}"
