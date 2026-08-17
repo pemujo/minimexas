@@ -1,0 +1,480 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Directory - MiniMexitas Community</title>
+    <meta name="description" content="Discover fellow MiniMexitas community members across the San Francisco Bay Area and connect through shared event interests.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS & Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <style>
+        .directory-card {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 1rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            background: #ffffff;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .directory-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+            border-color: rgba(37, 211, 102, 0.4);
+        }
+        .avatar-circle {
+            width: 46px;
+            height: 46px;
+            min-width: 46px;
+            border-radius: 50%;
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #25d366, #128c7e);
+            color: #ffffff;
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.25);
+        }
+        .region-badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+        .interest-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            background-color: #f1f5f9;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+        }
+        .privacy-banner {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border: 1px solid #a7f3d0;
+            border-radius: 0.875rem;
+        }
+        .view-btn.active {
+            background-color: #25d366 !important;
+            color: #ffffff !important;
+            border-color: #25d366 !important;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- Top Navigation Bar -->
+    {% include 'recommendations/navbar.html' %}
+
+    <main class="container py-4 py-md-5">
+
+        <!-- Breadcrumb & Page Header -->
+        <div class="row mb-4 align-items-center justify-content-between g-3">
+            <div class="col-lg-8">
+                <nav aria-label="breadcrumb" class="mb-2">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted">Home</a></li>
+                        <li class="breadcrumb-item active text-dark fw-semibold" aria-current="page">Member Directory</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h2 class="fw-bold text-dark mb-0">Community Member Directory</h2>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 fw-semibold font-monospace" style="font-size: 0.8rem;">
+                        {{ total_members }} Members
+                    </span>
+                </div>
+                <p class="text-muted small mb-0">
+                    Discover fellow MiniMexitas members across the Bay Area, see shared event interests, and find families in your neighborhood.
+                </p>
+            </div>
+            
+            <div class="col-lg-4 text-lg-end d-flex align-items-center justify-content-lg-end gap-2">
+                <a href="{% url 'profile' %}" class="btn btn-outline-success rounded-pill px-3 py-2 fw-semibold shadow-sm">
+                    <i class="bi bi-pencil-square me-1"></i> Edit My Profile
+                </a>
+                {% if is_admin %}
+                <a href="{% url 'organizer_dashboard' %}" class="btn btn-warning text-dark rounded-pill px-3 py-2 fw-semibold shadow-sm" title="Go to Organizer Admin Dashboard">
+                    <i class="bi bi-shield-lock-fill me-1"></i> Organizer Portal
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Privacy Assurance Banner -->
+        <div class="privacy-banner p-3 p-md-3.5 mb-4 shadow-sm">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center mt-1" style="width: 28px; height: 28px; min-width: 28px; font-size: 0.85rem;">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark small mb-0.5">Privacy Protected Community Directory</div>
+                    <div class="text-secondary small" style="font-size: 0.82rem; line-height: 1.45;">
+                        This directory connects members by region, neighborhood, and shared interests. For member privacy, <strong>phone numbers, Gmail addresses, and organizer roles are hidden</strong>.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search, Filter & Layout Controls -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white p-3 p-md-4 mb-4">
+            <div class="row g-3 align-items-center justify-content-between">
+                
+                <!-- Live Search Box -->
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" id="memberSearchInput" class="form-control border-start-0" placeholder="Search by name, neighborhood, interests, family...">
+                        <button class="btn btn-outline-secondary border-start-0" type="button" id="clearSearchBtn" style="display: none;" title="Clear search">
+                            <i class="bi bi-x-circle"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Region Filter Dropdown -->
+                <div class="col-md-4">
+                    <select id="memberRegionFilter" class="form-select">
+                        <option value="">All Bay Area Regions ({{ total_members }})</option>
+                        {% for code, name in region_choices %}
+                        <option value="{{ name }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- View Switcher (Cards vs List) -->
+                <div class="col-md-3 text-md-end">
+                    <div class="btn-group btn-group-sm shadow-sm" role="group" aria-label="View switch">
+                        <button type="button" class="btn btn-outline-secondary view-btn active px-3" id="viewCardsBtn" title="Cards Grid View">
+                            <i class="bi bi-grid-fill me-1"></i> Cards
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary view-btn px-3" id="viewListBtn" title="Compact Table View">
+                            <i class="bi bi-list-ul me-1"></i> List
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Active Results Counter -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top text-muted small" style="font-size: 0.82rem;">
+                <span id="resultsCounter">Showing <strong class="text-dark">{{ total_members }}</strong> members</span>
+                <span class="text-secondary"><i class="bi bi-geo-alt text-primary me-1"></i> {{ total_with_region }} of {{ total_members }} have shared their region</span>
+            </div>
+        </div>
+
+        <!-- CARDS VIEW (Default) -->
+        <div id="cardsContainer" class="row g-4 mb-4">
+            {% for m in members %}
+            <div class="col-md-6 col-lg-4 member-item" 
+                 data-name="{{ m.full_name|lower }}" 
+                 data-region="{{ m.region_label|lower }}" 
+                 data-city="{{ m.city|lower }}" 
+                 data-family="{{ m.family_info|lower }}" 
+                 data-interests="{{ m.interests_raw|lower }}" 
+                 data-bio="{{ m.bio|lower }}">
+                
+                <div class="directory-card p-4">
+                    
+                    <!-- Member Header: Avatar & Name -->
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="avatar-circle">
+                            {{ m.full_name|slice:":1"|upper }}
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            <h6 class="fw-bold text-dark mb-0.5 text-truncate" title="{{ m.full_name }}">
+                                {{ m.full_name }}
+                            </h6>
+                            {% if m.region_label %}
+                            <span class="region-badge-pill" title="Bay Area Region">
+                                <i class="bi bi-geo-alt-fill"></i> {{ m.region_label }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">Region not set</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Neighborhood / City -->
+                    {% if m.city %}
+                    <div class="d-flex align-items-center gap-2 text-secondary small mb-2.5">
+                        <i class="bi bi-pin-map text-danger" style="font-size: 0.9rem;"></i>
+                        <span class="fw-medium text-dark">{{ m.city }}</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Family & Kids -->
+                    {% if m.family_info %}
+                    <div class="d-flex align-items-start gap-2 text-secondary small mb-2.5">
+                        <i class="bi bi-balloon-heart text-warning mt-0.5" style="font-size: 0.9rem;"></i>
+                        <span class="text-muted">{{ m.family_info }}</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Bio / Notes -->
+                    {% if m.bio %}
+                    <div class="p-2.5 rounded-3 bg-light bg-opacity-75 text-secondary small mb-3 fst-italic" style="font-size: 0.8rem; line-height: 1.45;">
+                        "{{ m.bio|truncatechars:120 }}"
+                    </div>
+                    {% endif %}
+
+                    <!-- Event Interests Tags -->
+                    <div class="mt-auto pt-2 border-top">
+                        <div class="text-muted fw-semibold small mb-1.5" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Event Interests
+                        </div>
+                        {% if m.interests_list %}
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for tag in m.interests_list %}
+                            <span class="interest-pill">
+                                <i class="bi bi-check2 text-success"></i> {{ tag }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <span class="text-muted small fst-italic" style="font-size: 0.75rem;">None specified yet</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- LIST / TABLE VIEW (Alternative) -->
+        <div id="tableContainer" class="card border-0 shadow-sm rounded-4 bg-white p-3 mb-4" style="display: none;">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-muted small text-uppercase">
+                        <tr>
+                            <th scope="col" style="min-width: 170px;">Member</th>
+                            <th scope="col" style="min-width: 160px;">Bay Area Region</th>
+                            <th scope="col" style="min-width: 120px;">Neighborhood</th>
+                            <th scope="col" style="min-width: 150px;">Family & Kids</th>
+                            <th scope="col" style="min-width: 200px;">Event Interests</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for m in members %}
+                        <tr class="member-table-row" 
+                            data-name="{{ m.full_name|lower }}" 
+                            data-region="{{ m.region_label|lower }}" 
+                            data-city="{{ m.city|lower }}" 
+                            data-family="{{ m.family_info|lower }}" 
+                            data-interests="{{ m.interests_raw|lower }}" 
+                            data-bio="{{ m.bio|lower }}">
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar-circle" style="width: 32px; height: 32px; min-width: 32px; font-size: 0.8rem;">
+                                        {{ m.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div class="fw-bold text-dark">{{ m.full_name }}</div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if m.region_label %}
+                                <span class="region-badge-pill" style="font-size: 0.72rem;">{{ m.region_label }}</span>
+                                {% else %}
+                                <span class="text-muted fst-italic">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.city %}
+                                <span class="fw-medium text-dark">{{ m.city }}</span>
+                                {% else %}
+                                <span class="text-muted fst-italic">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.family_info %}
+                                <span class="text-secondary">{{ m.family_info }}</span>
+                                {% else %}
+                                <span class="text-muted fst-italic">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.interests_list %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for tag in m.interests_list %}
+                                    <span class="interest-pill" style="font-size: 0.68rem;">{{ tag }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted fst-italic">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- No Results Fallback Card -->
+        <div id="noResultsState" class="card border-0 shadow-sm rounded-4 bg-white p-5 text-center" style="display: none;">
+            <div class="py-4">
+                <i class="bi bi-search text-muted opacity-50" style="font-size: 3rem;"></i>
+                <h5 class="fw-bold text-dark mt-3 mb-1">No Members Found</h5>
+                <p class="text-muted small mb-3">No member profiles match your search criteria or selected region.</p>
+                <button type="button" id="resetFiltersBtn" class="btn btn-outline-success rounded-pill px-4 btn-sm">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Filters
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Site Footer -->
+    {% include 'recommendations/footer.html' %}
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Interactive Client-side Filtering & Layout Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('memberSearchInput');
+            const clearBtn = document.getElementById('clearSearchBtn');
+            const regionFilter = document.getElementById('memberRegionFilter');
+            const resultsCounter = document.getElementById('resultsCounter');
+            const noResultsState = document.getElementById('noResultsState');
+            
+            const cardItems = document.querySelectorAll('.member-item');
+            const tableRows = document.querySelectorAll('.member-table-row');
+            
+            const cardsContainer = document.getElementById('cardsContainer');
+            const tableContainer = document.getElementById('tableContainer');
+            const viewCardsBtn = document.getElementById('viewCardsBtn');
+            const viewListBtn = document.getElementById('viewListBtn');
+
+            // View Switcher Handlers
+            viewCardsBtn.addEventListener('click', function() {
+                cardsContainer.style.display = 'flex';
+                tableContainer.style.display = 'none';
+                viewCardsBtn.classList.add('active');
+                viewListBtn.classList.remove('active');
+            });
+
+            viewListBtn.addEventListener('click', function() {
+                cardsContainer.style.display = 'none';
+                tableContainer.style.display = 'block';
+                viewListBtn.classList.add('active');
+                viewCardsBtn.classList.remove('active');
+            });
+
+            function filterDirectory() {
+                const query = searchInput.value.toLowerCase().trim();
+                const selectedRegion = regionFilter.value.toLowerCase().trim();
+
+                clearBtn.style.display = query ? 'block' : 'none';
+
+                let visibleCount = 0;
+
+                // Filter Card Items
+                cardItems.forEach(item => {
+                    const name = item.getAttribute('data-name') || '';
+                    const region = item.getAttribute('data-region') || '';
+                    const city = item.getAttribute('data-city') || '';
+                    const family = item.getAttribute('data-family') || '';
+                    const interests = item.getAttribute('data-interests') || '';
+                    const bio = item.getAttribute('data-bio') || '';
+
+                    const matchesSearch = !query || 
+                        name.includes(query) || 
+                        region.includes(query) || 
+                        city.includes(query) || 
+                        family.includes(query) || 
+                        interests.includes(query) || 
+                        bio.includes(query);
+
+                    const matchesRegion = !selectedRegion || region.includes(selectedRegion);
+
+                    if (matchesSearch && matchesRegion) {
+                        item.style.display = '';
+                        visibleCount++;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+
+                // Filter Table Rows
+                tableRows.forEach(row => {
+                    const name = row.getAttribute('data-name') || '';
+                    const region = row.getAttribute('data-region') || '';
+                    const city = row.getAttribute('data-city') || '';
+                    const family = row.getAttribute('data-family') || '';
+                    const interests = row.getAttribute('data-interests') || '';
+                    const bio = row.getAttribute('data-bio') || '';
+
+                    const matchesSearch = !query || 
+                        name.includes(query) || 
+                        region.includes(query) || 
+                        city.includes(query) || 
+                        family.includes(query) || 
+                        interests.includes(query) || 
+                        bio.includes(query);
+
+                    const matchesRegion = !selectedRegion || region.includes(selectedRegion);
+
+                    if (matchesSearch && matchesRegion) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                // Update counter and fallback state
+                resultsCounter.innerHTML = `Showing <strong class="text-dark">${visibleCount}</strong> members`;
+
+                if (visibleCount === 0) {
+                    noResultsState.style.display = 'block';
+                    cardsContainer.style.display = 'none';
+                    tableContainer.style.display = 'none';
+                } else {
+                    noResultsState.style.display = 'none';
+                    if (viewCardsBtn.classList.contains('active')) {
+                        cardsContainer.style.display = 'flex';
+                    } else {
+                        tableContainer.style.display = 'block';
+                    }
+                }
+            }
+
+            searchInput.addEventListener('input', filterDirectory);
+            regionFilter.addEventListener('change', filterDirectory);
+
+            clearBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                filterDirectory();
+                searchInput.focus();
+            });
+
+            document.getElementById('resetFiltersBtn').addEventListener('click', function() {
+                searchInput.value = '';
+                regionFilter.value = '';
+                filterDirectory();
+            });
+        });
+    </script>
+</body>
+</html>

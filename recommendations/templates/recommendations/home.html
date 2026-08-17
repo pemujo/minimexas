@@ -306,7 +306,7 @@
         <div class="row g-4 justify-content-center mb-5">
 
             <!-- 1. Recommendation Module Card (Active) -->
-            <div class="col-md-6 col-lg-4">
+            <div class="col-md-6 col-lg-3">
                 <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
@@ -318,8 +318,7 @@
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Browse vetted local services, doctors, restaurants, schools, and favorite spots shared
-                            directly across our WhatsApp group.
+                            Browse vetted local services, doctors, restaurants, and favorite spots shared directly across our group.
                         </p>
                     </div>
                     <a href="{% url 'recommendations:notes_list' %}"
@@ -330,7 +329,7 @@
             </div>
 
             <!-- 2. Events & Meetups Module (Active) -->
-            <div class="col-md-6 col-lg-4">
+            <div class="col-md-6 col-lg-3">
                 <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
@@ -342,18 +341,39 @@
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Stay up to date with cultural gatherings, family picnics, networking meetups, and local
-                            community activities in the Bay Area.
+                            Stay up to date with cultural gatherings, family picnics, networking meetups, and local community activities.
                         </p>
                     </div>
                     <a href="{% url 'events' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
-                        Explore Events & Calendar <i class="bi bi-arrow-right ms-1"></i>
+                        Explore Events <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
             </div>
 
-            <!-- 3. Member Profile & Region Module (Active) -->
-            <div class="col-md-6 col-lg-4">
+            <!-- 3. Community Directory Module (Active) -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon-box bg-green-subtle me-3">
+                                <i class="bi bi-people-fill"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">Member Directory</h5>
+                            </div>
+                        </div>
+                        <p class="text-secondary mb-4 small">
+                            Discover fellow members living in your Bay Area neighborhood and connect over shared event interests.
+                        </p>
+                    </div>
+                    <a href="{% url 'member_directory' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
+                        Browse Directory <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 4. Member Profile & Region Module (Active) -->
+            <div class="col-md-6 col-lg-3">
                 <div class="card card-custom h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center mb-3">
@@ -362,15 +382,14 @@
                             </div>
                             <div>
                                 <h5 class="fw-bold mb-0 text-dark">Member Profile</h5>
-                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.72rem;">Location & Region</span>
                             </div>
                         </div>
                         <p class="text-secondary mb-4 small">
-                            Add your contact details and Bay Area region (SF, Peninsula, South Bay, East Bay) to help organizers coordinate events near you.
+                            Add your contact details, family info, and Bay Area region to help organizers plan meetups near you.
                         </p>
                     </div>
                     <a href="{% url 'profile' %}" class="btn btn-primary-action fw-bold py-2 rounded-pill text-center">
-                        Manage Profile & Region <i class="bi bi-arrow-right ms-1"></i>
+                        Manage Profile <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
             </div>

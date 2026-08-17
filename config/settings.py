@@ -41,6 +41,9 @@ if _allowed_hosts_env:
 else:
     ALLOWED_HOSTS = ["pemujo.pythonanywhere.com", "127.0.0.1", "localhost", "0.0.0.0"]
 
+if "testserver" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("testserver")
+
 
 # Application definition
 
@@ -204,11 +207,23 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", None)
 
-# Production Security Hardening
+# Production & Cookie Security Hardening
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Allows standard Django CSRF token handling in forms
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
+    
+    if os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in ("true", "1", "yes"):
+        SECURE_SSL_REDIRECT = True
+        SECURE_HSTS_SECONDS = 31536000  # 1 year
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+
 

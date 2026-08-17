@@ -1,6 +1,5 @@
 import logging
 import secrets
-import csv
 from functools import wraps
 import requests
 from django.conf import settings
@@ -147,6 +146,9 @@ def google_callback_view(request):
     allowed, member_name, is_admin = is_gmail_allowed(user_email)
 
     if allowed:
+        # Prevent session fixation attacks
+        request.session.cycle_key()
+
         request.session['is_verified_member'] = True
         request.session['member_email'] = user_email
         request.session['is_admin'] = is_admin
@@ -171,39 +173,7 @@ def google_callback_view(request):
 def login_page_view(request):
     if is_authenticated_member(request):
         return redirect('home')
-    return render(request, 'recommendations/login.html', {
-        'is_dev_mode': settings.DEBUG
-    })
-
-
-def dev_login_view(request):
-    """
-    Developer bypass login available ONLY when DEBUG = True.
-    Allows instant local development and testing without requiring Google Cloud Console OAuth setup.
-    Pass ?admin=1 to simulate an organizer/admin account, or ?admin=0 for a regular member.
-    """
-    if not settings.DEBUG:
-        return redirect('login_page')
-    
-    email = request.GET.get('email', 'dev@minimexitas.local')
-    name = request.GET.get('name', 'Developer Member')
-    is_admin = request.GET.get('admin', '1') == '1'
-
-    request.session['is_verified_member'] = True
-    request.session['member_email'] = email
-    request.session['is_admin'] = is_admin
-
-    profile, _ = MemberProfile.objects.get_or_create(
-        email=email,
-        defaults={'full_name': name, 'is_admin': is_admin}
-    )
-    if profile.is_admin != is_admin:
-        profile.is_admin = is_admin
-        profile.save()
-
-    request.session['member_name'] = profile.full_name or name
-    request.session.set_expiry(60 * 60 * 24 * 30)
-    return redirect('home')
+    return render(request, 'recommendations/login.html')
 
 
 def logout_view(request):
@@ -280,6 +250,7 @@ def events_view(request):
         'upcoming_events': upcoming_events,
         'past_events': past_events,
         'all_events': all_events,
+        'events_payload': events_payload,
         'events_json': json.dumps(events_payload),
         'member_name': request.session.get('member_name', 'Member')
     })
@@ -367,6 +338,59 @@ def profile_view(request):
     })
 
 
+@member_required
+def member_directory_view(request):
+    """
+    Public community directory accessible to all verified members.
+    For member privacy, Phone numbers, Gmail addresses, and Roles are strictly excluded.
+    """
+    profiles = MemberProfile.objects.all().order_by('full_name', 'id')
+    total_members = profiles.count()
+    total_with_region = profiles.exclude(region='').count()
+
+    # Calculate region distribution stats
+    counts = MemberProfile.objects.exclude(region='').values('region').annotate(count=Count('region')).order_by('-count')
+    region_dict = dict(MemberProfile.REGION_CHOICES)
+    region_stats = []
+    if total_with_region > 0:
+        for c in counts:
+            pct = round((c['count'] / total_with_region) * 100)
+            region_stats.append({
+                'region_key': c['region'],
+                'region_label': region_dict.get(c['region'], c['region'].title()),
+                'count': c['count'],
+                'percentage': pct,
+            })
+
+    # Prepare privacy-safe list (phone, gmail, and role strictly omitted)
+    member_list = []
+    for p in profiles:
+        interests_list = [i.strip() for i in p.interests.split(',') if i.strip()] if p.interests else []
+        member_list.append({
+            'id': p.id,
+            'full_name': p.full_name or 'Community Member',
+            'region_key': p.region,
+            'region_label': p.get_region_display() if p.region else '',
+            'city': p.city,
+            'family_info': p.family_info,
+            'interests_list': interests_list,
+            'interests_raw': p.interests,
+            'bio': p.bio,
+            'updated_at': p.updated_at,
+        })
+
+    return render(request, 'recommendations/directory.html', {
+        'members': member_list,
+        'total_members': total_members,
+        'total_with_region': total_with_region,
+        'region_stats': region_stats,
+        'region_choices': MemberProfile.REGION_CHOICES,
+        'member_name': request.session.get('member_name', 'Member'),
+        'is_admin': request.session.get('is_admin', False),
+        'active_page': 'directory',
+    })
+
+
 @admin_required
 def organizer_dashboard_view(request):
     profiles = MemberProfile.objects.all().order_by('-updated_at')
@@ -404,31 +428,6 @@ def organizer_dashboard_view(request):
         'member_name': request.session.get('member_name', 'Organizer'),
         'active_page': 'organizers',
     })
-
-
-@admin_required
-def export_members_csv_view(request):
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="minimexitas_members_directory.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(['Full Name', 'Gmail', 'Region', 'City / Neighborhood', 'Phone / WhatsApp', 'Family & Kids', 'Interests', 'Bio', 'Role', 'Last Updated'])
-
-    for p in MemberProfile.objects.all().order_by('full_name', 'email'):
-        writer.writerow([
-            p.full_name,
-            p.email,
-            p.get_region_display() if p.region else 'Not set',
-            p.city,
-            p.phone_number,
-            p.family_info,
-            p.interests,
-            p.bio,
-            'Organizer / Admin' if p.is_admin else 'Member',
-            p.updated_at.strftime('%Y-%m-%d %H:%M') if p.updated_at else ''
-        ])
-
-    return response
 
 
 
