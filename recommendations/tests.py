@@ -80,6 +80,7 @@ class ModelsTestCase(TestCase):
         self.assertIn("Declined", str(req_rejected))
 
 
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
 class AuthHelpersTestCase(TestCase):
     @patch('recommendations.auth_helpers.get_gspread_client')
     def test_is_gmail_allowed_admin_and_member_roles(self, mock_get_client):
@@ -151,6 +152,7 @@ class AuthHelpersTestCase(TestCase):
         self.assertFalse(is_admin)
 
 
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
 class SheetsSyncTestCase(TestCase):
     def test_normalize_record_keys(self):
         raw_row = {
@@ -1461,6 +1463,7 @@ class StaticFilesServingTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
 class MemberDeletionTestCase(TestCase):
     def setUp(self):
         self.client = Client()
@@ -1612,6 +1615,7 @@ class MemberDeletionTestCase(TestCase):
         mock_ws.delete_rows.assert_not_called()
 
 
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
 class ReconciliationSyncTestCase(TestCase):
     def setUp(self):
         self.client = Client()

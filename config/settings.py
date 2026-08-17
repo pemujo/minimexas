@@ -208,7 +208,7 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", None)
 
 # Target Google Spreadsheet Configuration (Allows separate sheets per environment)
-GOOGLE_SHEET_KEY = os.environ.get("GOOGLE_SHEET_KEY", os.environ.get("GOOGLE_SHEET_ID", "1lL8cvfJn-HDtaGQq25vdTeF5V1w6vrkJ9HlUcnorUOA"))
+GOOGLE_SHEET_KEY = os.environ.get("GOOGLE_SHEET_KEY", os.environ.get("GOOGLE_SHEET_ID", ""))
 
 # Production & Cookie Security Hardening
 SESSION_COOKIE_HTTPONLY = True
