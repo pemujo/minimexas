@@ -1,3 +1,4 @@
+import os
 import logging
 from django.conf import settings
 import gspread
@@ -45,12 +46,32 @@ def get_gspread_client():
     raise ValueError("Google Service Account credentials are not configured in .env or environment.")
 
 
+def open_google_spreadsheet(gc):
+    """
+    Opens the configured Google Spreadsheet based on settings/environment variables:
+    1. GOOGLE_SHEET_KEY / GOOGLE_SHEET_ID (by unique spreadsheet key)
+    2. GOOGLE_SHEET_URL (by full spreadsheet URL)
+    3. GOOGLE_SHEET_NAME (by spreadsheet title, defaults to 'WhatsApp Recommendations')
+    """
+    sheet_key = getattr(settings, 'GOOGLE_SHEET_KEY', '') or os.environ.get('GOOGLE_SHEET_KEY', os.environ.get('GOOGLE_SHEET_ID', ''))
+    if sheet_key and str(sheet_key).strip():
+        return gc.open_by_key(str(sheet_key).strip())
+
+    sheet_url = getattr(settings, 'GOOGLE_SHEET_URL', '') or os.environ.get('GOOGLE_SHEET_URL', '')
+    if sheet_url and str(sheet_url).strip():
+        return gc.open_by_url(str(sheet_url).strip())
+
+    sheet_name = getattr(settings, 'GOOGLE_SHEET_NAME', '') or os.environ.get('GOOGLE_SHEET_NAME', 'WhatsApp Recommendations')
+    target_name = str(sheet_name).strip() if sheet_name else 'WhatsApp Recommendations'
+    return gc.open(target_name)
+
+
 def fetch_recommendations():
     """
     Fetches rows from the Google Sheet and returns normalized dictionaries.
     """
     gc = get_gspread_client()
-    sh = gc.open("WhatsApp Recommendations")
+    sh = open_google_spreadsheet(gc)
     worksheet = sh.sheet1
     
     raw_records = worksheet.get_all_records()
@@ -70,7 +91,7 @@ def sync_profile_to_google_sheet(profile):
     try:
         from datetime import datetime
         gc = get_gspread_client()
-        sh = gc.open("WhatsApp Recommendations")
+        sh = open_google_spreadsheet(gc)
 
         try:
             worksheet = sh.worksheet("Members")
@@ -182,7 +203,7 @@ def sync_pending_request_to_google_sheet(request_obj):
     try:
         from datetime import datetime
         gc = get_gspread_client()
-        sh = gc.open("WhatsApp Recommendations")
+        sh = open_google_spreadsheet(gc)
 
         try:
             worksheet = sh.worksheet("Pending_Requests")
@@ -275,7 +296,7 @@ def update_pending_request_status_in_google_sheet(email, status_display, reviewe
     try:
         from datetime import datetime
         gc = get_gspread_client()
-        sh = gc.open("WhatsApp Recommendations")
+        sh = open_google_spreadsheet(gc)
         try:
             worksheet = sh.worksheet("Pending_Requests")
         except Exception:
@@ -342,7 +363,7 @@ def delete_profile_from_google_sheet(email):
 
     try:
         gc = get_gspread_client()
-        sh = gc.open("WhatsApp Recommendations")
+        sh = open_google_spreadsheet(gc)
 
         try:
             worksheet = sh.worksheet("Members")
@@ -398,7 +419,7 @@ def reconcile_members_with_google_sheet():
 
     try:
         gc = get_gspread_client()
-        sh = gc.open("WhatsApp Recommendations")
+        sh = open_google_spreadsheet(gc)
 
         try:
             worksheet = sh.worksheet("Members")

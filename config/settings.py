@@ -207,6 +207,11 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", None)
 
+# Google Spreadsheet Configuration (Allows separate sheets per environment)
+GOOGLE_SHEET_NAME = os.environ.get("GOOGLE_SHEET_NAME", "WhatsApp Recommendations")
+GOOGLE_SHEET_KEY = os.environ.get("GOOGLE_SHEET_KEY", os.environ.get("GOOGLE_SHEET_ID", ""))
+GOOGLE_SHEET_URL = os.environ.get("GOOGLE_SHEET_URL", "")
+
 # Production & Cookie Security Hardening
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False  # Allows standard Django CSRF token handling in forms

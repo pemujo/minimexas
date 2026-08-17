@@ -10,6 +10,7 @@ from recommendations.auth_helpers import is_gmail_allowed
 from recommendations.sheets import (
     _normalize_record_keys,
     get_gspread_client,
+    open_google_spreadsheet,
     fetch_recommendations,
     sync_profile_to_google_sheet,
     sync_pending_request_to_google_sheet,
@@ -1701,6 +1702,37 @@ class ReconciliationSyncTestCase(TestCase):
         response = self.client.get(reverse('member_directory'))
         self.assertEqual(response.status_code, 403)
         self.assertContains(response, "Your access was revoked because your account is no longer registered", status_code=403)
+
+
+class OpenGoogleSpreadsheetConfigTestCase(TestCase):
+    def test_open_by_sheet_key_when_configured(self):
+        mock_gc = MagicMock()
+        with override_settings(GOOGLE_SHEET_KEY="1abc_test_sheet_key_123", GOOGLE_SHEET_NAME="Default Name"):
+            open_google_spreadsheet(mock_gc)
+            mock_gc.open_by_key.assert_called_once_with("1abc_test_sheet_key_123")
+            mock_gc.open.assert_not_called()
+            mock_gc.open_by_url.assert_not_called()
+
+    def test_open_by_sheet_url_when_configured(self):
+        mock_gc = MagicMock()
+        with override_settings(GOOGLE_SHEET_KEY="", GOOGLE_SHEET_URL="https://docs.google.com/spreadsheets/d/test_url_key/edit", GOOGLE_SHEET_NAME="Default Name"):
+            open_google_spreadsheet(mock_gc)
+            mock_gc.open_by_url.assert_called_once_with("https://docs.google.com/spreadsheets/d/test_url_key/edit")
+            mock_gc.open.assert_not_called()
+            mock_gc.open_by_key.assert_not_called()
+
+    def test_open_by_custom_sheet_name_when_configured(self):
+        mock_gc = MagicMock()
+        with override_settings(GOOGLE_SHEET_KEY="", GOOGLE_SHEET_URL="", GOOGLE_SHEET_NAME="MiniMexitas Production"):
+            open_google_spreadsheet(mock_gc)
+            mock_gc.open.assert_called_once_with("MiniMexitas Production")
+
+    def test_open_defaults_to_whatsapp_recommendations_when_unset(self):
+        mock_gc = MagicMock()
+        with override_settings(GOOGLE_SHEET_KEY="", GOOGLE_SHEET_URL="", GOOGLE_SHEET_NAME=""):
+            open_google_spreadsheet(mock_gc)
+            mock_gc.open.assert_called_once_with("WhatsApp Recommendations")
+
 
 
 
