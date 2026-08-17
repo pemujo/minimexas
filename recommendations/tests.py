@@ -2,6 +2,7 @@ import datetime
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
+from django.core import mail
 from django.core.cache import cache
 
 from recommendations.models import MemberProfile, MembershipRequest
@@ -11,6 +12,10 @@ from recommendations.sheets import (
     get_gspread_client,
     fetch_recommendations,
     sync_profile_to_google_sheet,
+    sync_pending_request_to_google_sheet,
+    update_pending_request_status_in_google_sheet,
+    delete_profile_from_google_sheet,
+    reconcile_members_with_google_sheet,
 )
 from recommendations.calendar_sync import (
     get_google_calendar_add_url,
@@ -18,6 +23,13 @@ from recommendations.calendar_sync import (
     fetch_community_events,
 )
 from recommendations.views import get_whatsapp_url
+from recommendations.notifications import (
+    send_membership_approval_email,
+    send_membership_rejection_email,
+    build_whatsapp_approval_link,
+    build_whatsapp_decline_link,
+    clean_phone_for_whatsapp,
+)
 
 
 class ModelsTestCase(TestCase):
@@ -249,6 +261,84 @@ class SheetsSyncTestCase(TestCase):
         res = sync_profile_to_google_sheet(profile)
         self.assertFalse(res)
 
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_pending_request_to_google_sheet_appends_new_row(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Name', 'Gmail', 'Phone', 'Region', 'City', 'Referral Source', 'Status', 'Submitted At', 'Reviewed By', 'Reviewed At', 'Review Notes']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        req = MembershipRequest(
+            full_name="New Applicant",
+            email="applicant@gmail.com",
+            phone_number="+52 55 1111 2222",
+            region="south_bay",
+            city="San Jose",
+            referral_source="Friend",
+            status=MembershipRequest.STATUS_PENDING
+        )
+
+        res = sync_pending_request_to_google_sheet(req)
+        self.assertTrue(res)
+        mock_ws.append_row.assert_called_once()
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_pending_request_to_google_sheet_updates_existing_row(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Name', 'Gmail', 'Phone', 'Region', 'City', 'Referral Source', 'Status', 'Submitted At', 'Reviewed By', 'Reviewed At', 'Review Notes'],
+            ['Old Name', 'applicant@gmail.com', '+52 55 1111 2222', 'South Bay', 'San Jose', 'Friend', 'Pending', '2026-08-01', '', '', '']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        req = MembershipRequest(
+            full_name="Updated Applicant",
+            email="applicant@gmail.com",
+            phone_number="+52 55 1111 2222",
+            region="san_francisco",
+            city="Mission",
+            referral_source="Updated referral",
+            status=MembershipRequest.STATUS_APPROVED,
+            reviewed_by="Admin"
+        )
+
+        res = sync_pending_request_to_google_sheet(req)
+        self.assertTrue(res)
+        mock_ws.update.assert_called_once()
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_update_pending_request_status_in_google_sheet(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Name', 'Gmail', 'Phone', 'Region', 'City', 'Referral Source', 'Status', 'Submitted At', 'Reviewed By', 'Reviewed At', 'Review Notes'],
+            ['Applicant', 'target@gmail.com', '+1 415 555 1234', 'Peninsula', '', 'Referral', 'Pending', '2026-08-01', '', '', '']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        res = update_pending_request_status_in_google_sheet('target@gmail.com', 'Declined', 'Admin Maria', review_notes='Outside Bay Area')
+        self.assertTrue(res)
+        mock_ws.update.assert_called_once()
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_pending_request_to_google_sheet_handles_exception_safely(self, mock_get_client):
+        mock_get_client.side_effect = Exception("Google Sheets connection error")
+        req = MembershipRequest(email="error@gmail.com", full_name="Error User")
+        res = sync_pending_request_to_google_sheet(req)
+        self.assertFalse(res)
+
 
 class CalendarSyncTestCase(TestCase):
     def setUp(self):
@@ -425,6 +515,64 @@ class AuthenticationAndAccessViewsTestCase(TestCase):
 
         profile = MemberProfile.objects.get(email='admin@gmail.com')
         self.assertTrue(profile.is_admin)
+
+    @patch('recommendations.views.requests.post')
+    @patch('recommendations.views.requests.get')
+    @patch('recommendations.views.is_gmail_allowed')
+    def test_google_callback_unregistered_pending_request_shows_pending_alert(self, mock_allowed, mock_get, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {'access_token': 'valid_token'}
+
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {'email': 'pending.user@gmail.com', 'verified_email': True}
+
+        mock_allowed.return_value = (False, None, False)
+
+        MembershipRequest.objects.create(
+            full_name="Pending User",
+            email="pending.user@gmail.com",
+            phone_number="+52 55 9999 8888",
+            status=MembershipRequest.STATUS_PENDING
+        )
+
+        session = self.client.session
+        session['oauth_state'] = 'pending_state_111'
+        session.save()
+
+        response = self.client.get(reverse('google_callback') + '?code=p_code&state=pending_state_111')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Membership Request Pending")
+        self.assertContains(response, "currently pending organizer review")
+
+    @patch('recommendations.views.requests.post')
+    @patch('recommendations.views.requests.get')
+    @patch('recommendations.views.is_gmail_allowed')
+    def test_google_callback_unregistered_rejected_request_shows_sorry_note_and_reason(self, mock_allowed, mock_get, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {'access_token': 'valid_token'}
+
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {'email': 'rejected.user@gmail.com', 'verified_email': True}
+
+        mock_allowed.return_value = (False, None, False)
+
+        MembershipRequest.objects.create(
+            full_name="Rejected User",
+            email="rejected.user@gmail.com",
+            phone_number="+1 415 555 9999",
+            status=MembershipRequest.STATUS_REJECTED,
+            review_notes="Location is outside the San Francisco Bay Area community scope."
+        )
+
+        session = self.client.session
+        session['oauth_state'] = 'rejected_state_222'
+        session.save()
+
+        response = self.client.get(reverse('google_callback') + '?code=r_code&state=rejected_state_222')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Membership Request Status: Not Approved")
+        self.assertContains(response, "Location is outside the San Francisco Bay Area community scope.")
+        self.assertContains(response, "Submit an Updated Request")
 
     def test_logout_clears_session_and_redirects_to_login(self):
         session = self.client.session
@@ -832,7 +980,10 @@ class MembershipRequestWorkflowTestCase(TestCase):
         self.assertContains(response, "WhatsApp / Mobile Phone")
         self.assertContains(response, "Bay Area Region")
 
-    def test_join_request_post_success_creates_pending_request(self):
+    @patch('recommendations.views.sync_pending_request_to_google_sheet')
+    def test_join_request_post_success_creates_pending_request(self, mock_pending_sync):
+        mock_pending_sync.return_value = True
+
         post_data = {
             'full_name': 'Sofia Ramirez',
             'email': 'sofia.ramirez@gmail.com',
@@ -853,6 +1004,8 @@ class MembershipRequestWorkflowTestCase(TestCase):
         self.assertEqual(req.status, MembershipRequest.STATUS_PENDING)
         self.assertEqual(req.region, 'south_bay')
         self.assertEqual(req.city, 'San Jose')
+
+        mock_pending_sync.assert_called_once_with(req)
 
     def test_join_request_post_validation_errors(self):
         # Missing full name
@@ -957,7 +1110,7 @@ class MembershipRequestWorkflowTestCase(TestCase):
             response = self.client.get(reverse('google_callback') + '?code=auth_code&state=xyz123')
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, "Membership Request Pending")
-            self.assertContains(response, "pending organizer approval")
+            self.assertContains(response, "pending organizer review")
 
     def test_organizer_dashboard_displays_pending_requests(self):
         MembershipRequest.objects.create(
@@ -986,9 +1139,11 @@ class MembershipRequestWorkflowTestCase(TestCase):
         self.assertContains(response, "https://wa.me/525512345678")
         self.assertContains(response, "Referred by Sofía.")
 
+    @patch('recommendations.views.update_pending_request_status_in_google_sheet')
     @patch('recommendations.views.sync_profile_to_google_sheet')
-    def test_organizer_approve_request_creates_profile_and_syncs(self, mock_sync):
+    def test_organizer_approve_request_creates_profile_and_syncs(self, mock_sync, mock_pending_update):
         mock_sync.return_value = True
+        mock_pending_update.return_value = True
 
         req = MembershipRequest.objects.create(
             full_name="New Member Laura",
@@ -1023,6 +1178,13 @@ class MembershipRequestWorkflowTestCase(TestCase):
         self.assertEqual(profile.city, 'Marina SF')
 
         mock_sync.assert_called_once_with(profile)
+        mock_pending_update.assert_called_once_with('laura@gmail.com', 'Approved', 'Admin Organizer')
+
+        # Check approval welcome email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('laura@gmail.com', mail.outbox[0].to)
+        self.assertIn('¡Bienvenido(a) a MiniMexitas!', mail.outbox[0].subject)
+        self.assertIn('Laura', mail.outbox[0].body)
 
     def test_organizer_approve_request_nonexistent_returns_404(self):
         session = self.client.session
@@ -1035,7 +1197,10 @@ class MembershipRequestWorkflowTestCase(TestCase):
         response = self.client.post(reverse('organizer_approve_request', kwargs={'request_id': 99999}))
         self.assertEqual(response.status_code, 404)
 
-    def test_organizer_reject_request(self):
+    @patch('recommendations.views.update_pending_request_status_in_google_sheet')
+    def test_organizer_reject_request(self, mock_pending_update):
+        mock_pending_update.return_value = True
+
         req = MembershipRequest.objects.create(
             full_name="Spam User",
             email="spam@gmail.com",
@@ -1052,14 +1217,25 @@ class MembershipRequestWorkflowTestCase(TestCase):
         session['member_email'] = 'admin@minimexitas.local'
         session.save()
 
-        response = self.client.post(reverse('organizer_reject_request', kwargs={'request_id': req.id}))
+        response = self.client.post(
+            reverse('organizer_reject_request', kwargs={'request_id': req.id}),
+            {'review_notes': 'Outside Bay Area scope.'}
+        )
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('organizer_dashboard'), response.url)
 
         req.refresh_from_db()
         self.assertEqual(req.status, MembershipRequest.STATUS_REJECTED)
         self.assertEqual(req.reviewed_by, 'Admin Organizer')
+        self.assertEqual(req.review_notes, 'Outside Bay Area scope.')
         self.assertFalse(MemberProfile.objects.filter(email='spam@gmail.com').exists())
+        mock_pending_update.assert_called_once_with('spam@gmail.com', 'Declined', 'Admin Organizer', review_notes='Outside Bay Area scope.')
+
+        # Check rejection email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('spam@gmail.com', mail.outbox[0].to)
+        self.assertIn('Actualización sobre tu solicitud', mail.outbox[0].subject)
+        self.assertIn('Outside Bay Area scope.', mail.outbox[0].body)
 
     def test_organizer_reject_request_nonexistent_returns_404(self):
         session = self.client.session
@@ -1152,3 +1328,380 @@ class MembershipRequestWorkflowTestCase(TestCase):
 
         req.refresh_from_db()
         self.assertEqual(req.status, MembershipRequest.STATUS_PENDING)
+
+
+class NotificationsTestCase(TestCase):
+    def test_clean_phone_for_whatsapp(self):
+        self.assertEqual(clean_phone_for_whatsapp(""), "")
+        self.assertEqual(clean_phone_for_whatsapp(None), "")
+        # 10 digits adds 1
+        self.assertEqual(clean_phone_for_whatsapp("(415) 555-1234"), "14155551234")
+        # International with country code preserved
+        self.assertEqual(clean_phone_for_whatsapp("+52 55 1234 5678"), "525512345678")
+
+    def test_build_whatsapp_approval_link(self):
+        link = build_whatsapp_approval_link("Carlos Ruiz", "+52 55 9999 8888", portal_url="https://minimexitas.org")
+        self.assertTrue(link.startswith("https://wa.me/525599998888?text="))
+        self.assertIn("Carlos%20Ruiz", link)
+        self.assertIn("aprobada", link)
+
+    def test_build_whatsapp_approval_link_empty_phone(self):
+        link = build_whatsapp_approval_link("Carlos Ruiz", "")
+        self.assertEqual(link, "")
+
+    def test_build_whatsapp_decline_link(self):
+        link = build_whatsapp_decline_link("Pedro Soto", "+1 (415) 555-4321", reason="Outside service area")
+        self.assertTrue(link.startswith("https://wa.me/14155554321?text="))
+        self.assertIn("Pedro%20Soto", link)
+        self.assertIn("Outside%20service%20area", link)
+
+    def test_send_membership_approval_email_success(self):
+        req = MembershipRequest.objects.create(
+            full_name="Lucia Gomez",
+            email="lucia.gomez@gmail.com",
+            phone_number="+52 33 1111 2222",
+            region="south_bay"
+        )
+        mail.outbox.clear()
+        success = send_membership_approval_email(req, portal_url="https://portal.minimexitas.org/login/")
+        self.assertTrue(success)
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ["lucia.gomez@gmail.com"])
+        self.assertIn("¡Bienvenido(a) a MiniMexitas!", sent.subject)
+        self.assertIn("Lucia Gomez", sent.body)
+        self.assertIn("https://portal.minimexitas.org/login/", sent.body)
+        # Verify HTML alternative
+        self.assertEqual(len(sent.alternatives), 1)
+        html_body, mime = sent.alternatives[0]
+        self.assertEqual(mime, "text/html")
+        self.assertIn("Lucia Gomez", html_body)
+
+    def test_send_membership_approval_email_empty_recipient(self):
+        req = MembershipRequest.objects.create(
+            full_name="No Email User",
+            email="",
+            status=MembershipRequest.STATUS_PENDING
+        )
+        success = send_membership_approval_email(req)
+        self.assertFalse(success)
+
+    @patch('recommendations.notifications.EmailMultiAlternatives.send')
+    def test_send_membership_approval_email_handles_backend_exception(self, mock_send):
+        mock_send.side_effect = Exception("SMTP Server Connection Timeout")
+        req = MembershipRequest.objects.create(
+            full_name="Timeout User",
+            email="timeout.user@gmail.com",
+            status=MembershipRequest.STATUS_PENDING
+        )
+        success = send_membership_approval_email(req)
+        self.assertFalse(success)
+
+    def test_send_membership_rejection_email_success(self):
+        req = MembershipRequest.objects.create(
+            full_name="Mateo Perez",
+            email="mateo.perez@gmail.com",
+            phone_number="+1 415 555 3333",
+            region="east_bay"
+        )
+        mail.outbox.clear()
+        success = send_membership_rejection_email(req, reason="Location is outside Bay Area.")
+        self.assertTrue(success)
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ["mateo.perez@gmail.com"])
+        self.assertIn("Actualización sobre tu solicitud", sent.subject)
+        self.assertIn("Mateo Perez", sent.body)
+        self.assertIn("Location is outside Bay Area.", sent.body)
+        # Verify HTML alternative
+        self.assertEqual(len(sent.alternatives), 1)
+        html_body, mime = sent.alternatives[0]
+        self.assertEqual(mime, "text/html")
+        self.assertIn("Mateo Perez", html_body)
+        self.assertIn("Location is outside Bay Area.", html_body)
+
+    def test_send_membership_rejection_email_empty_recipient(self):
+        req = MembershipRequest.objects.create(
+            full_name="Blank Email",
+            email="",
+            status=MembershipRequest.STATUS_PENDING
+        )
+        success = send_membership_rejection_email(req)
+        self.assertFalse(success)
+
+    @patch('recommendations.notifications.EmailMultiAlternatives.send')
+    def test_send_membership_rejection_email_handles_backend_exception(self, mock_send):
+        mock_send.side_effect = Exception("SMTP Rejection Error")
+        req = MembershipRequest.objects.create(
+            full_name="Error User",
+            email="error.rejection@gmail.com",
+            status=MembershipRequest.STATUS_PENDING
+        )
+        success = send_membership_rejection_email(req)
+        self.assertFalse(success)
+
+
+class StaticFilesServingTestCase(TestCase):
+    def test_static_files_serve_under_debug_false(self):
+        response = self.client.get('/static/images/banners/welcome.png')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/png')
+
+    def test_manifest_serves_under_debug_false(self):
+        response = self.client.get('/static/manifest.json')
+        self.assertEqual(response.status_code, 200)
+
+
+class MemberDeletionTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.member = MemberProfile.objects.create(
+            full_name="Diego Rivera",
+            email="diego.rivera@gmail.com",
+            phone_number="+1 415 555 9999",
+            region="san_francisco",
+            city="Mission District",
+            is_admin=False
+        )
+        self.admin = MemberProfile.objects.create(
+            full_name="Frida Admin",
+            email="frida.admin@gmail.com",
+            phone_number="+52 55 1234 5678",
+            region="south_bay",
+            is_admin=True
+        )
+
+    @patch('recommendations.views.delete_profile_from_google_sheet')
+    def test_member_self_deletion_flow(self, mock_sheet_delete):
+        mock_sheet_delete.return_value = True
+        
+        # Log in as member
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "diego.rivera@gmail.com"
+        session['member_name'] = "Diego Rivera"
+        session['is_admin'] = False
+        session.save()
+
+        # POST to self-deletion endpoint
+        response = self.client.post(reverse('profile_delete_self'), follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # Verify DB deletion
+        self.assertFalse(MemberProfile.objects.filter(email="diego.rivera@gmail.com").exists())
+
+        # Verify Google Sheet deletion was triggered
+        mock_sheet_delete.assert_called_once_with("diego.rivera@gmail.com")
+
+        # Verify redirect to login page and flash message displayed
+        self.assertContains(response, "Account & Profile Deleted")
+        self.assertContains(response, "Your profile has been removed from MiniMexitas")
+
+    def test_member_self_deletion_get_rejected(self):
+        # Log in as member
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "diego.rivera@gmail.com"
+        session.save()
+
+        # GET should redirect back to profile page without deleting
+        response = self.client.get(reverse('profile_delete_self'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('profile'))
+        self.assertTrue(MemberProfile.objects.filter(email="diego.rivera@gmail.com").exists())
+
+    @patch('recommendations.views.delete_profile_from_google_sheet')
+    def test_admin_delete_member_flow(self, mock_sheet_delete):
+        mock_sheet_delete.return_value = True
+
+        # Log in as admin
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "frida.admin@gmail.com"
+        session['member_name'] = "Frida Admin"
+        session['is_admin'] = True
+        session.save()
+
+        # Admin deletes Diego
+        response = self.client.post(reverse('organizer_delete_member', kwargs={'member_id': self.member.id}), follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # Verify member is deleted
+        self.assertFalse(MemberProfile.objects.filter(id=self.member.id).exists())
+        mock_sheet_delete.assert_called_once_with("diego.rivera@gmail.com")
+        self.assertContains(response, "Member &#x27;Diego Rivera&#x27; has been successfully removed")
+
+    def test_admin_cannot_delete_self_from_organizer_dashboard(self):
+        # Log in as admin
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "frida.admin@gmail.com"
+        session['member_name'] = "Frida Admin"
+        session['is_admin'] = True
+        session.save()
+
+        # Admin tries to delete herself via organizer dashboard
+        response = self.client.post(reverse('organizer_delete_member', kwargs={'member_id': self.admin.id}), follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # Verify admin profile was NOT deleted
+        self.assertTrue(MemberProfile.objects.filter(id=self.admin.id).exists())
+        self.assertContains(response, "organizers cannot delete themselves from the organizer dashboard")
+
+    def test_unauthenticated_cannot_delete_member(self):
+        response = self.client.post(reverse('organizer_delete_member', kwargs={'member_id': self.member.id}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login_page'), response.url)
+        self.assertTrue(MemberProfile.objects.filter(id=self.member.id).exists())
+
+    def test_regular_member_cannot_delete_other_member(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "diego.rivera@gmail.com"
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('organizer_delete_member', kwargs={'member_id': self.admin.id}))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(MemberProfile.objects.filter(id=self.admin.id).exists())
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_delete_profile_from_google_sheet_unit(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Name', 'Gmail', 'Region', 'Phone'],
+            ['Diego Rivera', 'diego.rivera@gmail.com', 'San Francisco', '+1 415 555 9999'],
+            ['Frida Admin', 'frida.admin@gmail.com', 'South Bay', '+52 55 1234 5678']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_gc = MagicMock()
+        mock_gc.open.return_value = mock_sh
+        mock_get_client.return_value = mock_gc
+
+        success = delete_profile_from_google_sheet("diego.rivera@gmail.com")
+        self.assertTrue(success)
+        mock_ws.delete_rows.assert_called_once_with(2)
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_delete_profile_from_google_sheet_not_found(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Name', 'Gmail', 'Region', 'Phone'],
+            ['Frida Admin', 'frida.admin@gmail.com', 'South Bay', '+52 55 1234 5678']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_gc = MagicMock()
+        mock_gc.open.return_value = mock_sh
+        mock_get_client.return_value = mock_gc
+
+        success = delete_profile_from_google_sheet("absent.user@gmail.com")
+        self.assertTrue(success)
+        mock_ws.delete_rows.assert_not_called()
+
+
+class ReconciliationSyncTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        # Diego is in SQLite but will NOT be in Google Sheet (orphan)
+        self.orphan_member = MemberProfile.objects.create(
+            full_name="Diego Orphan",
+            email="diego.orphan@gmail.com",
+            phone_number="+1 415 555 1111",
+            region="san_francisco",
+            is_admin=False
+        )
+        # Frida is in both SQLite and Google Sheet
+        self.admin = MemberProfile.objects.create(
+            full_name="Frida Admin",
+            email="frida.admin@gmail.com",
+            phone_number="+52 55 1234 5678",
+            region="south_bay",
+            is_admin=True
+        )
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_reconcile_purges_orphan_and_imports_new(self, mock_get_client):
+        # Google Sheet contains Frida Admin and a NEW member Carlos New, but NOT Diego Orphan
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Name', 'Gmail', 'Region', 'City', 'Phone', 'Role'],
+            ['Frida Admin', 'frida.admin@gmail.com', 'South Bay', 'San Jose', '+52 55 1234 5678', 'Admin'],
+            ['Carlos New', 'carlos.new@gmail.com', 'Peninsula', 'Palo Alto', '+1 650 555 2222', 'Member']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_gc = MagicMock()
+        mock_gc.open.return_value = mock_sh
+        mock_get_client.return_value = mock_gc
+
+        result = reconcile_members_with_google_sheet()
+        self.assertTrue(result['success'])
+        self.assertEqual(result['purged_count'], 1)
+        self.assertIn('diego.orphan@gmail.com', result['purged_emails'])
+        self.assertEqual(result['created_count'], 1)
+
+        # Verify Diego is purged from SQLite
+        self.assertFalse(MemberProfile.objects.filter(email="diego.orphan@gmail.com").exists())
+
+        # Verify Carlos is created in SQLite
+        carlos = MemberProfile.objects.filter(email="carlos.new@gmail.com").first()
+        self.assertIsNotNone(carlos)
+        self.assertEqual(carlos.full_name, "Carlos New")
+        self.assertEqual(carlos.region, "peninsula")
+        self.assertEqual(carlos.city, "Palo Alto")
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_reconcile_handles_network_error_safely(self, mock_get_client):
+        mock_get_client.side_effect = Exception("Google API timeout")
+
+        result = reconcile_members_with_google_sheet()
+        self.assertFalse(result['success'])
+        # Safety guard: existing records should not be deleted on network error
+        self.assertTrue(MemberProfile.objects.filter(email="diego.orphan@gmail.com").exists())
+
+    @patch('recommendations.views.reconcile_members_with_google_sheet')
+    def test_organizer_sync_sheets_post_view(self, mock_reconcile):
+        mock_reconcile.return_value = {
+            'success': True,
+            'purged_count': 1,
+            'created_count': 2,
+            'updated_count': 0,
+            'total_sheet_members': 3,
+            'purged_emails': ['diego.orphan@gmail.com'],
+        }
+
+        # Log in as admin
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "frida.admin@gmail.com"
+        session['member_name'] = "Frida Admin"
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('organizer_sync_sheets'), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Google Sheets Sync Complete: 1 purged")
+        self.assertContains(response, "2 new members imported")
+
+    def test_member_required_invalidates_session_for_purged_profile(self):
+        # Diego is logged in with active session
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "diego.orphan@gmail.com"
+        session['member_name'] = "Diego Orphan"
+        session['is_admin'] = False
+        session.save()
+
+        # Delete Diego's profile (simulating purge)
+        self.orphan_member.delete()
+
+        # Diego tries to access member directory
+        response = self.client.get(reverse('member_directory'))
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "Your access was revoked because your account is no longer registered", status_code=403)
+
+
+
+

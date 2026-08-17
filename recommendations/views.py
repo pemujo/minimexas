@@ -9,9 +9,22 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
-from .sheets import fetch_recommendations, sync_profile_to_google_sheet
+from .sheets import (
+    fetch_recommendations,
+    sync_profile_to_google_sheet,
+    sync_pending_request_to_google_sheet,
+    update_pending_request_status_in_google_sheet,
+    delete_profile_from_google_sheet,
+    reconcile_members_with_google_sheet,
+)
 from .auth_helpers import is_gmail_allowed
 from .models import MemberProfile, MembershipRequest
+from .notifications import (
+    send_membership_approval_email,
+    send_membership_rejection_email,
+    build_whatsapp_approval_link,
+    build_whatsapp_decline_link,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +43,15 @@ def member_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
         if not is_authenticated_member(request):
             return redirect('login_page')
+        
+        # Verify member profile still exists in database (invalidates session if purged by Google Sheet reconciliation)
+        user_email = request.session.get('member_email', '').strip().lower()
+        if user_email and not MemberProfile.objects.filter(email__iexact=user_email).exists():
+            request.session.flush()
+            return render(request, 'recommendations/login.html', {
+                'error': 'Your access was revoked because your account is no longer registered in the member directory.'
+            }, status=403)
+
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
@@ -167,22 +189,28 @@ def google_callback_view(request):
         request.session.set_expiry(60 * 60 * 24 * 30)  # Logged in for 30 days
         return redirect('home')
     else:
-        # Check if there is a pending or recent request for this email
-        pending_req = MembershipRequest.objects.filter(
-            email=user_email, 
-            status=MembershipRequest.STATUS_PENDING
-        ).first()
+        # Check if there is a pending or rejected request for this email
+        latest_req = MembershipRequest.objects.filter(email=user_email).order_by('-created_at').first()
 
-        if pending_req:
-            error_msg = f"Your membership request for ({user_email}) was received on {pending_req.created_at.strftime('%b %d, %Y')} and is currently pending organizer approval. We will notify you once approved!"
+        is_pending = False
+        is_rejected = False
+        rejection_reason = ""
+
+        if latest_req and latest_req.status == MembershipRequest.STATUS_PENDING:
+            error_msg = f"Your membership request for ({user_email}) was received on {latest_req.created_at.strftime('%b %d, %Y')} and is currently pending organizer review. We will notify you once approved!"
             is_pending = True
+        elif latest_req and latest_req.status == MembershipRequest.STATUS_REJECTED:
+            rejection_reason = latest_req.review_notes.strip() if latest_req.review_notes else "Application details could not be verified."
+            error_msg = f"We are sorry, but your membership request for ({user_email}) could not be approved at this time."
+            is_rejected = True
         else:
             error_msg = f"The Gmail account ({user_email}) is not registered in our verified member directory."
-            is_pending = False
 
         return render(request, 'recommendations/login.html', {
             'error': error_msg,
             'is_pending_request': is_pending,
+            'is_rejected_request': is_rejected,
+            'rejection_reason': rejection_reason,
             'unregistered_email': user_email,
         })
 
@@ -190,7 +218,14 @@ def google_callback_view(request):
 def login_page_view(request):
     if is_authenticated_member(request):
         return redirect('home')
-    return render(request, 'recommendations/login.html')
+
+    account_deleted = request.session.pop('account_deleted_flash', False)
+    account_deleted_email = request.session.pop('account_deleted_email', None)
+
+    return render(request, 'recommendations/login.html', {
+        'account_deleted': account_deleted,
+        'account_deleted_email': account_deleted_email,
+    })
 
 
 def logout_view(request):
@@ -364,6 +399,38 @@ def profile_view(request):
     })
 
 
+@member_required
+def profile_delete_self_view(request):
+    """
+    Self-service account and profile deletion for authenticated members.
+    Deletes the member's profile and membership requests from SQLite,
+    removes their row from the Google Sheet 'Members' tab, flushes the session,
+    and redirects them to the login screen with confirmation.
+    """
+    if request.method != 'POST':
+        return redirect('profile')
+
+    user_email = request.session.get('member_email', '').strip().lower()
+
+    if user_email:
+        # Delete profile and requests from database
+        MemberProfile.objects.filter(email__iexact=user_email).delete()
+        MembershipRequest.objects.filter(email__iexact=user_email).delete()
+
+        # Remove member row from Google Sheets 'Members' tab
+        try:
+            delete_profile_from_google_sheet(user_email)
+        except Exception as e:
+            logger.warning(f"Failed to delete profile from Google Sheet for self-removal ({user_email}): {e}")
+
+    # Flush active session
+    request.session.flush()
+    request.session['account_deleted_flash'] = True
+    request.session['account_deleted_email'] = user_email
+
+    return redirect('login_page')
+
+
 def get_whatsapp_url(phone):
     """
     Constructs a direct WhatsApp messaging URL (https://wa.me/<digits>)
@@ -495,7 +562,7 @@ def join_request_view(request):
                 if existing_req and existing_req.status == MembershipRequest.STATUS_PENDING:
                     error_message = f"A membership request for ({email}) has already been submitted and is currently awaiting organizer review. We will contact you soon!"
                 else:
-                    MembershipRequest.objects.create(
+                    req_obj = MembershipRequest.objects.create(
                         full_name=full_name,
                         email=email,
                         phone_number=phone_number,
@@ -504,6 +571,13 @@ def join_request_view(request):
                         referral_source=referral_source,
                         status=MembershipRequest.STATUS_PENDING
                     )
+
+                    # Dual-sync pending request to Google Sheets for zero-data-loss protection
+                    try:
+                        sync_pending_request_to_google_sheet(req_obj)
+                    except Exception as e:
+                        logger.warning(f"Failed to dual-sync pending request for {email} to Google Sheet: {e}")
+
                     success_submitted = True
                     submitted_email = email
 
@@ -525,6 +599,7 @@ def organizer_dashboard_view(request):
 
     # Pending & reviewed membership requests
     pending_requests_qs = MembershipRequest.objects.filter(status=MembershipRequest.STATUS_PENDING).order_by('-created_at')
+    login_url = request.build_absolute_uri(reverse('login_page'))
     pending_requests = []
     for pr in pending_requests_qs:
         pending_requests.append({
@@ -536,6 +611,7 @@ def organizer_dashboard_view(request):
             'city': pr.city,
             'referral_source': pr.referral_source,
             'whatsapp_url': get_whatsapp_url(pr.phone_number),
+            'whatsapp_approval_url': build_whatsapp_approval_link(pr.full_name, pr.phone_number, portal_url=login_url),
             'created_at': pr.created_at,
         })
     pending_count = len(pending_requests)
@@ -560,14 +636,53 @@ def organizer_dashboard_view(request):
                 'percentage': pct,
             })
 
-    # Flash messages from query params
+    # Flash messages from query params and session
     action_message = None
+    action_error = None
+    approved_data = None
     if request.GET.get('approved'):
         action_message = "Membership request approved successfully! Member added to directory and synced to Google Sheets."
+        approved_name = request.session.pop('approved_flash_name', None)
+        approved_email = request.session.pop('approved_flash_email', None)
+        approved_wa_link = request.session.pop('approved_flash_wa_link', None)
+        if approved_name or approved_email:
+            approved_data = {
+                'name': approved_name,
+                'email': approved_email,
+                'wa_link': approved_wa_link,
+            }
     elif request.GET.get('declined'):
-        action_message = "Membership request declined."
+        declined_name = request.session.pop('declined_flash_name', None)
+        declined_email = request.session.pop('declined_flash_email', None)
+        if declined_name or declined_email:
+            action_message = f"Membership request for {declined_name or declined_email} was declined. An email notification with the explanation has been dispatched to {declined_email}."
+        else:
+            action_message = "Membership request declined and notification email dispatched."
     elif request.GET.get('added'):
         action_message = "New member added directly and synced to Google Sheets!"
+    elif request.GET.get('member_deleted'):
+        deleted_name = request.session.pop('deleted_member_name', None)
+        if deleted_name:
+            action_message = f"Member '{deleted_name}' has been successfully removed from the community and Google Sheets."
+        else:
+            action_message = "Member has been successfully removed from the community and Google Sheets."
+    elif request.GET.get('synced'):
+        sync_data = request.session.pop('sync_flash_result', None)
+        if sync_data:
+            purged = sync_data.get('purged_count', 0)
+            created = sync_data.get('created_count', 0)
+            updated = sync_data.get('updated_count', 0)
+            total = sync_data.get('total_sheet_members', 0)
+            action_message = (
+                f"Google Sheets Sync Complete: {purged} purged (no longer in spreadsheet), "
+                f"{created} new members imported, {updated} updated ({total} total in spreadsheet)."
+            )
+        else:
+            action_message = "Google Sheets reconciliation sync completed successfully."
+    elif request.GET.get('sync_error'):
+        action_error = request.session.pop('sync_flash_error', "Failed to synchronize with Google Sheets.")
+    elif request.GET.get('error') == 'self_delete_forbidden':
+        action_error = "For safety, organizers cannot delete themselves from the organizer dashboard. Use your Profile page if you wish to leave the community."
 
     return render(request, 'recommendations/organizers.html', {
         'profiles': profiles,
@@ -581,6 +696,8 @@ def organizer_dashboard_view(request):
         'top_region': top_region,
         'region_choices': MemberProfile.REGION_CHOICES,
         'action_message': action_message,
+        'action_error': action_error,
+        'approved_data': approved_data,
         'member_name': request.session.get('member_name', 'Organizer'),
         'active_page': 'organizers',
     })
@@ -617,11 +734,32 @@ def organizer_approve_request_view(request, request_id):
         profile.city = req.city or profile.city
         profile.save()
 
-    # Sync to Google Sheets
+    # Send confirmation approval email notification
+    try:
+        send_membership_approval_email(req, request=request)
+    except Exception as e:
+        logger.warning(f"Failed to dispatch approval notification email for {req.email}: {e}")
+
+    # Set session flash data for confirmation alert & direct WhatsApp button
+    request.session['approved_flash_name'] = req.full_name or req.email
+    request.session['approved_flash_email'] = req.email
+    if req.phone_number:
+        request.session['approved_flash_wa_link'] = build_whatsapp_approval_link(
+            req.full_name, req.phone_number,
+            portal_url=request.build_absolute_uri(reverse('login_page'))
+        )
+
+    # Sync to Members tab in Google Sheets
     try:
         sync_profile_to_google_sheet(profile)
     except Exception as e:
         logger.warning(f"Failed to sync approved member to Google Sheet: {e}")
+
+    # Update Pending_Requests tab in Google Sheets
+    try:
+        update_pending_request_status_in_google_sheet(req.email, 'Approved', reviewer)
+    except Exception as e:
+        logger.warning(f"Failed to update pending request status in Google Sheet: {e}")
 
     return redirect(reverse('organizer_dashboard') + '?approved=1')
 
@@ -639,6 +777,21 @@ def organizer_reject_request_view(request, request_id):
     req.reviewed_at = timezone.now()
     req.review_notes = request.POST.get('review_notes', '').strip()
     req.save()
+
+    # Send automated rejection notification email with the explanation/notes
+    try:
+        send_membership_rejection_email(req, reason=req.review_notes)
+    except Exception as e:
+        logger.warning(f"Failed to dispatch rejection email to {req.email}: {e}")
+
+    # Update Pending_Requests tab in Google Sheets
+    try:
+        update_pending_request_status_in_google_sheet(req.email, 'Declined', reviewer, review_notes=req.review_notes)
+    except Exception as e:
+        logger.warning(f"Failed to update declined request status in Google Sheet: {e}")
+
+    request.session['declined_flash_name'] = req.full_name
+    request.session['declined_flash_email'] = req.email
 
     return redirect(reverse('organizer_dashboard') + '?declined=1')
 
@@ -683,6 +836,65 @@ def organizer_direct_add_member_view(request):
         logger.warning(f"Failed to sync direct added member to Google Sheet: {e}")
 
     return redirect(reverse('organizer_dashboard') + '?added=1')
+
+
+@admin_required
+def organizer_delete_member_view(request, member_id):
+    """
+    Allows organizers/admins to delete a member from the portal and Google Sheets.
+    Deletes the profile from the database, cleans up any associated membership requests,
+    and deletes the member row from the Google Sheet 'Members' tab.
+    """
+    if request.method != 'POST':
+        return redirect('organizer_dashboard')
+
+    profile = get_object_or_404(MemberProfile, id=member_id)
+    current_admin_email = request.session.get('member_email', '').strip().lower()
+
+    # Safety: prevent admin from accidentally deleting their own active organizer session
+    if profile.email.strip().lower() == current_admin_email:
+        return redirect(reverse('organizer_dashboard') + '?error=self_delete_forbidden')
+
+    target_email = profile.email
+    target_name = profile.full_name or profile.email
+
+    # 1. Delete profile from database
+    profile.delete()
+
+    # 2. Clean up any membership requests associated with this email
+    MembershipRequest.objects.filter(email__iexact=target_email).delete()
+
+    # 3. Delete from Google Sheet
+    try:
+        delete_profile_from_google_sheet(target_email)
+    except Exception as e:
+        logger.warning(f"Failed to delete member {target_email} from Google Sheet: {e}")
+
+    request.session['deleted_member_name'] = target_name
+    return redirect(reverse('organizer_dashboard') + '?member_deleted=1')
+
+
+@admin_required
+def organizer_sync_sheets_view(request):
+    """
+    On-demand two-way reconciliation with Google Sheets Members tab.
+    Purges deleted members, imports new ones, and syncs roles.
+    """
+    if request.method != 'POST':
+        return redirect('organizer_dashboard')
+
+    result = reconcile_members_with_google_sheet()
+    cache.set('last_organizer_auto_sync', True, 900)
+
+    if result.get('success'):
+        request.session['sync_flash_result'] = result
+        return redirect(reverse('organizer_dashboard') + '?synced=1')
+    else:
+        err = result.get('error', 'Failed to communicate with Google Sheets.')
+        request.session['sync_flash_error'] = err
+        return redirect(reverse('organizer_dashboard') + '?sync_error=1')
+
+
 
 
 

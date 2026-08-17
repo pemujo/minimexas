@@ -327,6 +327,60 @@
                     </form>
 
                 </div>
+
+                <!-- Danger Zone: Leave Community / Delete Profile -->
+                <div class="card border-0 shadow-sm rounded-4 p-4 mt-4" style="background: #fff8f8; border: 1px solid #fecaca !important;">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div>
+                            <h6 class="fw-bold text-danger mb-1 d-flex align-items-center gap-2">
+                                <i class="bi bi-person-x-fill fs-5"></i> Leave MiniMexitas & Delete Profile
+                            </h6>
+                            <p class="text-muted small mb-0" style="max-width: 580px; line-height: 1.5;">
+                                Deleting your profile will remove your directory listing, delete your information from our Google Sheet, and revoke your member portal access. You can request to rejoin at any time.
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger rounded-pill px-3 py-2 text-nowrap fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#deleteSelfModal">
+                            <i class="bi bi-trash3 me-1"></i> Delete Profile
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Delete Self Confirmation Modal -->
+                <div class="modal fade" id="deleteSelfModal" tabindex="-1" aria-labelledby="deleteSelfModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0 shadow">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="deleteSelfModalLabel">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Delete Account & Leave
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-start">
+                                <p class="text-dark small mb-3">
+                                    Are you sure you want to delete your profile for <strong class="text-dark">{{ profile.email }}</strong>?
+                                </p>
+                                <div class="alert alert-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 small mb-0 text-danger">
+                                    <strong class="d-block mb-1"><i class="bi bi-info-circle-fill me-1"></i> What happens next:</strong>
+                                    <ul class="mb-0 ps-3">
+                                        <li>Your member profile and interests will be permanently deleted.</li>
+                                        <li>Your record in the community Google Sheet will be removed.</li>
+                                        <li>You will be logged out immediately.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                                <form method="POST" action="{% url 'profile_delete_self' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill px-4 fw-semibold shadow-sm">
+                                        <i class="bi bi-trash3 me-1"></i> Yes, Delete My Profile
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>

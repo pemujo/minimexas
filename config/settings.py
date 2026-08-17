@@ -213,17 +213,36 @@ CSRF_COOKIE_HTTPONLY = False  # Allows standard Django CSRF token handling in fo
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
+# Email Configuration for Notifications
+_default_email_backend = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if (os.environ.get("EMAIL_HOST_USER") or os.environ.get("EMAIL_HOST_PASSWORD"))
+    else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", _default_email_backend)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MiniMexitas Community <no-reply@minimexitas.org>")
+PORTAL_BASE_URL = os.environ.get("PORTAL_BASE_URL", "https://pemujo.pythonanywhere.com")
+
 if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     
-    if os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in ("true", "1", "yes"):
+    if (
+        os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in ("true", "1", "yes")
+        or os.environ.get("SESSION_COOKIE_SECURE", "False").lower() in ("true", "1", "yes")
+    ):
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
         SECURE_SSL_REDIRECT = True
         SECURE_HSTS_SECONDS = 31536000  # 1 year
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
+
 
 
