@@ -24,9 +24,8 @@ def build_whatsapp_approval_link(full_name: str, phone_number: str, portal_url: 
         return ""
     
     name = full_name.strip() if full_name else "amig@"
-    url = portal_url or getattr(settings, 'PORTAL_BASE_URL', 'https://pemujo.pythonanywhere.com')
-    if not url.endswith('/login/'):
-        url = url.rstrip('/') + '/login/'
+    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    url = f"{base}/login/" if base else "/login/"
 
     message = (
         f"¡Hola {name}! 🎉 Tu solicitud para unirte a MiniMexitas ha sido aprobada. "
@@ -66,13 +65,9 @@ def send_membership_approval_email(request_obj, portal_url: str = None, request 
     full_name = getattr(request_obj, 'full_name', '').strip() or "Nuevo Miembro"
     recipient_email = recipient_email.strip().lower()
 
-    # Determine portal login URL
-    if not portal_url:
-        if request:
-            portal_url = request.build_absolute_uri(reverse('login_page'))
-        else:
-            base = getattr(settings, 'PORTAL_BASE_URL', 'https://pemujo.pythonanywhere.com').rstrip('/')
-            portal_url = f"{base}/login/"
+    # Determine portal login URL from PORTAL_BASE_URL in .env
+    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    portal_url = f"{base}/login/" if base else "/login/"
 
     subject = "¡Bienvenido(a) a MiniMexitas! Tu solicitud ha sido aprobada 🎉"
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
@@ -180,7 +175,7 @@ Equipo de Organizadores de MiniMexitas
         return False
 
 
-def send_membership_rejection_email(request_obj, reason: str = None) -> bool:
+def send_membership_rejection_email(request_obj, reason: str = None, portal_url: str = None) -> bool:
     """
     Sends an automated, polite rejection notification email to an applicant whose
     membership request was declined, including the reason/notes entered by the admin.
@@ -193,6 +188,10 @@ def send_membership_rejection_email(request_obj, reason: str = None) -> bool:
 
     full_name = getattr(request_obj, 'full_name', '').strip() or "Estimad@ solicitante"
     recipient_email = recipient_email.strip().lower()
+
+    # Determine portal join URL from PORTAL_BASE_URL in .env
+    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    join_url = f"{base}/join/" if base else "/join/"
 
     reason_text = reason.strip() if reason and reason.strip() else "No fue posible verificar la conexión con la comunidad o los requisitos de registro en este momento."
 
@@ -209,7 +208,7 @@ Detalles de la revisión:
 "{reason_text}"
 
 Si consideras que hubo algún error, o si deseas postularte más adelante con datos actualizados o mayor información sobre tu referencia en la comunidad, eres bienvenido(a) a enviar una nueva solicitud en:
-https://pemujo.pythonanywhere.com/join/
+{join_url}
 
 Agradecemos tu tiempo y te deseamos lo mejor.
 

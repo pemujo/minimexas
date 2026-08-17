@@ -39,7 +39,13 @@ _allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
 else:
-    ALLOWED_HOSTS = ["pemujo.pythonanywhere.com", "127.0.0.1", "localhost", "0.0.0.0"]
+    ALLOWED_HOSTS = [
+        "pemujo.pythonanywhere.com",
+        "minimexitas.pythonanywhere.com",
+        "127.0.0.1",
+        "localhost",
+        "0.0.0.0",
+    ]
 
 if "testserver" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append("testserver")
@@ -180,7 +186,7 @@ def _get_google_sa_info():
     if sa_email and sa_key:
         return {
             "type": "service_account",
-            "project_id": os.environ.get("GOOGLE_SA_PROJECT_ID", "minimexas"),
+            "project_id": os.environ.get("GOOGLE_SA_PROJECT_ID", ""),
             "private_key_id": os.environ.get("GOOGLE_SA_PRIVATE_KEY_ID", ""),
             "private_key": sa_key.replace("\\n", "\n"),
             "client_email": sa_email,
@@ -229,7 +235,7 @@ EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in ("true", "1",
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MiniMexitas Community <no-reply@minimexitas.org>")
-PORTAL_BASE_URL = os.environ.get("PORTAL_BASE_URL", "https://pemujo.pythonanywhere.com")
+PORTAL_BASE_URL = os.environ.get("PORTAL_BASE_URL", "").rstrip("/")
 
 if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
