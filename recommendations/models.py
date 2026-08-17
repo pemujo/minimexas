@@ -112,3 +112,35 @@ class MembershipRequest(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.email}) - {self.get_status_display()}"
+
+
+class MembershipAuditLog(models.Model):
+    ACTION_SUBMITTED = 'submitted'
+    ACTION_APPROVED = 'approved'
+    ACTION_REJECTED = 'rejected'
+    ACTION_DIRECT_ADDED = 'direct_added'
+    ACTION_DELETED = 'deleted'
+
+    ACTION_CHOICES = [
+        (ACTION_SUBMITTED, 'Request Submitted'),
+        (ACTION_APPROVED, 'Request Approved'),
+        (ACTION_REJECTED, 'Request Rejected'),
+        (ACTION_DIRECT_ADDED, 'Member Added Directly'),
+        (ACTION_DELETED, 'Member Deleted'),
+    ]
+
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES, db_index=True, verbose_name="Action")
+    target_email = models.EmailField(db_index=True, verbose_name="Target Member Email")
+    target_name = models.CharField(max_length=150, blank=True, verbose_name="Target Member Name")
+    actor_name = models.CharField(max_length=150, blank=True, verbose_name="Performed By (Name)")
+    actor_email = models.CharField(max_length=150, blank=True, verbose_name="Performed By (Email)")
+    notes = models.TextField(blank=True, verbose_name="Notes / Justification")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Timestamp")
+
+    class Meta:
+        verbose_name = "Membership Audit Log"
+        verbose_name_plural = "Membership Audit Logs"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.created_at.strftime('%Y-%m-%d %H:%M')}] {self.get_action_display()}: {self.target_name or self.target_email} by {self.actor_name or self.actor_email or 'System'}"

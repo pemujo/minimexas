@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.core import mail
 from django.core.cache import cache
 
-from recommendations.models import MemberProfile, MembershipRequest
+from recommendations.models import MemberProfile, MembershipRequest, MembershipAuditLog
 from recommendations.auth_helpers import is_gmail_allowed
 from recommendations.sheets import (
     _normalize_record_keys,
@@ -27,6 +27,7 @@ from recommendations.views import get_whatsapp_url
 from recommendations.notifications import (
     send_membership_approval_email,
     send_membership_rejection_email,
+    send_admin_new_request_notification,
     build_whatsapp_approval_link,
     build_whatsapp_decline_link,
     clean_phone_for_whatsapp,
@@ -1733,6 +1734,253 @@ class OpenGoogleSpreadsheetConfigTestCase(TestCase):
                 with self.assertRaises(ValueError) as ctx:
                     open_google_spreadsheet(mock_gc)
                 self.assertIn("GOOGLE_SHEET_KEY is not configured", str(ctx.exception))
+
+
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123", PORTAL_BASE_URL="https://testportal.minimexitas.org")
+class AdminNotificationAndAuditLogTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        # Create 2 admins and 1 regular member
+        self.admin1 = MemberProfile.objects.create(
+            email="organizer1@minimexitas.org",
+            full_name="Admin One",
+            is_admin=True,
+            region="san_francisco"
+        )
+        self.admin2 = MemberProfile.objects.create(
+            email="organizer2@minimexitas.org",
+            full_name="Admin Two",
+            is_admin=True,
+            region="east_bay"
+        )
+        self.regular_member = MemberProfile.objects.create(
+            email="regular@gmail.com",
+            full_name="Regular Member",
+            is_admin=False,
+            region="south_bay"
+        )
+
+    def test_membership_audit_log_str(self):
+        log = MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_APPROVED,
+            target_email="newbie@gmail.com",
+            target_name="Newbie Member",
+            actor_name="Admin One",
+            actor_email="organizer1@minimexitas.org",
+            notes="Approved after phone interview"
+        )
+        self.assertIn("Request Approved", str(log))
+        self.assertIn("Newbie Member", str(log))
+        self.assertIn("Admin One", str(log))
+
+    def test_send_admin_new_request_notification_dispatches_to_all_admins(self):
+        req = MembershipRequest.objects.create(
+            full_name="Carlos Santana",
+            email="carlos.guitar@gmail.com",
+            phone_number="+1 415 555 7788",
+            region="san_francisco",
+            city="Mission District",
+            referral_source="Friend in the Bay Area Mexican meetup",
+            status=MembershipRequest.STATUS_PENDING
+        )
+
+        mail.outbox.clear()
+        sent = send_admin_new_request_notification(req)
+        self.assertTrue(sent)
+        self.assertEqual(len(mail.outbox), 1)
+
+        email = mail.outbox[0]
+        self.assertIn("Carlos Santana", email.subject)
+        self.assertIn("organizer1@minimexitas.org", email.to)
+        self.assertIn("organizer2@minimexitas.org", email.to)
+        self.assertNotIn("regular@gmail.com", email.to)
+        self.assertIn("Carlos Santana", email.body)
+        self.assertIn("carlos.guitar@gmail.com", email.body)
+        self.assertIn("Mission District", email.body)
+        self.assertIn("Friend in the Bay Area", email.body)
+        self.assertIn("https://testportal.minimexitas.org/organizers/", email.body)
+
+    def test_send_admin_new_request_notification_no_admins_returns_false(self):
+        MemberProfile.objects.filter(is_admin=True).delete()
+        req = MembershipRequest.objects.create(
+            full_name="Orphan Applicant",
+            email="orphan@gmail.com",
+            status=MembershipRequest.STATUS_PENDING
+        )
+        mail.outbox.clear()
+        sent = send_admin_new_request_notification(req)
+        self.assertFalse(sent)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch('recommendations.views.sync_pending_request_to_google_sheet')
+    def test_join_request_view_creates_audit_log_and_emails_admins(self, mock_sync_pending):
+        mock_sync_pending.return_value = True
+        mail.outbox.clear()
+
+        response = self.client.post(reverse('join_request'), {
+            'full_name': 'Gabriela Mistral',
+            'email': 'gabriela.poet@gmail.com',
+            'phone_number': '+52 55 1234 5678',
+            'region': 'peninsula',
+            'city': 'Palo Alto',
+            'referral_source': 'Found on community Instagram',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Request Received!")
+        self.assertContains(response, "Pending Organizer Review")
+
+        # Verify request record in DB
+        req = MembershipRequest.objects.get(email='gabriela.poet@gmail.com')
+        self.assertEqual(req.status, MembershipRequest.STATUS_PENDING)
+
+        # Verify Audit Log entry created
+        audit_log = MembershipAuditLog.objects.filter(target_email='gabriela.poet@gmail.com').first()
+        self.assertIsNotNone(audit_log)
+        self.assertEqual(audit_log.action, MembershipAuditLog.ACTION_SUBMITTED)
+        self.assertEqual(audit_log.target_name, 'Gabriela Mistral')
+        self.assertIn('Palo Alto', audit_log.notes)
+
+        # Verify email dispatched to admins
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Gabriela Mistral", mail.outbox[0].subject)
+        self.assertIn("organizer1@minimexitas.org", mail.outbox[0].to)
+
+    @patch('recommendations.views.sync_profile_to_google_sheet')
+    @patch('recommendations.views.update_pending_request_status_in_google_sheet')
+    def test_organizer_approve_request_creates_audit_log_and_records_reviewer(self, mock_update_status, mock_sync_profile):
+        mock_update_status.return_value = True
+        mock_sync_profile.return_value = True
+
+        req = MembershipRequest.objects.create(
+            full_name="Valentina Gomez",
+            email="valentina@gmail.com",
+            phone_number="+1 415 555 9900",
+            region="east_bay",
+            status=MembershipRequest.STATUS_PENDING
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "organizer1@minimexitas.org"
+        session['member_name'] = "Admin One"
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('organizer_approve_request', kwargs={'request_id': req.id}))
+        self.assertRedirects(response, reverse('organizer_dashboard') + '?approved=1')
+
+        # Verify request updated with reviewer info
+        req.refresh_from_db()
+        self.assertEqual(req.status, MembershipRequest.STATUS_APPROVED)
+        self.assertEqual(req.reviewed_by, "Admin One")
+        self.assertIsNotNone(req.reviewed_at)
+
+        # Verify Audit Log entry created
+        audit_log = MembershipAuditLog.objects.filter(target_email='valentina@gmail.com', action=MembershipAuditLog.ACTION_APPROVED).first()
+        self.assertIsNotNone(audit_log)
+        self.assertEqual(audit_log.actor_name, "Admin One")
+        self.assertEqual(audit_log.actor_email, "organizer1@minimexitas.org")
+
+    @patch('recommendations.views.update_pending_request_status_in_google_sheet')
+    def test_organizer_reject_request_creates_audit_log_and_records_reviewer_notes(self, mock_update_status):
+        mock_update_status.return_value = True
+
+        req = MembershipRequest.objects.create(
+            full_name="Spam Bot",
+            email="spambot@gmail.com",
+            phone_number="+1 555 000 0000",
+            region="south_bay",
+            status=MembershipRequest.STATUS_PENDING
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "organizer2@minimexitas.org"
+        session['member_name'] = "Admin Two"
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('organizer_reject_request', kwargs={'request_id': req.id}), {
+            'review_notes': 'Applicant does not appear to be located in the Bay Area.'
+        })
+        self.assertRedirects(response, reverse('organizer_dashboard') + '?declined=1')
+
+        # Verify request updated with reviewer info & decline notes
+        req.refresh_from_db()
+        self.assertEqual(req.status, MembershipRequest.STATUS_REJECTED)
+        self.assertEqual(req.reviewed_by, "Admin Two")
+        self.assertEqual(req.review_notes, "Applicant does not appear to be located in the Bay Area.")
+        self.assertIsNotNone(req.reviewed_at)
+
+        # Verify Audit Log entry created
+        audit_log = MembershipAuditLog.objects.filter(target_email='spambot@gmail.com', action=MembershipAuditLog.ACTION_REJECTED).first()
+        self.assertIsNotNone(audit_log)
+        self.assertEqual(audit_log.actor_name, "Admin Two")
+        self.assertEqual(audit_log.actor_email, "organizer2@minimexitas.org")
+        self.assertIn("does not appear to be located in the Bay Area", audit_log.notes)
+
+    @patch('recommendations.views.delete_profile_from_google_sheet')
+    def test_organizer_delete_member_creates_audit_log(self, mock_delete_sheet):
+        mock_delete_sheet.return_value = True
+
+        target_member = MemberProfile.objects.create(
+            email="to_be_deleted@gmail.com",
+            full_name="Member To Delete",
+            is_admin=False
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "organizer1@minimexitas.org"
+        session['member_name'] = "Admin One"
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('organizer_delete_member', kwargs={'member_id': target_member.id}))
+        self.assertRedirects(response, reverse('organizer_dashboard') + '?member_deleted=1')
+
+        audit_log = MembershipAuditLog.objects.filter(target_email='to_be_deleted@gmail.com', action=MembershipAuditLog.ACTION_DELETED).first()
+        self.assertIsNotNone(audit_log)
+        self.assertEqual(audit_log.actor_name, "Admin One")
+        self.assertEqual(audit_log.actor_email, "organizer1@minimexitas.org")
+
+    def test_organizer_dashboard_displays_audit_log_and_review_history(self):
+        # Create sample audit logs
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_APPROVED,
+            target_email="test.approved@gmail.com",
+            target_name="Approved User",
+            actor_name="Admin One",
+            actor_email="organizer1@minimexitas.org",
+            notes="Approved after review"
+        )
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_REJECTED,
+            target_email="test.rejected@gmail.com",
+            target_name="Rejected User",
+            actor_name="Admin Two",
+            actor_email="organizer2@minimexitas.org",
+            notes="No connection to Bay Area"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "organizer1@minimexitas.org"
+        session['member_name'] = "Admin One"
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.get(reverse('organizer_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Historial de Revisiones y Registro de Auditoría")
+        self.assertContains(response, "test.approved@gmail.com")
+        self.assertContains(response, "test.rejected@gmail.com")
+        self.assertContains(response, "Admin One")
+        self.assertContains(response, "Admin Two")
+        self.assertContains(response, "Approved after review")
+        self.assertContains(response, "No connection to Bay Area")
+
 
 
 

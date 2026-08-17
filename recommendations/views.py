@@ -18,10 +18,11 @@ from .sheets import (
     reconcile_members_with_google_sheet,
 )
 from .auth_helpers import is_gmail_allowed
-from .models import MemberProfile, MembershipRequest
+from .models import MemberProfile, MembershipRequest, MembershipAuditLog
 from .notifications import (
     send_membership_approval_email,
     send_membership_rejection_email,
+    send_admin_new_request_notification,
     build_whatsapp_approval_link,
     build_whatsapp_decline_link,
 )
@@ -411,8 +412,19 @@ def profile_delete_self_view(request):
         return redirect('profile')
 
     user_email = request.session.get('member_email', '').strip().lower()
+    user_name = request.session.get('member_name', '')
 
     if user_email:
+        # Audit log before deletion
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_DELETED,
+            target_email=user_email,
+            target_name=user_name,
+            actor_name=user_name or "Self",
+            actor_email=user_email,
+            notes="Account self-deleted by member."
+        )
+
         # Delete profile and requests from database
         MemberProfile.objects.filter(email__iexact=user_email).delete()
         MembershipRequest.objects.filter(email__iexact=user_email).delete()
@@ -572,6 +584,22 @@ def join_request_view(request):
                         status=MembershipRequest.STATUS_PENDING
                     )
 
+                    # Log to MembershipAuditLog
+                    MembershipAuditLog.objects.create(
+                        action=MembershipAuditLog.ACTION_SUBMITTED,
+                        target_email=email,
+                        target_name=full_name,
+                        actor_name=full_name,
+                        actor_email=email,
+                        notes=f"Referral: {referral_source} | Phone: {phone_number} | Region: {region} {f'({city})' if city else ''}".strip()
+                    )
+
+                    # Send notification email to all admins
+                    try:
+                        send_admin_new_request_notification(req_obj)
+                    except Exception as e:
+                        logger.warning(f"Failed to dispatch admin notification email for new request ({email}): {e}")
+
                     # Dual-sync pending request to Google Sheets for zero-data-loss protection
                     try:
                         sync_pending_request_to_google_sheet(req_obj)
@@ -617,6 +645,7 @@ def organizer_dashboard_view(request):
     pending_count = len(pending_requests)
 
     reviewed_requests = MembershipRequest.objects.exclude(status=MembershipRequest.STATUS_PENDING).order_by('-reviewed_at')[:20]
+    audit_logs = MembershipAuditLog.objects.all().order_by('-created_at')[:50]
 
     # Calculate region distribution stats across all registered members
     counts = MemberProfile.objects.exclude(region='').values('region').annotate(count=Count('region')).order_by('-count')
@@ -692,6 +721,7 @@ def organizer_dashboard_view(request):
         'pending_requests': pending_requests,
         'pending_count': pending_count,
         'reviewed_requests': reviewed_requests,
+        'audit_logs': audit_logs,
         'region_stats': region_stats,
         'top_region': top_region,
         'region_choices': MemberProfile.REGION_CHOICES,
@@ -740,6 +770,17 @@ def organizer_approve_request_view(request, request_id):
     except Exception as e:
         logger.warning(f"Failed to dispatch approval notification email for {req.email}: {e}")
 
+    # Audit Log Entry
+    admin_email = request.session.get('member_email', '')
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_APPROVED,
+        target_email=req.email,
+        target_name=req.full_name,
+        actor_name=reviewer,
+        actor_email=admin_email,
+        notes="Membership request approved."
+    )
+
     # Set session flash data for confirmation alert & direct WhatsApp button
     request.session['approved_flash_name'] = req.full_name or req.email
     request.session['approved_flash_email'] = req.email
@@ -783,6 +824,17 @@ def organizer_reject_request_view(request, request_id):
         send_membership_rejection_email(req, reason=req.review_notes)
     except Exception as e:
         logger.warning(f"Failed to dispatch rejection email to {req.email}: {e}")
+
+    # Audit Log Entry
+    admin_email = request.session.get('member_email', '')
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_REJECTED,
+        target_email=req.email,
+        target_name=req.full_name,
+        actor_name=reviewer,
+        actor_email=admin_email,
+        notes=req.review_notes or "Membership request declined."
+    )
 
     # Update Pending_Requests tab in Google Sheets
     try:
@@ -830,6 +882,18 @@ def organizer_direct_add_member_view(request):
     profile.is_admin = is_admin
     profile.save()
 
+    # Audit Log Entry
+    actor_name = request.session.get('member_name', 'Organizer')
+    actor_email = request.session.get('member_email', '')
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_DIRECT_ADDED,
+        target_email=email,
+        target_name=full_name,
+        actor_name=actor_name,
+        actor_email=actor_email,
+        notes=f"Added directly by admin. Role: {role} | Phone: {phone_number}"
+    )
+
     try:
         sync_profile_to_google_sheet(profile)
     except Exception as e:
@@ -857,6 +921,18 @@ def organizer_delete_member_view(request, member_id):
 
     target_email = profile.email
     target_name = profile.full_name or profile.email
+
+    # Audit Log Entry
+    actor_name = request.session.get('member_name', 'Organizer')
+    actor_email = request.session.get('member_email', '')
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_DELETED,
+        target_email=target_email,
+        target_name=target_name,
+        actor_name=actor_name,
+        actor_email=actor_email,
+        notes="Member deleted from directory and Google Sheets by organizer."
+    )
 
     # 1. Delete profile from database
     profile.delete()

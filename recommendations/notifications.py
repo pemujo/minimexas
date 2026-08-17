@@ -294,3 +294,132 @@ Equipo de Organizadores de MiniMexitas
         logger.warning(f"Failed to send membership rejection email to {recipient_email}: {e}")
         return False
 
+
+def send_admin_new_request_notification(request_obj, admin_emails=None, portal_url: str = None) -> bool:
+    """
+    Sends an automated notification email to all community admins/organizers when
+    a new membership request is submitted, containing applicant details and a direct
+    review button to the Organizer Dashboard.
+    """
+    if admin_emails is None:
+        from .models import MemberProfile
+        admin_emails = list(
+            MemberProfile.objects.filter(is_admin=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+
+    # Clean list of admin emails
+    valid_admins = list({e.strip().lower() for e in admin_emails if e and '@' in e})
+    if not valid_admins:
+        logger.info("No admin emails found to notify for new join request.")
+        return False
+
+    applicant_name = getattr(request_obj, 'full_name', '').strip() or "Nuevo Solicitante"
+    applicant_email = getattr(request_obj, 'email', '').strip()
+    applicant_phone = getattr(request_obj, 'phone_number', '').strip()
+    
+    get_region_display = getattr(request_obj, 'get_region_display', None)
+    applicant_region = get_region_display() if callable(get_region_display) else getattr(request_obj, 'region', '')
+    applicant_city = getattr(request_obj, 'city', '').strip()
+    referral = getattr(request_obj, 'referral_source', '').strip() or "No especificado"
+
+    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    dashboard_url = f"{base}/organizers/" if base else "/organizers/"
+
+    subject = f"🔔 Nueva solicitud para unirse a MiniMexitas: {applicant_name}"
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
+
+    plain_text_content = f"""¡Hola equipo de Organizadores!
+
+Se ha recibido una nueva solicitud para unirse al portal privado de la comunidad MiniMexitas:
+
+• Nombre: {applicant_name}
+• Gmail: {applicant_email}
+• WhatsApp / Teléfono: {applicant_phone or 'No proporcionado'}
+• Zona / Región: {applicant_region} {f'({applicant_city})' if applicant_city else ''}
+• ¿Cómo nos encontró / Referencia?:
+"{referral}"
+
+Para revisar, aprobar o declinar esta solicitud, ingresa al Panel de Organizadores:
+{dashboard_url}
+
+Atentamente,
+MiniMexitas Portal Bot
+"""
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nueva Solicitud - MiniMexitas</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }}
+    .container {{ max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05); }}
+    .header {{ background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 28px 24px; text-align: center; }}
+    .header h1 {{ color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; }}
+    .header p {{ color: #e0f2fe; margin: 4px 0 0; font-size: 13px; }}
+    .content {{ padding: 28px 24px; line-height: 1.6; }}
+    .badge-applicant {{ display: inline-block; background-color: #e0f2fe; color: #0369a1; font-weight: 600; font-size: 12px; padding: 4px 10px; border-radius: 20px; margin-bottom: 12px; }}
+    .info-card {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin: 16px 0; }}
+    .info-row {{ margin-bottom: 8px; font-size: 14px; }}
+    .info-label {{ font-weight: 600; color: #475569; display: inline-block; width: 140px; }}
+    .info-value {{ color: #0f172a; font-weight: 500; }}
+    .referral-box {{ background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 16px; margin-top: 12px; }}
+    .referral-box p {{ margin: 0; font-size: 13px; color: #92400e; font-style: italic; }}
+    .cta-container {{ text-align: center; margin: 24px 0 12px; }}
+    .btn {{ display: inline-block; background-color: #0284c7; color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 50px; box-shadow: 0 4px 12px rgba(2,132,199,0.3); }}
+    .footer {{ background-color: #0f172a; color: #94a3b8; padding: 20px; text-align: center; font-size: 12px; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Panel de Organizadores</h1>
+      <p>Notificación de Nueva Solicitud de Membresía</p>
+    </div>
+    <div class="content">
+      <span class="badge-applicant">🔔 Pendiente de Revisión</span>
+      <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0f172a;">Solicitud de {applicant_name}</h2>
+      
+      <div class="info-card">
+        <div class="info-row"><span class="info-label">👤 Nombre:</span> <span class="info-value">{applicant_name}</span></div>
+        <div class="info-row"><span class="info-label">✉️ Gmail:</span> <span class="info-value">{applicant_email}</span></div>
+        <div class="info-row"><span class="info-label">📱 WhatsApp:</span> <span class="info-value">{applicant_phone or 'No indicado'}</span></div>
+        <div class="info-row"><span class="info-label">📍 Zona / Región:</span> <span class="info-value">{applicant_region} {f'({applicant_city})' if applicant_city else ''}</span></div>
+        
+        <div class="referral-box">
+          <strong style="font-size: 12px; color: #78350f; text-transform: uppercase;">Referencia / Motivo:</strong>
+          <p>"{referral}"</p>
+        </div>
+      </div>
+
+      <div class="cta-container">
+        <a href="{dashboard_url}" class="btn">Revisar en el Panel de Organizadores</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">MiniMexitas Community Management System</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    try:
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=plain_text_content,
+            from_email=from_email,
+            to=valid_admins
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send(fail_silently=False)
+        logger.info(f"Admin new request notification sent to {len(valid_admins)} admins for applicant {applicant_email}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to send admin notification email to {valid_admins}: {e}")
+        return False
+
+
