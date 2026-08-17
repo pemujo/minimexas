@@ -1973,7 +1973,7 @@ class AdminNotificationAndAuditLogTestCase(TestCase):
 
         response = self.client.get(reverse('organizer_dashboard'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Historial de Revisiones y Registro de Auditoría")
+        self.assertContains(response, "Review History & Audit Log")
         self.assertContains(response, "test.approved@gmail.com")
         self.assertContains(response, "test.rejected@gmail.com")
         self.assertContains(response, "Admin One")
