@@ -3,9 +3,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![Django Version](https://img.shields.io/badge/django-5.0+-green.svg)](https://www.djangoproject.com/)
 [![License](https://img.shields.io/badge/license-Private-red.svg)]()
-[![Tests](https://img.shields.io/badge/tests-100%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-147%20passed-brightgreen.svg)]()
+[![CI Status](https://img.shields.io/badge/CI-GitHub%20Actions-blueviolet.svg)](https://github.com/pemujo/minimexas/actions)
 
-A private, gated web portal and community management system for the **MiniMexitas** Mexican community across the San Francisco Bay Area. The platform connects verified families, organizes regional meetups, curates local recommendations, and automates membership admissions with bi-directional Google Sheets synchronization and email notifications.
+A private, gated web portal and community management platform for the **MiniMexitas** Mexican community across the San Francisco Bay Area. The platform connects verified families, organizes regional meetups, powers community decision polls, curates local recommendations, and streamlines membership admissions with automated workflows and email notifications.
 
 ---
 
@@ -17,7 +18,7 @@ A private, gated web portal and community management system for the **MiniMexita
 - [Local Development Setup](#-local-development-setup)
 - [Environment Configuration (`.env`)](#-environment-configuration-env)
 - [Google Cloud & Spreadsheet Setup](#-google-cloud--spreadsheet-setup)
-- [Testing & Quality Assurance](#-testing--quality-assurance)
+- [Testing & Continuous Integration (CI)](#-testing--continuous-integration-ci)
 - [Deployment Guide (PythonAnywhere)](#-deployment-guide-pythonanywhere)
 - [Security & Privacy Standards](#-security--privacy-standards)
 
@@ -26,13 +27,13 @@ A private, gated web portal and community management system for the **MiniMexita
 ## 🏗 Overview & Architecture
 
 MiniMexitas operates on a **hybrid source-of-truth architecture**:
-1. **Google Sheets** acts as the central, human-editable database for community organizers to view rosters, manage roles, and populate recommendations.
-2. **Django + SQLite** provides the responsive web application layer, session security, fast cached queries, applicant review workflows, and immutable audit logging.
-3. **Google OAuth 2.0** enforces strict gated single sign-on (SSO), verifying that incoming users match verified members in the active roster.
+1. **Google Sheets** serves as the central administrative ledger for community organizers to inspect rosters, manage roles, view event RSVPs, and curate recommendations.
+2. **Django + SQLite** powers the responsive web application, authenticated member sessions, fast cached queries, applicant review workflows, interactive surveys, event management, and immutable audit logging.
+3. **Google OAuth 2.0** enforces strict gated single sign-on (SSO), ensuring only verified members on the active roster gain access to community resources.
 
 ```mermaid
 flowchart TD
-    subgraph Users & Admins
+    subgraph Community Users & Organizers
         Applicant[Prospective Member]
         Member[Verified Member]
         Admin[Community Organizer]
@@ -42,7 +43,10 @@ flowchart TD
         JoinView[Join Form /join/]
         OAuthView[Google OAuth Handshake]
         DashView[Organizer Dashboard]
-        DirView[Member Directory & Events]
+        DirView[Member Directory]
+        EventsView[Events & RSVPs]
+        SurveysView[Surveys & Decision Center]
+        ProfileView[Profile & Notification Settings]
         AuditLog[(SQLite Audit Log)]
     end
 
@@ -53,18 +57,24 @@ flowchart TD
     end
 
     Applicant -->|Submit Application| JoinView
-    JoinView -->|Record Action| AuditLog
-    JoinView -->|Dispatch Alert| SMTP
+    JoinView -->|Record Submission| AuditLog
+    JoinView -->|Admin Alert| SMTP
     JoinView -->|Dual-Sync Row| GoogleSheets
 
     Member -->|Sign In with Google| OAuthView
     OAuthView <-->|Token & Profile| GoogleOAuth
-    OAuthView <-->|Check Roster| GoogleSheets
+    OAuthView <-->|Validate Roster| GoogleSheets
     OAuthView -->|Access Granted| DirView
 
+    Member -->|Vote in Polls| SurveysView
+    Member -->|1-Click Signed RSVP| EventsView
+    Member -->|Update Preferences| ProfileView
+
     Admin -->|Review & Approve/Reject| DashView
-    DashView -->|Send Welcome / Decline Notice| SMTP
-    DashView -->|Update Status & Sync Roster| GoogleSheets
+    Admin -->|Broadcast Announcements| EventsView
+    Admin -->|Publish Polls| SurveysView
+    DashView -->|Dispatch Welcome/Decline| SMTP
+    DashView -->|Dual-Sync Roster & Data| GoogleSheets
     DashView -->|Immutable Audit Record| AuditLog
 ```
 
@@ -73,45 +83,65 @@ flowchart TD
 ## ✨ Key Features
 
 - **🔒 Gated Single Sign-On (Google OAuth 2.0)**:
-  - Strict domain and account verification against approved members in Google Sheets.
-  - Granular role-based access control (`Member` vs `Admin` / `Organizer`).
-  - Protection against CSRF and session fixation attacks.
+  - Strict domain and account verification against approved members.
+  - Role-based permissions (`Member` vs `Admin` / `Organizer`).
+  - Protection against CSRF, expired states, and session fixation.
 
-- **📝 Membership Application & Review Queue**:
-  - Public `/join/` application form with client- and server-side validation.
-  - Automated email notifications dispatched to all active organizers upon receiving a new application.
-  - Organizer review queue with one-click approval, direct WhatsApp outreach buttons, and rejection workflows with customized feedback notes.
+- **🗳️ Surveys & Community Decision Center (`/surveys/`)**:
+  - Interactive community polling with categorized topics (*Community, Event Planning, Meetup, General*).
+  - Single-choice and multiple-choice voting modes with live percentage distribution bars.
+  - Instant and re-broadcast email announcements sent to subscribed members.
+  - Organizer controls to create, close/re-open, broadcast, and delete surveys.
 
-- **📋 Complete Activity & Audit Logging**:
-  - Append-only `MembershipAuditLog` recording every submission, approval, rejection, direct member addition, and member removal.
-  - Tracks timestamp, admin identity, applicant email, and review justification.
+- **📅 Community Events & 1-Click Signed RSVPs (`/events/`)**:
+  - In-portal event scheduling with location links and automatic *"Add to Google Calendar"* generation.
+  - One-click tokenized RSVP email links (`Going`, `Maybe`, `Declined`) using cryptographically signed tokens.
+  - Live RSVP attendance tracking and breakdown.
+  - Instant email broadcasts with rich HTML formatting and dynamic action buttons.
+
+- **🔔 Member Notification Preferences (`/profile/`)**:
+  - Self-service toggle allowing members to opt-in or opt-out of community broadcast emails at any time.
+  - Notification badges displayed in the organizer member directory.
+  - Broadcast engine automatically respects member preferences and only delivers to opted-in active members.
+
+- **📝 Membership Application & Review Queue (`/join/` & `/organizers/`)**:
+  - Public `/join/` application form with real-time field validation.
+  - Instant admin alert notifications dispatched upon new submissions.
+  - Organizer queue featuring one-click approvals, mobile-optimized action controls, WhatsApp outreach buttons, and custom rejection feedback notes.
+
+- **📋 Immutable Activity & Audit Logging**:
+  - Append-only `MembershipAuditLog` recording every admission, rejection, member creation, deletion, and broadcast announcement.
+  - Tracks timestamp, admin identity, applicant target, and review notes.
 
 - **🔄 Bi-Directional Google Sheets Dual-Sync**:
-  - Real-time synchronization for zero-data-loss protection between SQLite and Google Sheets (`Members` and `Pending_Requests` tabs).
-  - One-click reconciliation engine to purge removed members and import newly added rows.
+  - Automated synchronization between SQLite and Google Sheets for roster members, pending requests, events, RSVPs, surveys, and votes.
+  - One-click reconciliation engine to resolve roster changes and sync offline data.
 
-- **📍 Member Directory & Geographic Intelligence**:
+- **📍 Member Directory & Regional Intelligence (`/directory/`)**:
   - Searchable directory of verified community members.
-  - Regional grouping across the Bay Area (*San Francisco, East Bay, Peninsula, South Bay, North Bay*).
-  - Geographic distribution progress bars and analytics for event planning.
-  - Direct WhatsApp deep links with prefilled greetings.
+  - Regional groupings across the Bay Area (*San Francisco, East Bay, Peninsula, South Bay, North Bay*).
+  - Regional member distribution analytics for event planning.
+  - Direct WhatsApp links with prefilled greetings.
 
-- **🌮 Curated Community Recommendations & Events**:
-  - Filterable directory of authentic Mexican businesses, doctors, restaurants, schools, and cultural events.
-  - One-click *"Add to Google Calendar"* event integration.
+- **🌮 Curated Community Recommendations (`/`)**:
+  - Categorized directory of authentic Mexican businesses, restaurants, doctors, schools, and cultural artisans.
+
+- **📱 Mobile-First Responsive Design**:
+  - Optimized for smartphones (iOS Safari and Android Chrome) with momentum scrolling, touch-friendly inputs, and responsive modal viewports.
 
 - **🛡️ Self-Service Privacy & Account Deletion**:
-  - Members can edit their public profiles or delete their accounts at any time, instantly removing their data from both SQLite and Google Sheets.
+  - Members can edit their profile information or permanently delete their account with complete data cleanup across SQLite and Google Sheets.
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Backend**: Python 3.12, Django 5.x
-- **Frontend**: Vanilla HTML5 / Modern CSS3, Bootstrap 5.3, Bootstrap Icons
-- **Integrations**: `gspread`, `google-auth`, Google OAuth2 API, Google Calendar API
+- **Backend**: Python 3.12, Django 5.x / 6.x
+- **Frontend**: Vanilla HTML5, Modern CSS3, Bootstrap 5.3, Bootstrap Icons
+- **Integrations**: `gspread`, `google-auth`, Google OAuth 2.0, Google Calendar API
 - **Database**: SQLite3 (Production on PythonAnywhere / Local Dev)
-- **Email**: Django SMTP backend (Gmail SMTP or Transactional Provider)
+- **Email**: Django SMTP backend with dynamic Gmail SMTP sender resolution
+- **CI/CD**: GitHub Actions automated matrix testing
 
 ---
 
@@ -120,7 +150,7 @@ flowchart TD
 ### 1. Prerequisites
 - Python 3.10+ installed on your machine.
 - Git.
-- A Google Cloud Service Account and OAuth 2.0 Client Credentials (see [Google Cloud Setup](#-google-cloud--spreadsheet-setup)).
+- A Google Cloud Service Account and OAuth 2.0 Web Client Credentials.
 
 ### 2. Clone and Setup Environment
 ```bash
@@ -143,7 +173,7 @@ cp .env.example .env
 ```
 
 ### 4. Database Migrations
-Run the initial database migrations:
+Run the database migrations:
 ```bash
 python manage.py migrate
 ```
@@ -174,7 +204,7 @@ Visit `http://127.0.0.1:8000/` in your browser.
 | `EMAIL_USE_TLS` | No | Enable TLS connection | `True` |
 | `EMAIL_HOST_USER` | No | SMTP authentication username / Gmail address | `notificaciones@minimexitas.org` |
 | `EMAIL_HOST_PASSWORD` | No | SMTP App Password (16-char Google App Password) | `abcd efgh ijkl mnop` |
-| `DEFAULT_FROM_EMAIL` | No | Friendly sender name for outgoing emails | `MiniMexitas Community <no-reply@minimexitas.org>` |
+| `DEFAULT_FROM_EMAIL` | No | Friendly sender name for outgoing emails | `MiniMexitas Community <user@gmail.com>` |
 
 ---
 
@@ -183,9 +213,7 @@ Visit `http://127.0.0.1:8000/` in your browser.
 ### 1. Google Cloud Console
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
 2. Create or select your project.
-3. Enable the following APIs:
-   - **Google Sheets API**
-   - **Google Drive API**
+3. Enable the **Google Sheets API** and **Google Drive API**.
 4. Under **APIs & Services > Credentials**:
    - Create an **OAuth 2.0 Web Client ID**:
      - Authorized JavaScript Origins: `http://127.0.0.1:8000`, `https://<your-subdomain>.pythonanywhere.com`
@@ -197,37 +225,44 @@ Visit `http://127.0.0.1:8000/` in your browser.
 ### 2. Google Spreadsheet Structure
 1. Open your target Google Spreadsheet.
 2. Click **Share** and add your Service Account email with the **Editor** role.
-3. Ensure the spreadsheet contains the following three worksheets and header columns:
+3. Ensure the spreadsheet contains the following standard worksheets:
 
-#### `Members` Tab
-| Name | Gmail | Role | Phone | Region | City | Family Info | Interests | Bio |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-
-*(Role column should contain `Admin`, `Organizer`, or `Member`)*
-
-#### `Pending_Requests` Tab
-| Full Name | Email | Phone Number | Region | City | Referral Source | Status | Reviewed By | Reviewed At | Review Notes |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-
-#### `Recomendaciones` Tab (or `Notes`)
-| Categoría | Nombre | Recomendación | Dirección / Zona | Link / Teléfono | Notas |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+- **`Members`**: `Name`, `Gmail`, `Role`, `Phone`, `Region`, `City`, `Family Info`, `Interests`, `Bio`
+- **`Pending_Requests`**: `Full Name`, `Email`, `Phone Number`, `Region`, `City`, `Referral Source`, `Status`, `Reviewed By`, `Reviewed At`, `Review Notes`
+- **`Recomendaciones`**: `Categoría`, `Nombre`, `Recomendación`, `Dirección / Zona`, `Link / Teléfono`, `Notas`
+- **`Events`**: `Event ID`, `Title`, `Category`, `Start Time`, `End Time`, `Location`, `Location URL`, `Description`, `Created By`, `Status`, `Updated At`
+- **`Event_RSVPs`**: `Event ID`, `Event Title`, `Member Name`, `Member Email`, `RSVP Status`, `Notes`, `Updated At`
+- **`Surveys_Polls`**: `Survey ID`, `Title`, `Category`, `Mode`, `Status`, `Created By`, `Created At`, `Options`, `Total Votes`
+- **`Survey_Votes`**: `Vote ID`, `Survey ID`, `Survey Title`, `Option Text`, `Voter Name`, `Voter Email`, `Voted At`
+- **`Audit_Log`**: `Timestamp`, `Action`, `Target Email`, `Target Name`, `Actor Name`, `Actor Email`, `Notes`
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## 🧪 Testing & Continuous Integration (CI)
 
-The codebase includes an extensive, fully isolated automated unit test suite. All Google API calls and SMTP dispatches are mocked during testing to prevent rate limits or live spreadsheet modifications.
+The codebase includes an automated test suite containing **147 tests** covering access control, survey polling, event RSVPs, notification preference toggling, audit logging, and Google API mock handling.
 
-To run all test cases:
+### Local Testing
 ```bash
+# Run the entire test suite
 python manage.py test recommendations
+
+# Run with verbose output
+python manage.py test recommendations --verbosity=2
+
+# Check for missing migrations
+python manage.py makemigrations --check --dry-run
+
+# Run Django system integrity check
+python manage.py check
 ```
 
-To run a specific test suite or test case:
-```bash
-python manage.py test recommendations.tests.AdminNotificationAndAuditLogTestCase
-```
+### GitHub Actions CI Workflow
+Continuous integration runs automatically on every push and pull request via [`.github/workflows/ci.yml`](.github/workflows/ci.yml) across Python 3.11 and 3.12:
+- System & configuration validation
+- Database migration sanity checks
+- Static asset collection verification
+- Execution of all 147 unit and integration tests
 
 ---
 
@@ -249,7 +284,7 @@ python manage.py collectstatic --noinput
 ```
 
 ### 3. Verify `.env` Configuration
-Ensure the `.env` file on PythonAnywhere contains the production `PORTAL_BASE_URL`, production `GOOGLE_SHEET_KEY`, and valid email credentials.
+Ensure the `.env` file on PythonAnywhere contains the production `PORTAL_BASE_URL`, `DEBUG=False`, production `GOOGLE_SHEET_KEY`, and valid email SMTP credentials.
 
 ### 4. Reload Web Application
 In the **Web** tab of PythonAnywhere, click the green **Reload <subdomain>.pythonanywhere.com** button.
@@ -258,11 +293,13 @@ In the **Web** tab of PythonAnywhere, click the green **Reload <subdomain>.pytho
 
 ## 🔒 Security & Privacy Standards
 
-- **Environment Isolation**: No production secrets, service account credentials, or spreadsheet IDs are hardcoded in the repository.
+- **Environment Isolation**: No production secrets, service account credentials, or spreadsheet IDs are committed to source control.
 - **CSRF & State Token Verification**: OAuth handshakes enforce cryptographically secure `state` tokens stored in user sessions.
 - **Session Protection**: Sessions are cycled upon authentication (`cycle_key()`) to prevent session fixation attacks.
-- **Zero Orphaned Data on Deletion**: When a user requests self-deletion or an admin removes a member, records are purged simultaneously across SQLite and the Google Sheet `Members` tab.
-- **Auditable Governance**: All membership admissions and rejections are logged with reviewer metadata for community governance.
+- **Signed RSVP Tokens**: Event 1-click response links use cryptographic signatures with timestamps to prevent spoofing or unauthorized changes.
+- **Permission Boundary Enforcement**: Non-admin members attempting to access organizer management or survey creation routes are rejected with HTTP 403.
+- **Zero Orphaned Data on Deletion**: When a member requests account deletion, records are purged simultaneously across SQLite and Google Sheets.
+- **Auditable Governance**: All membership decisions and broadcast dispatches are permanently recorded in `MembershipAuditLog`.
 
 ---
 
@@ -270,3 +307,4 @@ In the **Web** tab of PythonAnywhere, click the green **Reload <subdomain>.pytho
 
 Private repository and intellectual property of the **MiniMexitas Community**.  
 All rights reserved. Unauthorized reproduction, distribution, or public scraping is strictly prohibited.
+
