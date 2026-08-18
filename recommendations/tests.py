@@ -2124,6 +2124,7 @@ class AdminNotificationAndAuditLogTestCase(TestCase):
         self.assertContains(response, "No connection to Bay Area")
 
 
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
 class SurveysFeatureTestCase(TestCase):
     def setUp(self):
         cache.clear()
@@ -3104,6 +3105,7 @@ class CommunityEventDualSourceTestCase(TestCase):
         self.assertEqual(g_evt['source'], 'google_calendar')
 
 
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
 class CommunityEventSheetSyncTestCase(TestCase):
     @patch('recommendations.sheets.get_gspread_client')
     def test_sync_community_event_to_google_sheet_new_row(self, mock_get_client):

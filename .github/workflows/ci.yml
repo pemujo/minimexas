@@ -59,5 +59,6 @@ jobs:
         SECRET_KEY: 'ci-test-suite-secret-key-temporary'
         DEBUG: 'True'
         ALLOWED_HOSTS: 'localhost,127.0.0.1,testserver'
+        GOOGLE_SHEET_KEY: 'mock_test_sheet_key_ci_123'
       run: |
         python manage.py test recommendations --verbosity=2
