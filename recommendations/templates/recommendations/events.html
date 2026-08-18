@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Community Events & Calendar - MiniMexitas</title>
     <meta name="description" content="Discover upcoming community events, celebrations, and gatherings organized by MiniMexitas in the Bay Area.">
     <!-- Open Graph / WhatsApp -->
@@ -108,6 +108,25 @@
             right: 24px;
             z-index: 1090;
             min-width: 300px;
+        }
+        @media (max-width: 576px) {
+            .rsvp-toast {
+                left: 12px;
+                right: 12px;
+                bottom: 16px;
+                min-width: auto;
+                max-width: calc(100% - 24px);
+            }
+            .rsvp-btn-group {
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+            }
+            .btn-rsvp-pill {
+                flex: 1;
+                padding: 6px 4px;
+                font-size: 0.72rem;
+            }
         }
     </style>
 </head>
@@ -615,7 +634,7 @@
     {% if is_admin %}
     <!-- CREATE EVENT MODAL -->
     <div class="modal fade" id="createEventModal" tabindex="-1" aria-labelledby="createEventModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
                     <h5 class="modal-title fw-bold" id="createEventModalLabel">
@@ -697,7 +716,7 @@
 
     <!-- EDIT EVENT MODAL -->
     <div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
                     <h5 class="modal-title fw-bold" id="editEventModalLabel">
@@ -766,7 +785,7 @@
 
     <!-- DELETE EVENT MODAL -->
     <div class="modal fade" id="deleteEventModal" tabindex="-1" aria-labelledby="deleteEventModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
                 <div class="modal-header text-white bg-danger">
                     <h5 class="modal-title fw-bold" id="deleteEventModalLabel">
@@ -798,7 +817,7 @@
 
     <!-- BROADCAST EVENT MODAL -->
     <div class="modal fade" id="broadcastModal" tabindex="-1" aria-labelledby="broadcastModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
                     <h5 class="modal-title fw-bold" id="broadcastModalLabel">
@@ -857,7 +876,7 @@
 
     <!-- EVENT DETAILS MODAL -->
     <div class="modal fade" id="eventDetailModal" tabindex="-1" aria-labelledby="eventDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
                     <h5 class="modal-title fw-bold" id="modalEventTitle">Event Details</h5>

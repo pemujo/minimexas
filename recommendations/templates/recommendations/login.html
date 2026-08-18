@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Member Sign In - MiniMexitas Portal</title>
     <meta name="description" content="Welcome to the MiniMexitas Member Portal. Connect with fellow Bay Area community members, access verified recommendations, and discover local meetups.">
     <!-- Open Graph / WhatsApp -->
@@ -45,14 +45,14 @@
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="{% url 'login_page' %}">
                 <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="brand-logo-img me-2">
-                <span>MiniMexitas <span class="fw-normal text-white-50 fs-6 ms-1">Portal</span></span>
+                <span>MiniMexitas <span class="fw-normal text-white-50 fs-6 ms-1 d-none d-sm-inline">Portal</span></span>
             </a>
 
             <div class="d-flex align-items-center gap-2">
-                <a href="{% url 'join_request' %}" class="btn btn-sm btn-outline-light rounded-pill px-3 py-1 fw-semibold">
-                    <i class="bi bi-person-plus me-1"></i> Request to Join
+                <a href="{% url 'join_request' %}" class="btn btn-sm btn-outline-light rounded-pill px-2 px-sm-3 py-1 fw-semibold text-nowrap">
+                    <i class="bi bi-person-plus me-1"></i> <span class="d-none d-sm-inline">Request to </span>Join
                 </a>
-                <a href="#signin-section" class="btn btn-sm btn-light rounded-pill px-3 py-1 fw-semibold text-dark">
+                <a href="#signin-section" class="btn btn-sm btn-light rounded-pill px-2 px-sm-3 py-1 fw-semibold text-dark text-nowrap">
                     <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
                 </a>
             </div>

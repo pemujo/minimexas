@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Organizer Dashboard - MiniMexitas Community</title>
     <meta name="description" content="Organizer & Admin dashboard for MiniMexitas member approvals, onboarding, and region analytics.">
     
@@ -272,132 +272,135 @@
                                         <i class="bi bi-x-lg me-1"></i> Decline
                                     </button>
                                 </div>
-
-                                <!-- Approve Modal for this Request -->
-                                <div class="modal fade" id="approveModal-{{ req.id }}" tabindex="-1" aria-labelledby="approveModalLabel-{{ req.id }}" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content rounded-4 border-0 shadow">
-                                            <div class="modal-header border-0 pb-0">
-                                                <h5 class="modal-title fw-bold text-success d-flex align-items-center gap-2" id="approveModalLabel-{{ req.id }}">
-                                                    <i class="bi bi-person-check-fill"></i> Approve Membership Request
-                                                </h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body text-start">
-                                                <p class="text-secondary small mb-3">
-                                                    You are approving <strong class="text-dark">{{ req.full_name }}</strong> (<span class="text-muted">{{ req.email }}</span>) to join the MiniMexitas private portal.
-                                                </p>
-
-                                                <!-- Automated Email Notification Notice -->
-                                                <div class="alert alert-success border-0 rounded-3 small mb-3 p-3 d-flex align-items-start gap-2" style="background-color: #ecfdf5;">
-                                                    <i class="bi bi-envelope-check-fill text-success fs-5 flex-shrink-0 mt-1"></i>
-                                                    <div>
-                                                        <strong class="text-success d-block mb-1">Automated Confirmation Email</strong>
-                                                        An official welcome email will be automatically sent to <strong>{{ req.email }}</strong> confirming their authorization, login link, and community guide.
-                                                    </div>
-                                                </div>
-
-                                                {% if req.phone_number %}
-                                                <!-- Optional Direct WhatsApp Welcome -->
-                                                <div class="p-3 bg-light rounded-3 border mb-3">
-                                                    <div class="d-flex align-items-center justify-content-between mb-1">
-                                                        <span class="fw-semibold small text-dark"><i class="bi bi-whatsapp text-success me-1"></i> WhatsApp Welcome Message:</span>
-                                                    </div>
-                                                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">
-                                                        You can also send a personalized greeting directly to {{ req.full_name }} on WhatsApp:
-                                                    </p>
-                                                    <a href="{{ req.whatsapp_approval_url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 w-100 fw-semibold" style="font-size: 0.8rem;">
-                                                        <i class="bi bi-whatsapp me-1"></i> Send Welcome via WhatsApp
-                                                    </a>
-                                                </div>
-                                                {% endif %}
-
-                                                <!-- Sync Confirmation Details -->
-                                                <div class="small text-muted p-2 bg-light rounded-2 border">
-                                                    <i class="bi bi-cloud-arrow-up text-primary me-1"></i> Upon approval, this member will be synced to the Google Sheet <em>Members</em> tab and granted instant Google sign-in access.
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer border-0 pt-0">
-                                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" data-bs-dismiss="modal">Cancel</button>
-                                                <form method="POST" action="{% url 'organizer_approve_request' req.id %}">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center">
-                                                        <i class="bi bi-check-lg me-1"></i> Confirm & Approve
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Decline Modal for this Request -->
-                                <div class="modal fade" id="declineModal-{{ req.id }}" tabindex="-1" aria-labelledby="declineModalLabel-{{ req.id }}" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content rounded-4 border-0 shadow">
-                                            <div class="modal-header border-0 pb-0">
-                                                <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="declineModalLabel-{{ req.id }}">
-                                                    <i class="bi bi-x-circle-fill"></i> Decline Membership Request
-                                                </h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <form method="POST" action="{% url 'organizer_reject_request' req.id %}">
-                                                {% csrf_token %}
-                                                <div class="modal-body text-start">
-                                                    <p class="text-muted small mb-3">
-                                                        Decline request for <strong class="text-dark">{{ req.full_name }}</strong> (<span class="text-muted">{{ req.email }}</span>). Please provide the reason or feedback below so the applicant can understand what was missing.
-                                                    </p>
-
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-semibold small text-dark">
-                                                            Reason for Rejection / Note to Applicant <span class="text-danger">*</span>
-                                                        </label>
-                                                        <textarea name="review_notes" id="declineNotes-{{ req.id }}" class="form-control rounded-3" rows="3" required placeholder="e.g., We could not verify your connection to the Bay Area community or your referral. You are welcome to re-apply with more details."></textarea>
-                                                        <div class="form-text small text-muted">
-                                                            This explanation will be included in the automated notification email sent to the applicant.
-                                                        </div>
-                                                    </div>
-
-                                                    <!-- Quick Preset Suggestions -->
-                                                    <div class="mb-3">
-                                                        <label class="form-label text-muted" style="font-size: 0.75rem; font-weight: 600;">QUICK SUGGESTIONS:</label>
-                                                        <div class="d-flex flex-wrap gap-1">
-                                                            <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'Location is outside the San Francisco Bay Area community scope.')">
-                                                                Outside Bay Area
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'We were unable to verify your community referral or group connection.')">
-                                                                Unverified Referral
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'Incomplete application details or invalid contact information provided.')">
-                                                                Incomplete Info
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    <!-- Automated Rejection Email Notice -->
-                                                    <div class="alert alert-secondary border-0 rounded-3 small mb-2 p-3 d-flex align-items-start gap-2" style="background-color: #f1f5f9;">
-                                                        <i class="bi bi-envelope-x text-danger fs-5 flex-shrink-0 mt-1"></i>
-                                                        <div>
-                                                            <strong class="text-dark d-block mb-1">Automated Rejection Email</strong>
-                                                            An official notification email will be sent automatically to <strong>{{ req.email }}</strong> explaining that their request was not approved and including your notes above.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer border-0 pt-0">
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold">
-                                                        <i class="bi bi-x-circle me-1"></i> Confirm & Decline
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pending Requests Modals (Rendered outside table-responsive to avoid iOS Safari stacking context bugs) -->
+            {% for req in pending_requests %}
+            <!-- Approve Modal for this Request -->
+            <div class="modal fade" id="approveModal-{{ req.id }}" tabindex="-1" aria-labelledby="approveModalLabel-{{ req.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content rounded-4 border-0 shadow">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-success d-flex align-items-center gap-2" id="approveModalLabel-{{ req.id }}">
+                                <i class="bi bi-person-check-fill"></i> Approve Membership Request
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                            <p class="text-secondary small mb-3">
+                                You are approving <strong class="text-dark">{{ req.full_name }}</strong> (<span class="text-muted">{{ req.email }}</span>) to join the MiniMexitas private portal.
+                            </p>
+
+                            <!-- Automated Email Notification Notice -->
+                            <div class="alert alert-success border-0 rounded-3 small mb-3 p-3 d-flex align-items-start gap-2" style="background-color: #ecfdf5;">
+                                <i class="bi bi-envelope-check-fill text-success fs-5 flex-shrink-0 mt-1"></i>
+                                <div>
+                                    <strong class="text-success d-block mb-1">Automated Confirmation Email</strong>
+                                    An official welcome email will be automatically sent to <strong>{{ req.email }}</strong> confirming their authorization, login link, and community guide.
+                                </div>
+                            </div>
+
+                            {% if req.phone_number %}
+                            <!-- Optional Direct WhatsApp Welcome -->
+                            <div class="p-3 bg-light rounded-3 border mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="fw-semibold small text-dark"><i class="bi bi-whatsapp text-success me-1"></i> WhatsApp Welcome Message:</span>
+                                </div>
+                                <p class="text-muted small mb-2" style="font-size: 0.75rem;">
+                                    You can also send a personalized greeting directly to {{ req.full_name }} on WhatsApp:
+                                </p>
+                                <a href="{{ req.whatsapp_approval_url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 w-100 fw-semibold" style="font-size: 0.8rem;">
+                                    <i class="bi bi-whatsapp me-1"></i> Send Welcome via WhatsApp
+                                </a>
+                            </div>
+                            {% endif %}
+
+                            <!-- Sync Confirmation Details -->
+                            <div class="small text-muted p-2 bg-light rounded-2 border">
+                                <i class="bi bi-cloud-arrow-up text-primary me-1"></i> Upon approval, this member will be synced to the Google Sheet <em>Members</em> tab and granted instant Google sign-in access.
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" data-bs-dismiss="modal">Cancel</button>
+                            <form method="POST" action="{% url 'organizer_approve_request' req.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center">
+                                    <i class="bi bi-check-lg me-1"></i> Confirm & Approve
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decline Modal for this Request -->
+            <div class="modal fade" id="declineModal-{{ req.id }}" tabindex="-1" aria-labelledby="declineModalLabel-{{ req.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content rounded-4 border-0 shadow">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="declineModalLabel-{{ req.id }}">
+                                <i class="bi bi-x-circle-fill"></i> Decline Membership Request
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{% url 'organizer_reject_request' req.id %}">
+                            {% csrf_token %}
+                            <div class="modal-body text-start">
+                                <p class="text-muted small mb-3">
+                                    Decline request for <strong class="text-dark">{{ req.full_name }}</strong> (<span class="text-muted">{{ req.email }}</span>). Please provide the reason or feedback below so the applicant can understand what was missing.
+                                </p>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold small text-dark">
+                                        Reason for Rejection / Note to Applicant <span class="text-danger">*</span>
+                                    </label>
+                                    <textarea name="review_notes" id="declineNotes-{{ req.id }}" class="form-control rounded-3" rows="3" required placeholder="e.g., We could not verify your connection to the Bay Area community or your referral. You are welcome to re-apply with more details."></textarea>
+                                    <div class="form-text small text-muted">
+                                        This explanation will be included in the automated notification email sent to the applicant.
+                                    </div>
+                                </div>
+
+                                <!-- Quick Preset Suggestions -->
+                                <div class="mb-3">
+                                    <label class="form-label text-muted" style="font-size: 0.75rem; font-weight: 600;">QUICK SUGGESTIONS:</label>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'Location is outside the San Francisco Bay Area community scope.')">
+                                            Outside Bay Area
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'We were unable to verify your community referral or group connection.')">
+                                            Unverified Referral
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'Incomplete application details or invalid contact information provided.')">
+                                            Incomplete Info
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Automated Rejection Email Notice -->
+                                <div class="alert alert-secondary border-0 rounded-3 small mb-2 p-3 d-flex align-items-start gap-2" style="background-color: #f1f5f9;">
+                                    <i class="bi bi-envelope-x text-danger fs-5 flex-shrink-0 mt-1"></i>
+                                    <div>
+                                        <strong class="text-dark d-block mb-1">Automated Rejection Email</strong>
+                                        An official notification email will be sent automatically to <strong>{{ req.email }}</strong> explaining that their request was not approved and including your notes above.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold">
+                                    <i class="bi bi-x-circle me-1"></i> Confirm & Decline
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
             {% else %}
             <div class="text-center py-4 text-muted">
                 <i class="bi bi-check2-circle fs-1 text-success mb-2 d-block"></i>
@@ -725,42 +728,6 @@
                                 <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" data-bs-toggle="modal" data-bs-target="#deleteMemberModal-{{ p.id }}" title="Remove member from community">
                                     <i class="bi bi-person-dash me-1"></i> Remove
                                 </button>
-
-                                <!-- Delete Member Modal -->
-                                <div class="modal fade" id="deleteMemberModal-{{ p.id }}" tabindex="-1" aria-labelledby="deleteMemberModalLabel-{{ p.id }}" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content rounded-4 border-0 shadow text-start">
-                                            <div class="modal-header border-0 pb-0">
-                                                <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="deleteMemberModalLabel-{{ p.id }}">
-                                                    <i class="bi bi-person-x-fill"></i> Remove Member
-                                                </h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body text-start">
-                                                <p class="text-dark small mb-3">
-                                                    Are you sure you want to remove <strong class="text-dark">{{ p.full_name|default:p.email }}</strong> (<span class="text-muted">{{ p.email }}</span>)?
-                                                </p>
-                                                <div class="alert alert-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 small mb-0 text-danger">
-                                                    <strong class="d-block mb-1"><i class="bi bi-info-circle-fill me-1"></i> What this does:</strong>
-                                                    <ul class="mb-0 ps-3">
-                                                        <li>Deletes this member's profile from the database and directory.</li>
-                                                        <li>Deletes their entry from the Google Sheet <em>Members</em> tab.</li>
-                                                        <li>Revokes their Google OAuth access to the private portal.</li>
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer border-0 pt-0">
-                                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-                                                <form method="POST" action="{% url 'organizer_delete_member' p.id %}">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold shadow-sm">
-                                                        <i class="bi bi-trash3 me-1"></i> Confirm & Remove
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </td>
 
                         </tr>
@@ -774,6 +741,44 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Member Delete Modals (Rendered outside table-responsive to avoid iOS Safari stacking context bugs) -->
+            {% for p in profiles %}
+            <div class="modal fade" id="deleteMemberModal-{{ p.id }}" tabindex="-1" aria-labelledby="deleteMemberModalLabel-{{ p.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content rounded-4 border-0 shadow text-start">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="deleteMemberModalLabel-{{ p.id }}">
+                                <i class="bi bi-person-x-fill"></i> Remove Member
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                            <p class="text-dark small mb-3">
+                                Are you sure you want to remove <strong class="text-dark">{{ p.full_name|default:p.email }}</strong> (<span class="text-muted">{{ p.email }}</span>)?
+                            </p>
+                            <div class="alert alert-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 small mb-0 text-danger">
+                                <strong class="d-block mb-1"><i class="bi bi-info-circle-fill me-1"></i> What this does:</strong>
+                                <ul class="mb-0 ps-3">
+                                    <li>Deletes this member's profile from the database and directory.</li>
+                                    <li>Deletes their entry from the Google Sheet <em>Members</em> tab.</li>
+                                    <li>Revokes their Google OAuth access to the private portal.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                            <form method="POST" action="{% url 'organizer_delete_member' p.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold shadow-sm">
+                                    <i class="bi bi-trash3 me-1"></i> Confirm & Remove
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
 
             <!-- No results message for dynamic filter -->
             <div id="noResultsMessage" class="text-center py-4 text-muted d-none">
@@ -789,7 +794,7 @@
     <!-- DIRECT ADD MEMBER MODAL -->
     <!-- ========================================== -->
     <div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-bottom px-4 pt-4">
                     <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="addMemberModalLabel">
