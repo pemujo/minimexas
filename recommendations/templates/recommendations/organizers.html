@@ -3,9 +3,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Organizer Dashboard - MiniMexitas Community</title>
-    <meta name="description" content="Organizer & Admin dashboard for MiniMexitas event planning and member region analytics.">
+    <meta name="description" content="Organizer & Admin dashboard for MiniMexitas member approvals, onboarding, and region analytics.">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,9 +26,44 @@
 
     <main class="container py-4 py-md-5">
 
+        <!-- Notification / Action Alert Banner -->
+        {% if action_message %}
+        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm d-flex flex-wrap align-items-center justify-content-between mb-4 p-3 rounded-4" role="alert" style="background-color: #ecfdf5; border-left: 5px solid #10b981 !important;">
+            <div class="d-flex align-items-center me-3 my-1">
+                <i class="bi bi-check-circle-fill text-success fs-4 me-3 flex-shrink-0"></i>
+                <div>
+                    <strong class="text-success">Success:</strong> {{ action_message }}
+                    {% if approved_data and approved_data.email %}
+                    <div class="small text-secondary mt-1">
+                        <i class="bi bi-envelope-check-fill text-success me-1"></i> Automated welcome confirmation email was dispatched to <strong>{{ approved_data.email }}</strong>.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if approved_data and approved_data.wa_link %}
+            <div class="my-1">
+                <a href="{{ approved_data.wa_link }}" target="_blank" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold shadow-sm d-inline-flex align-items-center">
+                    <i class="bi bi-whatsapp me-1"></i> Send Welcome on WhatsApp
+                </a>
+            </div>
+            {% endif %}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        {% if action_error %}
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm d-flex align-items-center mb-4 p-3 rounded-4" role="alert" style="background-color: #fef2f2; border-left: 5px solid #ef4444 !important;">
+            <i class="bi bi-exclamation-triangle-fill text-danger fs-4 me-3 flex-shrink-0"></i>
+            <div>
+                <strong class="text-danger">Notice:</strong> {{ action_error }}
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
         <!-- Page Header & Actions -->
         <div class="row mb-4 align-items-center justify-content-between g-3">
-            <div class="col-lg-8">
+            <div class="col-lg-7">
                 <nav aria-label="breadcrumb" class="mb-2">
                     <ol class="breadcrumb mb-0 small">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted">Home</a></li>
@@ -39,13 +74,25 @@
                     <span class="badge bg-warning text-dark border border-warning px-2 py-1 fw-bold font-monospace" style="font-size: 0.75rem;">
                         <i class="bi bi-shield-lock-fill me-1"></i> ORGANIZER PORTAL
                     </span>
-                    <h2 class="fw-bold text-dark mb-0">Community Insights & Event Planning</h2>
+                    <h2 class="fw-bold text-dark mb-0">Community Management & Approvals</h2>
                 </div>
                 <p class="text-muted small mb-0">
-                    Review member region preferences to choose the best meetup locations and access the verified community directory.
+                    Review incoming membership requests, add new members, and analyze member region distribution.
                 </p>
             </div>
-            <div class="col-lg-4 text-lg-end">
+            <div class="col-lg-5 text-lg-end d-flex flex-wrap gap-2 justify-content-lg-end align-items-center">
+                <a href="{% url 'surveys' %}" class="btn btn-outline-primary rounded-pill px-3 py-2 fw-semibold shadow-sm">
+                    <i class="bi bi-bar-chart-line me-1"></i> Community Surveys
+                </a>
+                <form method="POST" action="{% url 'organizer_sync_sheets' %}" class="d-inline m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary rounded-pill px-3 py-2 fw-semibold shadow-sm" title="Reconcile and synchronize member directory">
+                        <i class="bi bi-arrow-repeat me-1"></i> Sync Directory
+                    </button>
+                </form>
+                <button type="button" class="btn btn-primary rounded-pill px-3 py-2 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+                    <i class="bi bi-person-plus-fill me-1"></i> Add Member Directly
+                </button>
                 <a href="{% url 'member_directory' %}" class="btn btn-outline-success rounded-pill px-3 py-2 fw-semibold shadow-sm">
                     <i class="bi bi-people-fill me-1"></i> Member Directory
                 </a>
@@ -55,6 +102,27 @@
         <!-- 4 KPI Metrics Row -->
         <div class="row g-3 mb-4">
             
+            <!-- Pending Requests Counter -->
+            <div class="col-sm-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative overflow-hidden">
+                    {% if pending_count > 0 %}
+                    <div style="position: absolute; top: 0; right: 0; width: 4px; height: 100%; background-color: #ef4444;"></div>
+                    {% endif %}
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="feature-icon-box {% if pending_count > 0 %}bg-danger bg-opacity-10 text-danger{% else %}bg-secondary bg-opacity-10 text-muted{% endif %}">
+                            <i class="bi bi-person-check-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Approval Queue</div>
+                            <div class="fs-3 fw-bold {% if pending_count > 0 %}text-danger{% else %}text-dark{% endif %}">
+                                {{ pending_count }} <span class="fs-6 fw-normal text-muted">pending</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Members -->
             <div class="col-sm-6 col-lg-3">
                 <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
                     <div class="d-flex align-items-center gap-3">
@@ -62,13 +130,14 @@
                             <i class="bi bi-people-fill fs-4"></i>
                         </div>
                         <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Total Members</div>
+                            <div class="text-muted small fw-semibold text-uppercase">Active Members</div>
                             <div class="fs-3 fw-bold text-dark">{{ total_members }}</div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Regions Specified -->
             <div class="col-sm-6 col-lg-3">
                 <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
                     <div class="d-flex align-items-center gap-3">
@@ -76,27 +145,14 @@
                             <i class="bi bi-geo-alt-fill fs-4"></i>
                         </div>
                         <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Regions Specified</div>
+                            <div class="text-muted small fw-semibold text-uppercase">Regions Mapped</div>
                             <div class="fs-3 fw-bold text-dark">{{ total_with_region }} <span class="fs-6 fw-normal text-muted">/ {{ total_members }}</span></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-lg-3">
-                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="feature-icon-box bg-amber-subtle text-warning">
-                            <i class="bi bi-star-fill fs-4"></i>
-                        </div>
-                        <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Top Bay Region</div>
-                            <div class="fs-6 fw-bold text-dark text-truncate" style="max-width: 140px;" title="{{ top_region }}">{{ top_region }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+            <!-- WhatsApp Listed -->
             <div class="col-sm-6 col-lg-3">
                 <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
                     <div class="d-flex align-items-center gap-3">
@@ -104,13 +160,395 @@
                             <i class="bi bi-whatsapp fs-4 text-success"></i>
                         </div>
                         <div>
-                            <div class="text-muted small fw-semibold text-uppercase">WhatsApp Listed</div>
+                            <div class="text-muted small fw-semibold text-uppercase">WhatsApp Phone</div>
                             <div class="fs-3 fw-bold text-dark">{{ total_with_phone }}</div>
                         </div>
                     </div>
                 </div>
             </div>
 
+        </div>
+
+        <!-- ========================================== -->
+        <!-- PENDING MEMBERSHIP REQUESTS APPROVAL QUEUE -->
+        <!-- ========================================== -->
+        <div class="card border-0 shadow-sm rounded-4 bg-white p-4 mb-4" id="approvalQueue">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 pb-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-danger bg-opacity-10 text-danger p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                        <i class="bi bi-inbox-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0">
+                            Membership Requests Queue
+                        </h5>
+                        <div class="text-muted small">Prospective members awaiting review and verification</div>
+                    </div>
+                </div>
+                <div>
+                    {% if pending_count > 0 %}
+                    <span class="badge bg-danger rounded-pill px-3 py-2 font-monospace">{{ pending_count }} Pending Action</span>
+                    {% else %}
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 font-monospace">
+                        <i class="bi bi-check-circle me-1"></i> Queue Clear
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if pending_requests %}
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light text-muted small text-uppercase">
+                        <tr>
+                            <th scope="col" style="min-width: 200px;">Applicant & Actions</th>
+                            <th scope="col" style="min-width: 140px;">WhatsApp Contact</th>
+                            <th scope="col" style="min-width: 140px;">Bay Area Region</th>
+                            <th scope="col" style="min-width: 200px;">Referral / Background</th>
+                            <th scope="col" style="min-width: 100px;">Submitted</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for req in pending_requests %}
+                        <tr>
+                            <!-- Applicant Name, Email & Direct Actions -->
+                            <td>
+                                <div class="fw-bold text-dark fs-6">{{ req.full_name }}</div>
+                                <div class="text-muted mb-2" style="font-size: 0.8rem;">
+                                    <i class="bi bi-google me-1 text-danger"></i> {{ req.email }}
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <!-- Approve Modal Trigger -->
+                                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center shadow-sm" data-bs-toggle="modal" data-bs-target="#approveModal-{{ req.id }}" title="Approve Request and Send Welcome Notification">
+                                        <i class="bi bi-check-lg me-1"></i> Approve
+                                    </button>
+
+                                    <!-- Decline Modal Trigger -->
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#declineModal-{{ req.id }}" title="Decline Request with Reason">
+                                        <i class="bi bi-x-lg me-1"></i> Decline
+                                    </button>
+                                </div>
+                            </td>
+
+                            <!-- WhatsApp Phone + Direct Chat Link -->
+                            <td>
+                                {% if req.phone_number %}
+                                <div class="fw-medium text-dark">{{ req.phone_number }}</div>
+                                {% if req.whatsapp_url %}
+                                <a href="{{ req.whatsapp_url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-2 py-0 mt-1" style="font-size: 0.72rem;">
+                                    <i class="bi bi-whatsapp me-1"></i> Chat on WhatsApp
+                                </a>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Region & City -->
+                            <td>
+                                {% if req.region_label %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 d-inline-block text-truncate" style="max-width: 150px;">
+                                    <i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ req.region_label }}
+                                </span>
+                                {% endif %}
+                                {% if req.city %}
+                                <div class="text-muted small mt-1">{{ req.city }}</div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Referral Note -->
+                            <td>
+                                <div class="text-secondary bg-light p-2 rounded-3 border" style="font-size: 0.8rem; line-height: 1.4; max-width: 260px;">
+                                    "{{ req.referral_source }}"
+                                </div>
+                            </td>
+
+                            <!-- Submitted Date -->
+                            <td class="text-muted" style="font-size: 0.75rem;">
+                                {{ req.created_at|date:"M d, Y" }}<br>
+                                <span class="text-muted">{{ req.created_at|time:"h:i A" }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pending Requests Modals (Rendered outside table-responsive to avoid iOS Safari stacking context bugs) -->
+            {% for req in pending_requests %}
+            <!-- Approve Modal for this Request -->
+            <div class="modal fade" id="approveModal-{{ req.id }}" tabindex="-1" aria-labelledby="approveModalLabel-{{ req.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content rounded-4 border-0 shadow">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-success d-flex align-items-center gap-2" id="approveModalLabel-{{ req.id }}">
+                                <i class="bi bi-person-check-fill"></i> Approve Membership Request
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                            <p class="text-secondary small mb-3">
+                                You are approving <strong class="text-dark">{{ req.full_name }}</strong> (<span class="text-muted">{{ req.email }}</span>) to join the MiniMexitas private portal.
+                            </p>
+
+                            <!-- Automated Email Notification Notice -->
+                            <div class="alert alert-success border-0 rounded-3 small mb-3 p-3 d-flex align-items-start gap-2" style="background-color: #ecfdf5;">
+                                <i class="bi bi-envelope-check-fill text-success fs-5 flex-shrink-0 mt-1"></i>
+                                <div>
+                                    <strong class="text-success d-block mb-1">Automated Confirmation Email</strong>
+                                    An official welcome email will be automatically sent to <strong>{{ req.email }}</strong> confirming their authorization, login link, and community guide.
+                                </div>
+                            </div>
+
+                            {% if req.phone_number %}
+                            <!-- Optional Direct WhatsApp Welcome -->
+                            <div class="p-3 bg-light rounded-3 border mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="fw-semibold small text-dark"><i class="bi bi-whatsapp text-success me-1"></i> WhatsApp Welcome Message:</span>
+                                </div>
+                                <p class="text-muted small mb-2" style="font-size: 0.75rem;">
+                                    You can also send a personalized greeting directly to {{ req.full_name }} on WhatsApp:
+                                </p>
+                                <a href="{{ req.whatsapp_approval_url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 w-100 fw-semibold" style="font-size: 0.8rem;">
+                                    <i class="bi bi-whatsapp me-1"></i> Send Welcome via WhatsApp
+                                </a>
+                            </div>
+                            {% endif %}
+
+                            <!-- Approval Details -->
+                            <div class="small text-muted p-2 bg-light rounded-2 border">
+                                <i class="bi bi-person-check-fill text-success me-1"></i> Upon approval, this member will be added to the official member directory and granted instant Google sign-in access.
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" data-bs-dismiss="modal">Cancel</button>
+                            <form method="POST" action="{% url 'organizer_approve_request' req.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center">
+                                    <i class="bi bi-check-lg me-1"></i> Confirm & Approve
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decline Modal for this Request -->
+            <div class="modal fade" id="declineModal-{{ req.id }}" tabindex="-1" aria-labelledby="declineModalLabel-{{ req.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <form class="modal-content rounded-4 border-0 shadow" method="POST" action="{% url 'organizer_reject_request' req.id %}">
+                        {% csrf_token %}
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="declineModalLabel-{{ req.id }}">
+                                <i class="bi bi-x-circle-fill"></i> Decline Membership Request
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                            <p class="text-muted small mb-3">
+                                Decline request for <strong class="text-dark">{{ req.full_name }}</strong> (<span class="text-muted">{{ req.email }}</span>). Please provide the reason or feedback below so the applicant can understand what was missing.
+                            </p>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small text-dark">
+                                    Reason for Rejection / Note to Applicant <span class="text-danger">*</span>
+                                </label>
+                                <textarea name="review_notes" id="declineNotes-{{ req.id }}" class="form-control rounded-3" rows="3" required placeholder="e.g., We could not verify your connection to the Bay Area community or your referral. You are welcome to re-apply with more details."></textarea>
+                                <div class="form-text small text-muted">
+                                    This explanation will be included in the automated notification email sent to the applicant.
+                                </div>
+                            </div>
+
+                            <!-- Quick Preset Suggestions -->
+                            <div class="mb-3">
+                                <label class="form-label text-muted" style="font-size: 0.75rem; font-weight: 600;">QUICK SUGGESTIONS:</label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'Location is outside the San Francisco Bay Area community scope.')">
+                                        Outside Bay Area
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'We were unable to verify your community referral or group connection.')">
+                                        Unverified Referral
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light border rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="setDeclineReason('{{ req.id }}', 'Incomplete application details or invalid contact information provided.')">
+                                        Incomplete Info
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Automated Rejection Email Notice -->
+                            <div class="alert alert-secondary border-0 rounded-3 small mb-2 p-3 d-flex align-items-start gap-2" style="background-color: #f1f5f9;">
+                                <i class="bi bi-envelope-x text-danger fs-5 flex-shrink-0 mt-1"></i>
+                                <div>
+                                    <strong class="text-dark d-block mb-1">Automated Rejection Email</strong>
+                                    An official notification email will be sent automatically to <strong>{{ req.email }}</strong> explaining that their request was not approved and including your notes above.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold">
+                                <i class="bi bi-x-circle me-1"></i> Confirm & Decline
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-check2-circle fs-1 text-success mb-2 d-block"></i>
+                <h6 class="fw-bold text-dark mb-1">No Pending Requests</h6>
+                <p class="small mb-0">All submitted membership requests have been reviewed.</p>
+            </div>
+            {% endif %}
+
+            <!-- Collapsible Request History & Audit Log -->
+            <div class="mt-4 pt-3 border-top">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <button class="btn btn-sm btn-link text-decoration-none text-muted p-0 d-flex align-items-center gap-1" type="button" data-bs-toggle="collapse" data-bs-target="#reviewedHistoryCollapse">
+                        <i class="bi bi-clock-history text-primary"></i> 
+                        <span class="fw-semibold">Review History & Audit Log</span>
+                        {% if audit_logs %}
+                        <span class="badge bg-secondary bg-opacity-10 text-dark font-monospace ms-1">{{ audit_logs|length }}</span>
+                        {% endif %}
+                        <i class="bi bi-chevron-down ms-1"></i>
+                    </button>
+                    <span class="text-muted small" style="font-size: 0.75rem;">Immutable activity log of requests, approvals, and declines</span>
+                </div>
+
+                <div class="collapse mt-3" id="reviewedHistoryCollapse">
+                    <ul class="nav nav-pills nav-fill mb-3 bg-light p-1 rounded-pill" id="auditTabs" role="tablist" style="max-width: 480px; font-size: 0.8rem;">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active rounded-pill py-1 px-3" id="audit-log-tab" data-bs-toggle="pill" data-bs-target="#audit-log-pane" type="button" role="tab">
+                                <i class="bi bi-journal-text me-1"></i> Full Audit Log ({{ audit_logs|length }})
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-pill py-1 px-3" id="requests-history-tab" data-bs-toggle="pill" data-bs-target="#requests-history-pane" type="button" role="tab">
+                                <i class="bi bi-person-check me-1"></i> Processed Requests ({{ reviewed_requests|length }})
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="auditTabsContent">
+                        <!-- Tab 1: Full Audit Trail -->
+                        <div class="tab-pane fade show active" id="audit-log-pane" role="tabpanel">
+                            {% if audit_logs %}
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0 text-muted" style="font-size: 0.8rem;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Action</th>
+                                            <th>Member / Applicant</th>
+                                            <th>Performed By (Admin)</th>
+                                            <th>Date & Time</th>
+                                            <th>Details / Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in audit_logs %}
+                                        <tr>
+                                            <td>
+                                                {% if log.action == 'approved' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1">
+                                                    <i class="bi bi-check-circle-fill me-1"></i> Approved
+                                                </span>
+                                                {% elif log.action == 'rejected' %}
+                                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-1">
+                                                    <i class="bi bi-x-circle-fill me-1"></i> Declined
+                                                </span>
+                                                {% elif log.action == 'submitted' %}
+                                                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-2 py-1">
+                                                    <i class="bi bi-file-earmark-plus-fill me-1"></i> New Request
+                                                </span>
+                                                {% elif log.action == 'direct_added' %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1">
+                                                    <i class="bi bi-person-plus-fill me-1"></i> Direct Add
+                                                </span>
+                                                {% elif log.action == 'deleted' %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1">
+                                                    <i class="bi bi-person-dash-fill me-1"></i> Removed
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-light text-dark border rounded-pill px-2 py-1">{{ log.action }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark">{{ log.target_name|default:log.target_email }}</div>
+                                                <div class="text-muted" style="font-size: 0.72rem;">{{ log.target_email }}</div>
+                                            </td>
+                                            <td>
+                                                <span class="fw-medium text-dark">{{ log.actor_name|default:log.actor_email|default:"System" }}</span>
+                                                {% if log.actor_email and log.actor_name != log.actor_email %}
+                                                <div class="text-muted" style="font-size: 0.72rem;">{{ log.actor_email }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ log.created_at|date:"M d, Y h:i A" }}</td>
+                                            <td>
+                                                {% if log.notes %}
+                                                <span class="text-secondary">{{ log.notes }}</span>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="p-3 text-center text-muted small">No audit events recorded yet.</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Tab 2: Requests History -->
+                        <div class="tab-pane fade" id="requests-history-pane" role="tabpanel">
+                            {% if reviewed_requests %}
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0 text-muted" style="font-size: 0.8rem;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Applicant</th>
+                                            <th>Email</th>
+                                            <th>Status</th>
+                                            <th>Reviewed By</th>
+                                            <th>Date</th>
+                                            <th>Reason / Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for r in reviewed_requests %}
+                                        <tr>
+                                            <td class="fw-semibold text-dark">{{ r.full_name }}</td>
+                                            <td>{{ r.email }}</td>
+                                            <td>
+                                                {% if r.status == 'approved' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1">Approved</span>
+                                                {% else %}
+                                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-1">Declined</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><span class="fw-medium text-dark">{{ r.reviewed_by|default:"Organizer" }}</span></td>
+                                            <td>{{ r.reviewed_at|date:"M d, Y h:i A" }}</td>
+                                            <td>
+                                                {% if r.review_notes %}
+                                                <span class="text-secondary fst-italic">"{{ r.review_notes }}"</span>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="p-3 text-center text-muted small">No requests have been reviewed yet.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Regional Distribution Bar Chart / Analysis -->
@@ -161,7 +599,7 @@
             <div class="row g-3 justify-content-between align-items-center mb-3">
                 <div class="col-md-4">
                     <h5 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
-                        <i class="bi bi-person-lines-fill text-primary"></i> Member Directory
+                        <i class="bi bi-person-lines-fill text-primary"></i> Registered Directory
                         <span class="badge bg-secondary bg-opacity-10 text-dark border font-monospace">{{ total_members }}</span>
                     </h5>
                 </div>
@@ -197,6 +635,7 @@
                             <th scope="col" style="min-width: 140px;">WhatsApp / Phone</th>
                             <th scope="col" style="min-width: 160px;">Interests & Family</th>
                             <th scope="col" style="min-width: 100px;">Role</th>
+                            <th scope="col" class="text-end" style="min-width: 110px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="small">
@@ -218,6 +657,17 @@
                                     <div class="text-truncate" style="max-width: 170px;">
                                         <div class="fw-bold text-dark">{{ p.full_name|default:"Unnamed Member" }}</div>
                                         <div class="text-muted" style="font-size: 0.75rem;">{{ p.email }}</div>
+                                        <div class="mt-1">
+                                            {% if p.email_notifications %}
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;" title="Subscribed to event email notifications">
+                                                <i class="bi bi-bell-fill me-1"></i> Emails: On
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;" title="Unsubscribed from event email notifications">
+                                                <i class="bi bi-bell-slash me-1"></i> Emails: Off
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -277,10 +727,17 @@
                                 {% endif %}
                             </td>
 
+                            <!-- Actions (Admin Member Management) -->
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" data-bs-toggle="modal" data-bs-target="#deleteMemberModal-{{ p.id }}" title="Remove member from community">
+                                    <i class="bi bi-person-dash me-1"></i> Remove
+                                </button>
+                            </td>
+
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">
+                            <td colspan="7" class="text-center py-4 text-muted">
                                 No registered member profiles found yet.
                             </td>
                         </tr>
@@ -288,6 +745,43 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Member Delete Modals (Rendered outside table-responsive to avoid iOS Safari stacking context bugs) -->
+            {% for p in profiles %}
+            <div class="modal fade" id="deleteMemberModal-{{ p.id }}" tabindex="-1" aria-labelledby="deleteMemberModalLabel-{{ p.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content rounded-4 border-0 shadow text-start">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="deleteMemberModalLabel-{{ p.id }}">
+                                <i class="bi bi-person-x-fill"></i> Remove Member
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                            <p class="text-dark small mb-3">
+                                Are you sure you want to remove <strong class="text-dark">{{ p.full_name|default:p.email }}</strong> (<span class="text-muted">{{ p.email }}</span>)?
+                            </p>
+                            <div class="alert alert-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 small mb-0 text-danger">
+                                <strong class="d-block mb-1"><i class="bi bi-info-circle-fill me-1"></i> What this does:</strong>
+                                <ul class="mb-0 ps-3">
+                                    <li>Deletes this member's profile from the database and directory.</li>
+                                    <li>Revokes their Google OAuth access to the private portal.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                            <form method="POST" action="{% url 'organizer_delete_member' p.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold shadow-sm">
+                                    <i class="bi bi-trash3 me-1"></i> Confirm & Remove
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
 
             <!-- No results message for dynamic filter -->
             <div id="noResultsMessage" class="text-center py-4 text-muted d-none">
@@ -298,6 +792,74 @@
         </div>
 
     </main>
+
+    <!-- ========================================== -->
+    <!-- DIRECT ADD MEMBER MODAL -->
+    <!-- ========================================== -->
+    <div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <form class="modal-content border-0 shadow-lg rounded-4" method="POST" action="{% url 'organizer_direct_add_member' %}">
+                {% csrf_token %}
+                <div class="modal-header border-bottom px-4 pt-4">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="addMemberModalLabel">
+                        <i class="bi bi-person-plus-fill text-primary"></i> Direct Add Member
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-muted small mb-3">
+                        Directly add a verified member to the community directory.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-dark">Full Name <span class="text-danger">*</span></label>
+                        <input type="text" name="full_name" class="form-control" placeholder="e.g., Carlos Santana" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-dark">Google / Gmail Address <span class="text-danger">*</span></label>
+                        <input type="email" name="email" class="form-control" placeholder="e.g., carlos@gmail.com" required>
+                        <div class="form-text" style="font-size: 0.75rem;">Must match the Google account they use to sign in.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-dark">WhatsApp / Phone Number <span class="text-danger">*</span></label>
+                        <input type="tel" name="phone_number" class="form-control" placeholder="e.g., +52 55 1234 5678 or +1 (415) 555-0123" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Bay Area Region</label>
+                            <select name="region" class="form-select form-select-sm">
+                                <option value="">-- Optional --</option>
+                                {% for code, name in region_choices %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-dark">City / Neighborhood</label>
+                            <input type="text" name="city" class="form-control form-control-sm" placeholder="e.g., San Jose">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-dark">Role</label>
+                        <select name="role" class="form-select form-select-sm">
+                            <option value="Member" selected>Member</option>
+                            <option value="Admin">Organizer / Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top px-4 pb-4">
+                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">
+                        <i class="bi bi-check-lg me-1"></i> Save & Add Member
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Site Footer -->
     {% include 'recommendations/footer.html' %}
@@ -356,6 +918,13 @@
             if (searchInput) searchInput.addEventListener('input', filterRows);
             if (regionFilter) regionFilter.addEventListener('change', filterRows);
         });
+
+        function setDeclineReason(reqId, reasonText) {
+            const textarea = document.getElementById('declineNotes-' + reqId);
+            if (textarea) {
+                textarea.value = reasonText;
+            }
+        }
     </script>
 
 </body>

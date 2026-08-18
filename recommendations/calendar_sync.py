@@ -142,6 +142,9 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
                 "month": start_dt.month,
                 "day": start_dt.day,
                 "is_past": is_past,
+                "source": "google_calendar",
+                "is_portal_event": False,
+                "portal_event_pk": None,
             })
 
         return events
@@ -150,26 +153,97 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
         return []
 
 
+def _fetch_from_database():
+    """
+    Fetches active community events created directly in the portal database.
+    """
+    try:
+        from .models import CommunityEvent
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        events = []
+        db_events = list(CommunityEvent.objects.filter(is_active=True).order_by('start_datetime'))
+
+        for evt in db_events:
+            start_dt = evt.start_datetime
+            end_dt = evt.end_datetime or (start_dt + datetime.timedelta(hours=2))
+
+            is_past = False
+            if hasattr(end_dt, 'tzinfo') and end_dt.tzinfo is not None:
+                is_past = end_dt < now_utc
+            elif isinstance(end_dt, datetime.datetime):
+                is_past = end_dt < datetime.datetime.now()
+
+            # Time formatted
+            if evt.end_datetime:
+                time_fmt = f"{start_dt.strftime('%I:%M %p').lstrip('0')} - {end_dt.strftime('%I:%M %p').lstrip('0')}"
+            else:
+                time_fmt = start_dt.strftime('%I:%M %p').lstrip('0')
+
+            loc_url = evt.location_url
+            if not loc_url and evt.location:
+                loc_url = f"https://www.google.com/maps/search/?api=1&query={quote_plus(evt.location)}"
+
+            events.append({
+                "id": f"portal_{evt.id}",
+                "title": evt.title,
+                "start_datetime": start_dt,
+                "end_datetime": end_dt,
+                "date_formatted": start_dt.strftime("%A, %B %d, %Y"),
+                "time_formatted": time_fmt,
+                "location": evt.location or "San Francisco Bay Area",
+                "location_url": loc_url,
+                "category": evt.category or "Community Gathering",
+                "description": evt.description or "",
+                "organizer": evt.created_by_name or "MiniMexitas Organizer",
+                "google_calendar_link": get_google_calendar_add_url(evt.title, start_dt, end_dt, evt.description, evt.location),
+                "year": start_dt.year,
+                "month": start_dt.month,
+                "day": start_dt.day,
+                "is_past": is_past,
+                "source": "portal",
+                "is_portal_event": True,
+                "portal_event_pk": evt.id,
+            })
+
+        return events
+    except Exception as e:
+        logger.error(f"Error fetching portal database events: {e}", exc_info=True)
+        return []
+
+
+def _normalize_for_sort(dt):
+    if dt is None:
+        return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+        return dt.astimezone(datetime.timezone.utc)
+    return dt.replace(tzinfo=datetime.timezone.utc)
+
+
 def fetch_community_events(force_refresh=False):
     """
-    Fetches community events directly from Google Calendar API.
-    Results are cached for 15 minutes.
+    Dual-source community events loader:
+    1. Fetches upcoming & past events directly from Google Calendar API.
+    2. Fetches portal-created community events directly from the local database.
+    3. Merges, sorts, and caches results for fast, responsive page loads.
     """
     if not force_refresh:
         cached = cache.get(CACHE_KEY_EVENTS)
         if cached is not None:
             return cached
 
-    events = []
+    gcal_events = []
     cal_id = os.environ.get("GOOGLE_CALENDAR_ID")
     sa_info = getattr(settings, "GOOGLE_SERVICE_ACCOUNT_INFO", None)
 
     if cal_id and sa_info:
-        logger.info(f"Syncing events directly from Google Calendar: {cal_id}")
-        events = _fetch_from_google_calendar_api(cal_id, sa_info) or []
-    else:
-        logger.info("GOOGLE_CALENDAR_ID not set or Service Account not configured; returning empty event list.")
-        events = []
+        logger.info(f"Syncing events from Google Calendar: {cal_id}")
+        gcal_events = _fetch_from_google_calendar_api(cal_id, sa_info) or []
 
-    cache.set(CACHE_KEY_EVENTS, events, CACHE_TIMEOUT_EVENTS)
-    return events
+    portal_events = _fetch_from_database() or []
+
+    # Merge events from both sources
+    all_events = portal_events + gcal_events
+    all_events.sort(key=lambda x: _normalize_for_sort(x.get('start_datetime')))
+
+    cache.set(CACHE_KEY_EVENTS, all_events, CACHE_TIMEOUT_EVENTS)
+    return all_events

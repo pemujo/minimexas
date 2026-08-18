@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>My Profile & Account - MiniMexitas Community</title>
     <meta name="description" content="Manage your MiniMexitas profile, account information, and Bay Area region preferences for community event planning.">
     
@@ -65,6 +65,17 @@
         </div>
         {% endif %}
 
+        <!-- Flash Error Notification -->
+        {% if error_message %}
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm d-flex align-items-center mb-4" role="alert" style="background-color: #fef2f2; border-left: 4px solid #ef4444 !important;">
+            <i class="bi bi-exclamation-triangle-fill text-danger fs-5 me-2"></i>
+            <div>
+                <strong class="text-danger">Action Required:</strong> {{ error_message }}
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
         <div class="row g-4">
             
             <!-- Left Sidebar: Profile Overview & Community Insights -->
@@ -110,6 +121,19 @@
                             </div>
                         </div>
                         {% endif %}
+
+                        <div class="mb-3">
+                            <label class="text-muted small text-uppercase fw-semibold mb-1 d-block">Email Notifications</label>
+                            {% if profile.email_notifications %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-bell-fill me-1"></i> Subscribed (Active)
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-bell-slash me-1"></i> Unsubscribed (Muted)
+                            </span>
+                            {% endif %}
+                        </div>
 
                         <div class="pt-3 border-top text-muted" style="font-size: 0.78rem;">
                             <i class="bi bi-clock-history me-1"></i> Last updated {{ profile.updated_at|date:"M d, Y, g:i a" }}
@@ -191,14 +215,13 @@
 
                                 <div class="col-md-12">
                                     <label for="phoneInput" class="form-label-custom">
-                                        <span>WhatsApp / Mobile Phone</span>
-                                        <span class="text-muted fw-normal small">Optional</span>
+                                        <span>WhatsApp / Mobile Phone <span class="text-danger">*</span></span>
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-light text-muted"><i class="bi bi-whatsapp text-success"></i></span>
-                                        <input type="tel" class="form-control" id="phoneInput" name="phone_number" value="{{ profile.phone_number }}" placeholder="e.g., +1 (415) 555-0123">
+                                        <input type="tel" class="form-control" id="phoneInput" name="phone_number" value="{{ profile.phone_number }}" required placeholder="e.g., +52 55 1234 5678 or +1 (415) 555-0123">
                                     </div>
-                                    <div class="form-text" style="font-size: 0.78rem;">Used by community organizers for event notifications & WhatsApp group coordination.</div>
+                                    <div class="form-text" style="font-size: 0.78rem;">Mandatory for member-to-member WhatsApp connection & event coordination (Mexico +52 and US +1 supported).</div>
                                 </div>
                             </div>
                         </div>
@@ -304,6 +327,29 @@
                             </div>
                         </div>
 
+                        <hr class="my-4 text-muted opacity-25">
+
+                        <!-- Section 4: Notification Preferences -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center">
+                                <i class="bi bi-bell-fill text-primary me-2"></i> Notification Preferences
+                            </h5>
+
+                            <div class="p-3 rounded-4 border bg-light">
+                                <div class="form-check form-switch d-flex align-items-center gap-3 ps-0 mb-0">
+                                    <input class="form-check-input ms-0 mt-0" type="checkbox" role="switch" id="emailNotificationsSwitch" name="email_notifications" value="1" {% if profile.email_notifications %}checked{% endif %} style="width: 2.75em; height: 1.45em; cursor: pointer;">
+                                    <div>
+                                        <label class="form-check-label fw-bold text-dark mb-0 d-block" for="emailNotificationsSwitch" style="cursor: pointer;">
+                                            Receive Email Notifications & Event Invitations
+                                        </label>
+                                        <div class="text-muted small" style="line-height: 1.4;">
+                                            Get notified via email when new community events, picnics, gatherings, and celebrations are posted, including 1-click RSVP options.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="pt-3 border-top d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
                             <span class="text-muted small">
@@ -317,6 +363,60 @@
                     </form>
 
                 </div>
+
+                <!-- Danger Zone: Leave Community / Delete Profile -->
+                <div class="card border-0 shadow-sm rounded-4 p-4 mt-4" style="background: #fff8f8; border: 1px solid #fecaca !important;">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div>
+                            <h6 class="fw-bold text-danger mb-1 d-flex align-items-center gap-2">
+                                <i class="bi bi-person-x-fill fs-5"></i> Leave MiniMexitas & Delete Profile
+                            </h6>
+                            <p class="text-muted small mb-0" style="max-width: 580px; line-height: 1.5;">
+                                Deleting your profile will remove your directory listing, delete your personal information, and revoke your member portal access. You can request to rejoin at any time.
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger rounded-pill px-3 py-2 text-nowrap fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#deleteSelfModal">
+                            <i class="bi bi-trash3 me-1"></i> Delete Profile
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Delete Self Confirmation Modal -->
+                <div class="modal fade" id="deleteSelfModal" tabindex="-1" aria-labelledby="deleteSelfModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content rounded-4 border-0 shadow">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="deleteSelfModalLabel">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Delete Account & Leave
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-start">
+                                <p class="text-dark small mb-3">
+                                    Are you sure you want to delete your profile for <strong class="text-dark">{{ profile.email }}</strong>?
+                                </p>
+                                <div class="alert alert-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 small mb-0 text-danger">
+                                    <strong class="d-block mb-1"><i class="bi bi-info-circle-fill me-1"></i> What happens next:</strong>
+                                    <ul class="mb-0 ps-3">
+                                        <li>Your member profile and interests will be permanently deleted.</li>
+                                        <li>Your membership records and access will be completely revoked.</li>
+                                        <li>You will be logged out immediately.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                                <form method="POST" action="{% url 'profile_delete_self' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill px-4 fw-semibold shadow-sm">
+                                        <i class="bi bi-trash3 me-1"></i> Yes, Delete My Profile
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>

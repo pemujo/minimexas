@@ -39,7 +39,13 @@ _allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
 else:
-    ALLOWED_HOSTS = ["pemujo.pythonanywhere.com", "127.0.0.1", "localhost", "0.0.0.0"]
+    ALLOWED_HOSTS = [
+        "pemujo.pythonanywhere.com",
+        "minimexitas.pythonanywhere.com",
+        "127.0.0.1",
+        "localhost",
+        "0.0.0.0",
+    ]
 
 if "testserver" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append("testserver")
@@ -180,7 +186,7 @@ def _get_google_sa_info():
     if sa_email and sa_key:
         return {
             "type": "service_account",
-            "project_id": os.environ.get("GOOGLE_SA_PROJECT_ID", "minimexas"),
+            "project_id": os.environ.get("GOOGLE_SA_PROJECT_ID", ""),
             "private_key_id": os.environ.get("GOOGLE_SA_PRIVATE_KEY_ID", ""),
             "private_key": sa_key.replace("\\n", "\n"),
             "client_email": sa_email,
@@ -207,23 +213,53 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", None)
 
+# Target Google Spreadsheet Configuration (Allows separate sheets per environment)
+GOOGLE_SHEET_KEY = os.environ.get("GOOGLE_SHEET_KEY", os.environ.get("GOOGLE_SHEET_ID", ""))
+
 # Production & Cookie Security Hardening
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False  # Allows standard Django CSRF token handling in forms
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
+# Email Configuration for Notifications
+_default_email_backend = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if (os.environ.get("EMAIL_HOST_USER") or os.environ.get("EMAIL_HOST_PASSWORD"))
+    else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", _default_email_backend)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "").strip()
+
+_env_from = os.environ.get("DEFAULT_FROM_EMAIL", "").strip()
+if _env_from:
+    DEFAULT_FROM_EMAIL = _env_from
+elif EMAIL_HOST_USER:
+    DEFAULT_FROM_EMAIL = f"MiniMexitas Community <{EMAIL_HOST_USER}>"
+else:
+    DEFAULT_FROM_EMAIL = "MiniMexitas Community <no-reply@minimexitas.org>"
+
+PORTAL_BASE_URL = os.environ.get("PORTAL_BASE_URL", "").rstrip("/")
+
 if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     
-    if os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in ("true", "1", "yes"):
+    if (
+        os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in ("true", "1", "yes")
+        or os.environ.get("SESSION_COOKIE_SECURE", "False").lower() in ("true", "1", "yes")
+    ):
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
         SECURE_SSL_REDIRECT = True
         SECURE_HSTS_SECONDS = 31536000  # 1 year
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
+
 
 
