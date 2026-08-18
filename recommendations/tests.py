@@ -942,7 +942,7 @@ class NotesAndEventsViewsTestCase(TestCase):
 
         response = self.client.get(reverse('recommendations:notes_list'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Unable to load Google Sheet")
+        self.assertContains(response, "Unable to load recommendations")
 
     def test_unauthenticated_events_redirects_to_login(self):
         response = self.client.get(reverse('events'))
@@ -1767,7 +1767,7 @@ class ReconciliationSyncTestCase(TestCase):
 
         response = self.client.post(reverse('organizer_sync_sheets'), follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Google Sheets Sync Complete: 1 purged")
+        self.assertContains(response, "Directory Sync Complete: 1 purged")
         self.assertContains(response, "2 new members imported")
 
     def test_member_required_invalidates_session_for_purged_profile(self):

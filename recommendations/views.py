@@ -273,9 +273,9 @@ def notes_list_view(request):
             notes = fetch_recommendations()
             cache.set('whatsapp_recommendations_cache', notes, 900)
         except Exception as e:
-            logger.error(f"Error loading Google Sheet: {e}", exc_info=True)
+            logger.error(f"Error loading recommendations: {e}", exc_info=True)
             notes = []
-            error = f"Unable to load Google Sheet: {str(e)}"
+            error = "Unable to load recommendations at this time."
 
     return render(request, 'recommendations/notes.html', {
         'notes': notes,
@@ -1209,7 +1209,7 @@ def organizer_dashboard_view(request):
     action_error = None
     approved_data = None
     if request.GET.get('approved'):
-        action_message = "Membership request approved successfully! Member added to directory and synced to Google Sheets."
+        action_message = "Membership request approved successfully! Member added to directory."
         approved_name = request.session.pop('approved_flash_name', None)
         approved_email = request.session.pop('approved_flash_email', None)
         approved_wa_link = request.session.pop('approved_flash_wa_link', None)
@@ -1227,13 +1227,13 @@ def organizer_dashboard_view(request):
         else:
             action_message = "Membership request declined and notification email dispatched."
     elif request.GET.get('added'):
-        action_message = "New member added directly and synced to Google Sheets!"
+        action_message = "New member added directly to the community directory!"
     elif request.GET.get('member_deleted'):
         deleted_name = request.session.pop('deleted_member_name', None)
         if deleted_name:
-            action_message = f"Member '{deleted_name}' has been successfully removed from the community and Google Sheets."
+            action_message = f"Member '{deleted_name}' has been successfully removed from the community."
         else:
-            action_message = "Member has been successfully removed from the community and Google Sheets."
+            action_message = "Member has been successfully removed from the community."
     elif request.GET.get('synced'):
         sync_data = request.session.pop('sync_flash_result', None)
         if sync_data:
@@ -1242,13 +1242,13 @@ def organizer_dashboard_view(request):
             updated = sync_data.get('updated_count', 0)
             total = sync_data.get('total_sheet_members', 0)
             action_message = (
-                f"Google Sheets Sync Complete: {purged} purged (no longer in spreadsheet), "
-                f"{created} new members imported, {updated} updated ({total} total in spreadsheet)."
+                f"Directory Sync Complete: {purged} purged, "
+                f"{created} new members imported, {updated} updated ({total} total in directory)."
             )
         else:
-            action_message = "Google Sheets reconciliation sync completed successfully."
+            action_message = "Member directory reconciliation sync completed successfully."
     elif request.GET.get('sync_error'):
-        action_error = request.session.pop('sync_flash_error', "Failed to synchronize with Google Sheets.")
+        action_error = request.session.pop('sync_flash_error', "Failed to synchronize member directory.")
     elif request.GET.get('error') == 'self_delete_forbidden':
         action_error = "For safety, organizers cannot delete themselves from the organizer dashboard. Use your Profile page if you wish to leave the community."
 
@@ -1521,7 +1521,7 @@ def organizer_sync_sheets_view(request):
         request.session['sync_flash_result'] = result
         return redirect(reverse('organizer_dashboard') + '?synced=1')
     else:
-        err = result.get('error', 'Failed to communicate with Google Sheets.')
+        err = result.get('error', 'Failed to synchronize member directory.')
         request.session['sync_flash_error'] = err
         return redirect(reverse('organizer_dashboard') + '?sync_error=1')
 

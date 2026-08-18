@@ -217,8 +217,7 @@
             role="alert">
             <i class="bi bi-stars fs-4 me-3 text-success"></i>
             <div>
-                <strong>Survey Published!</strong> The new survey has been posted for members to vote on and
-                synchronized to the Google Spreadsheet.
+                <strong>Survey Published!</strong> The new survey has been posted for members to vote on.
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -240,8 +239,7 @@
             role="alert">
             <i class="bi bi-trash-fill fs-4 me-3 text-warning"></i>
             <div>
-                <strong>Survey Deleted:</strong> The survey and its votes have been removed from the portal and Google
-                Sheet.
+                <strong>Survey Deleted:</strong> The survey and its votes have been removed.
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -458,13 +456,9 @@
                                         {% for opt in survey.options %}
                                         <label class="option-selectable-card d-flex align-items-center gap-3">
                                             {% if survey.is_multiple_choice %}
-                                            <input type="checkbox" name="options" value="{{ opt.id }}"
-                                                class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif
-                                                %}>
+                                            <input type="checkbox" name="options" value="{{ opt.id }}" class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif %}>
                                             {% else %}
-                                            <input type="radio" name="options" value="{{ opt.id }}"
-                                                class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif %}
-                                                required>
+                                            <input type="radio" name="options" value="{{ opt.id }}" class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif %} required>
                                             {% endif %}
                                             <span class="option-label-text small">{{ opt.text }}</span>
                                         </label>
@@ -655,8 +649,7 @@
 
                     <div class="alert alert-light border small text-muted mb-0">
                         <i class="bi bi-shield-check text-success me-1"></i>
-                        Survey results and member votes will automatically synchronize with your Google Spreadsheet's
-                        <strong>Surveys</strong> tab.
+                        Survey questions and voting options will be published instantly for verified community members.
                     </div>
 
                 </div>

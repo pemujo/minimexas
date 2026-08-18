@@ -86,8 +86,8 @@
                 </a>
                 <form method="POST" action="{% url 'organizer_sync_sheets' %}" class="d-inline m-0">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-outline-secondary rounded-pill px-3 py-2 fw-semibold shadow-sm" title="Reconcile local database with Google Sheets Members tab">
-                        <i class="bi bi-arrow-repeat me-1"></i> Sync with Sheets
+                    <button type="submit" class="btn btn-outline-secondary rounded-pill px-3 py-2 fw-semibold shadow-sm" title="Reconcile and synchronize member directory">
+                        <i class="bi bi-arrow-repeat me-1"></i> Sync Directory
                     </button>
                 </form>
                 <button type="button" class="btn btn-primary rounded-pill px-3 py-2 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addMemberModal">
@@ -315,9 +315,9 @@
                             </div>
                             {% endif %}
 
-                            <!-- Sync Confirmation Details -->
+                            <!-- Approval Details -->
                             <div class="small text-muted p-2 bg-light rounded-2 border">
-                                <i class="bi bi-cloud-arrow-up text-primary me-1"></i> Upon approval, this member will be synced to the Google Sheet <em>Members</em> tab and granted instant Google sign-in access.
+                                <i class="bi bi-person-check-fill text-success me-1"></i> Upon approval, this member will be added to the official member directory and granted instant Google sign-in access.
                             </div>
                         </div>
                         <div class="modal-footer border-0 pt-0">
@@ -754,7 +754,6 @@
                                 <strong class="d-block mb-1"><i class="bi bi-info-circle-fill me-1"></i> What this does:</strong>
                                 <ul class="mb-0 ps-3">
                                     <li>Deletes this member's profile from the database and directory.</li>
-                                    <li>Deletes their entry from the Google Sheet <em>Members</em> tab.</li>
                                     <li>Revokes their Google OAuth access to the private portal.</li>
                                 </ul>
                             </div>
@@ -798,7 +797,7 @@
                 </div>
                 <div class="modal-body px-4 py-3">
                     <p class="text-muted small mb-3">
-                        Directly add a member to the community and sync to the Google Sheet.
+                        Directly add a verified member to the community directory.
                     </p>
 
                     <div class="mb-3">
@@ -844,7 +843,7 @@
                 <div class="modal-footer border-top px-4 pb-4">
                     <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">
-                        <i class="bi bi-check-lg me-1"></i> Save & Sync to Sheet
+                        <i class="bi bi-check-lg me-1"></i> Save & Add Member
                     </button>
                 </div>
             </form>
