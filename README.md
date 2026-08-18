@@ -1,6 +1,6 @@
 # MiniMexitas Community Portal 🇲🇽✨
 
-[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.13%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Django Version](https://img.shields.io/badge/django-5.0+-green.svg)](https://www.djangoproject.com/)
 [![License](https://img.shields.io/badge/license-Private-red.svg)]()
 [![Tests](https://img.shields.io/badge/tests-147%20passed-brightgreen.svg)]()
@@ -136,19 +136,19 @@ flowchart TD
 
 ## 🛠 Tech Stack
 
-- **Backend**: Python 3.12, Django 5.x / 6.x
+- **Backend**: Python 3.13 (Production) / Python 3.14 (Dev), Django 5.x / 6.x
 - **Frontend**: Vanilla HTML5, Modern CSS3, Bootstrap 5.3, Bootstrap Icons
 - **Integrations**: `gspread`, `google-auth`, Google OAuth 2.0, Google Calendar API
 - **Database**: SQLite3 (Production on PythonAnywhere / Local Dev)
 - **Email**: Django SMTP backend with dynamic Gmail SMTP sender resolution
-- **CI/CD**: GitHub Actions automated matrix testing
+- **CI/CD**: GitHub Actions automated matrix testing (Python 3.13 & 3.14)
 
 ---
 
 ## 🚀 Local Development Setup
 
 ### 1. Prerequisites
-- Python 3.10+ installed on your machine.
+- Python 3.13+ installed on your machine.
 - Git.
 - A Google Cloud Service Account and OAuth 2.0 Web Client Credentials.
 
