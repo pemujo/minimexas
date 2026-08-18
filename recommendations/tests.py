@@ -1,6 +1,6 @@
 import datetime
 from unittest.mock import patch, MagicMock
-from django.test import TestCase, Client, override_settings
+from django.test import TestCase, Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.core import mail
 from django.core.cache import cache
@@ -1863,6 +1863,25 @@ class AdminNotificationAndAuditLogTestCase(TestCase):
         sent = send_admin_new_request_notification(req)
         self.assertFalse(sent)
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_send_admin_new_request_notification_uses_request_host(self):
+        req = MembershipRequest.objects.create(
+            full_name="Lucia Mendez",
+            email="lucia.m@gmail.com",
+            status=MembershipRequest.STATUS_PENDING
+        )
+        mail.outbox.clear()
+        factory = RequestFactory()
+        mock_request = factory.get('/join/')
+        with override_settings(PORTAL_BASE_URL=""):
+            sent = send_admin_new_request_notification(req, portal_url="", request=mock_request)
+            self.assertTrue(sent)
+            self.assertEqual(len(mail.outbox), 1)
+            email = mail.outbox[0]
+            self.assertIn("http://testserver/organizers/", email.body)
+            self.assertNotIn("http:///organizers/", email.body)
+            self.assertNotIn("href=\"/organizers/\"", email.alternatives[0][0])
+            self.assertIn("http://testserver/organizers/", email.alternatives[0][0])
 
     @patch('recommendations.views.sync_pending_request_to_google_sheet')
     def test_join_request_view_creates_audit_log_and_emails_admins(self, mock_sync_pending):

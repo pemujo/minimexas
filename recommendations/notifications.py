@@ -17,14 +17,42 @@ def clean_phone_for_whatsapp(phone_number: str) -> str:
     return raw_digits
 
 
-def build_whatsapp_approval_link(full_name: str, phone_number: str, portal_url: str = None) -> str:
+def _resolve_base_portal_url(portal_url: str = None, request = None) -> str:
+    """
+    Safely resolves the absolute portal base URL.
+    Prefers the dynamic request host (works in any environment), then explicit portal_url, then PORTAL_BASE_URL setting.
+    """
+    if request is not None:
+        try:
+            built = request.build_absolute_uri('/')
+            if built and '://' in built:
+                return built.rstrip('/')
+        except Exception:
+            pass
+
+    if portal_url and portal_url.strip():
+        url = portal_url.strip().rstrip('/')
+        if not url.startswith(('http://', 'https://')):
+            url = f"https://{url}"
+        return url
+
+    env_base = getattr(settings, 'PORTAL_BASE_URL', '').strip().rstrip('/')
+    if env_base:
+        if not env_base.startswith(('http://', 'https://')):
+            env_base = f"https://{env_base}"
+        return env_base
+
+    return ""
+
+
+def build_whatsapp_approval_link(full_name: str, phone_number: str, portal_url: str = None, request = None) -> str:
     """Build a pre-filled WhatsApp message URL to welcome an approved applicant."""
     clean_phone = clean_phone_for_whatsapp(phone_number)
     if not clean_phone:
         return ""
     
     name = full_name.strip() if full_name else "amig@"
-    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    base = _resolve_base_portal_url(portal_url, request)
     url = f"{base}/login/" if base else "/login/"
 
     message = (
@@ -65,8 +93,8 @@ def send_membership_approval_email(request_obj, portal_url: str = None, request 
     full_name = getattr(request_obj, 'full_name', '').strip() or "Nuevo Miembro"
     recipient_email = recipient_email.strip().lower()
 
-    # Determine portal login URL from PORTAL_BASE_URL in .env
-    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    # Determine absolute portal login URL
+    base = _resolve_base_portal_url(portal_url, request)
     portal_url = f"{base}/login/" if base else "/login/"
 
     subject = "¡Bienvenido(a) a MiniMexitas! Tu solicitud ha sido aprobada 🎉"
@@ -175,7 +203,7 @@ Equipo de Organizadores de MiniMexitas
         return False
 
 
-def send_membership_rejection_email(request_obj, reason: str = None, portal_url: str = None) -> bool:
+def send_membership_rejection_email(request_obj, reason: str = None, portal_url: str = None, request = None) -> bool:
     """
     Sends an automated, polite rejection notification email to an applicant whose
     membership request was declined, including the reason/notes entered by the admin.
@@ -189,8 +217,8 @@ def send_membership_rejection_email(request_obj, reason: str = None, portal_url:
     full_name = getattr(request_obj, 'full_name', '').strip() or "Estimad@ solicitante"
     recipient_email = recipient_email.strip().lower()
 
-    # Determine portal join URL from PORTAL_BASE_URL in .env
-    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    # Determine absolute portal join URL
+    base = _resolve_base_portal_url(portal_url, request)
     join_url = f"{base}/join/" if base else "/join/"
 
     reason_text = reason.strip() if reason and reason.strip() else "No fue posible verificar la conexión con la comunidad o los requisitos de registro en este momento."
@@ -295,7 +323,7 @@ Equipo de Organizadores de MiniMexitas
         return False
 
 
-def send_admin_new_request_notification(request_obj, admin_emails=None, portal_url: str = None) -> bool:
+def send_admin_new_request_notification(request_obj, admin_emails=None, portal_url: str = None, request = None) -> bool:
     """
     Sends an automated notification email to all community admins/organizers when
     a new membership request is submitted, containing applicant details and a direct
@@ -324,7 +352,8 @@ def send_admin_new_request_notification(request_obj, admin_emails=None, portal_u
     applicant_city = getattr(request_obj, 'city', '').strip()
     referral = getattr(request_obj, 'referral_source', '').strip() or "No especificado"
 
-    base = (portal_url or getattr(settings, 'PORTAL_BASE_URL', '')).rstrip('/')
+    # Determine absolute dashboard review URL
+    base = _resolve_base_portal_url(portal_url, request)
     dashboard_url = f"{base}/organizers/" if base else "/organizers/"
 
     subject = f"🔔 Nueva solicitud para unirse a MiniMexitas: {applicant_name}"

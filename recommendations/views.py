@@ -607,7 +607,7 @@ def join_request_view(request):
 
                     # Send notification email to all admins
                     try:
-                        send_admin_new_request_notification(req_obj)
+                        send_admin_new_request_notification(req_obj, request=request)
                     except Exception as e:
                         logger.warning(f"Failed to dispatch admin notification email for new request ({email}): {e}")
 
@@ -836,7 +836,7 @@ def organizer_reject_request_view(request, request_id):
 
     # Send automated rejection notification email with the explanation/notes
     try:
-        send_membership_rejection_email(req, reason=req.review_notes)
+        send_membership_rejection_email(req, reason=req.review_notes, request=request)
     except Exception as e:
         logger.warning(f"Failed to dispatch rejection email to {req.email}: {e}")
 
