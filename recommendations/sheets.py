@@ -175,6 +175,8 @@ def sync_profile_to_google_sheet(profile):
             'phone': profile.phone_number,
             'family info': profile.family_info,
             'interests': profile.interests,
+            'email notifications': 'Yes' if profile.email_notifications else 'No',
+            'notifications': 'Yes' if profile.email_notifications else 'No',
             'role': role_display,
             'last updated': updated_time,
         }

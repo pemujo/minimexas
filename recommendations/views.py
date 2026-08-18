@@ -42,6 +42,7 @@ from .notifications import (
     send_membership_rejection_email,
     send_admin_new_request_notification,
     send_event_broadcast_email,
+    send_survey_broadcast_email,
     verify_event_rsvp_token,
     generate_event_rsvp_token,
     build_whatsapp_approval_link,
@@ -302,6 +303,7 @@ def events_view(request):
     all_rsvps = list(CommunityEventRSVP.objects.all())
     broadcast_map = {b.event_id: b for b in CommunityEventBroadcast.objects.all()}
     total_members_count = MemberProfile.objects.exclude(email='').count()
+    subscribed_members_count = MemberProfile.objects.exclude(email='').filter(email_notifications=True).count()
 
     # Organize RSVPs by event_id
     rsvps_by_event = {}
@@ -384,6 +386,7 @@ def events_view(request):
         'member_email': member_email,
         'is_admin': is_admin,
         'total_members_count': total_members_count,
+        'subscribed_members_count': subscribed_members_count,
         'rsvp_flash_message': rsvp_msg,
         'broadcast_flash_message': broadcast_msg,
         'event_flash_message': event_flash_msg,
@@ -885,6 +888,7 @@ def profile_view(request):
             profile.family_info = family_info
             profile.interests = interests_str
             profile.bio = bio
+            profile.email_notifications = 'email_notifications' in request.POST
             profile.save()
 
             # Update session member name if changed
@@ -1592,6 +1596,8 @@ def surveys_list_view(request):
 
     active_count = CommunitySurvey.objects.filter(is_active=True).count()
     closed_count = CommunitySurvey.objects.filter(is_active=False).count()
+    subscribed_members_count = MemberProfile.objects.exclude(email__isnull=True).exclude(email='').filter(email_notifications=True).count()
+    survey_flash_message = request.session.pop('survey_flash_message', None)
 
     return render(request, 'recommendations/surveys.html', {
         'surveys': surveys_data,
@@ -1602,6 +1608,8 @@ def surveys_list_view(request):
         'closed_count': closed_count,
         'is_admin': is_admin,
         'active_page': 'surveys',
+        'subscribed_members_count': subscribed_members_count,
+        'survey_flash_message': survey_flash_message,
     })
 
 
@@ -1660,7 +1668,8 @@ def survey_vote_view(request, survey_id):
 @admin_required
 def organizer_survey_create_view(request):
     """
-    Allows admins/organizers to create a new survey with dynamic options.
+    Allows admins/organizers to create a new survey with dynamic options,
+    optionally dispatching an email notification announcement to all subscribed members.
     """
     if request.method != 'POST':
         return redirect('surveys')
@@ -1670,6 +1679,7 @@ def organizer_survey_create_view(request):
     category = request.POST.get('category', CommunitySurvey.CATEGORY_EVENT).strip()
     is_multiple_choice = request.POST.get('is_multiple_choice') in ('on', 'true', '1', True)
     options_raw = request.POST.getlist('options')
+    notify_members = request.POST.get('notify_members') in ('on', 'true', '1', True)
 
     clean_options = [opt.strip() for opt in options_raw if opt.strip()]
 
@@ -1699,6 +1709,19 @@ def organizer_survey_create_view(request):
             order=idx
         )
 
+    # Dispatch email broadcast if requested
+    sent_count = 0
+    if notify_members:
+        try:
+            sent_count = send_survey_broadcast_email(
+                survey_obj=survey,
+                broadcast_by_name=admin_name,
+                broadcast_by_email=admin_email,
+                request=request
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch survey broadcast email: {e}")
+
     # Audit log
     MembershipAuditLog.objects.create(
         action=MembershipAuditLog.ACTION_SURVEY_CREATED,
@@ -1706,7 +1729,7 @@ def organizer_survey_create_view(request):
         target_name=survey.title,
         actor_name=admin_name,
         actor_email=admin_email,
-        notes=f"Created survey '{survey.title}' with {len(clean_options)} options. Mode: {'Multiple Choice' if is_multiple_choice else 'Single Choice'}."
+        notes=f"Created survey '{survey.title}' with {len(clean_options)} options. Mode: {'Multiple Choice' if is_multiple_choice else 'Single Choice'}. Notified {sent_count} members."
     )
 
     try:
@@ -1714,7 +1737,49 @@ def organizer_survey_create_view(request):
     except Exception as e:
         logger.warning(f"Failed to sync new survey to Google Sheet: {e}")
 
-    return redirect(reverse('surveys') + '?created=1')
+    if notify_members and sent_count > 0:
+        request.session['survey_flash_message'] = f"🎉 ¡Encuesta '{survey.title}' creada exitosamente y notificada por correo a {sent_count} miembros!"
+    else:
+        request.session['survey_flash_message'] = f"🎉 ¡Encuesta '{survey.title}' creada exitosamente!"
+
+    return redirect('surveys')
+
+
+@admin_required
+def organizer_survey_broadcast_view(request, survey_id):
+    """
+    Allows admins/organizers to manually broadcast or re-broadcast an active survey to all subscribed members.
+    """
+    if request.method != 'POST':
+        return redirect('surveys')
+
+    survey = get_object_or_404(CommunitySurvey, id=survey_id)
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    sent_count = send_survey_broadcast_email(
+        survey_obj=survey,
+        broadcast_by_name=admin_name,
+        broadcast_by_email=admin_email,
+        request=request
+    )
+
+    # Audit log
+    audit_entry = MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_EVENT_BROADCAST,
+        target_name=f"Survey: {survey.title}",
+        target_email=f"survey_{survey.id}",
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Broadcasted survey notification '{survey.title}' to {sent_count} active community members."
+    )
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to sync survey broadcast audit log: {e}")
+
+    request.session['survey_flash_message'] = f"📢 ¡Notificación de la encuesta '{survey.title}' enviada exitosamente a {sent_count} miembros!"
+    return redirect('surveys')
 
 
 @admin_required

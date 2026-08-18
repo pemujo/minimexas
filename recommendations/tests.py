@@ -51,6 +51,9 @@ from recommendations.notifications import (
     generate_event_rsvp_token,
     verify_event_rsvp_token,
     send_event_broadcast_email,
+    send_survey_broadcast_email,
+    get_subscribed_members,
+    _get_from_email,
 )
 
 
@@ -794,6 +797,58 @@ class MemberProfileViewsTestCase(TestCase):
         response = self.client.post(reverse('profile'), post_data)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Please provide your full name.")
+
+    @patch('recommendations.views.sync_profile_to_google_sheet')
+    def test_profile_email_notifications_toggle_off_and_on(self, mock_sync):
+        mock_sync.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_name'] = 'Maria Gonzalez'
+        session['member_email'] = 'testuser@minimexitas.local'
+        session.save()
+
+        # Check default is True
+        self.assertTrue(self.profile.email_notifications)
+
+        # 1. Post form with email_notifications omitted (unchecked) -> should turn False
+        post_data_off = {
+            'full_name': 'Maria Gonzalez',
+            'phone_number': '+1 650 555 1234',
+            'region': 'peninsula',
+            'city': 'Palo Alto',
+            'family_info': '2 kids',
+            'bio': 'Software engineer and mom.',
+        }
+        response = self.client.post(reverse('profile'), post_data_off)
+        self.assertEqual(response.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.email_notifications)
+
+        # GET request should display unsubscribed / muted status
+        response_get = self.client.get(reverse('profile'))
+        self.assertEqual(response_get.status_code, 200)
+        self.assertContains(response_get, "Unsubscribed (Muted)")
+
+        # 2. Post form with email_notifications checked -> should turn True
+        post_data_on = {
+            'full_name': 'Maria Gonzalez',
+            'phone_number': '+1 650 555 1234',
+            'region': 'peninsula',
+            'city': 'Palo Alto',
+            'family_info': '2 kids',
+            'bio': 'Software engineer and mom.',
+            'email_notifications': '1',
+        }
+        response = self.client.post(reverse('profile'), post_data_on)
+        self.assertEqual(response.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.email_notifications)
+
+        # GET request should display subscribed / active status
+        response_get2 = self.client.get(reverse('profile'))
+        self.assertEqual(response_get2.status_code, 200)
+        self.assertContains(response_get2, "Subscribed (Active)")
 
 
 class MemberDirectoryViewsTestCase(TestCase):
@@ -2124,6 +2179,8 @@ class SurveysFeatureTestCase(TestCase):
         self.assertContains(response, "Surveys & Decision Center")
         self.assertContains(response, "Where should we host the 2026 Fall Picnic?")
         self.assertContains(response, "Coyote Point (San Mateo)")
+        self.assertContains(response, "Posted by Admin Maria")
+        self.assertNotContains(response, "{{ survey.created_by")
 
     @patch('recommendations.views.sync_survey_to_google_sheet')
     def test_survey_vote_view_single_choice(self, mock_sync):
@@ -2223,15 +2280,33 @@ class SurveysFeatureTestCase(TestCase):
             'description': "Let organizers know your preference.",
             'category': 'community',
             'is_multiple_choice': 'on',
-            'options': ['Altar Workshop', 'Catrina Contest', 'Pan de Muerto Tasting']
+            'options': ['Altar Workshop', 'Catrina Contest', 'Pan de Muerto Tasting'],
+            'notify_members': '1'
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn('created=1', response.url)
+        self.assertEqual(response.url, reverse('surveys'))
 
         new_survey = CommunitySurvey.objects.get(title="Favorite Dia de los Muertos activity?")
         self.assertTrue(new_survey.is_multiple_choice)
         self.assertEqual(new_survey.options.count(), 3)
         self.assertTrue(MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_SURVEY_CREATED).exists())
+
+    @patch('recommendations.views.send_survey_broadcast_email')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_survey_broadcast_view(self, mock_audit_sync, mock_send_email):
+        mock_send_email.return_value = 5
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "admin@minimexitas.org"
+        session['member_name'] = "Super Admin"
+        session.save()
+
+        response = self.client.post(reverse('survey_broadcast', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('surveys'))
+        mock_send_email.assert_called_once()
+        self.assertIn("survey_flash_message", self.client.session)
 
     def test_organizer_survey_create_requires_admin(self):
         session = self.client.session
@@ -2401,6 +2476,103 @@ class EventRSVPAndBroadcastTestCase(TestCase):
         self.assertIn("Mission Dolores Park", email_sent.body)
         self.assertIn("Google Calendar", email_sent.body)
         self.assertIn("/events/rsvp/?token=", email_sent.body)
+        self.assertIn("/profile/", email_sent.body)
+
+    def test_send_event_broadcast_skips_opted_out_members(self):
+        # Opt-out carlos from email notifications
+        self.member.email_notifications = False
+        self.member.save()
+
+        mail.outbox = []
+        request = self.factory.get('/events/')
+        
+        sent_count = send_event_broadcast_email(
+            event_data=self.mock_event,
+            broadcast_by_name="Elena Organizer",
+            broadcast_by_email="elena@minimexitas.org",
+            request=request
+        )
+        # Only Elena should receive the email broadcast
+        self.assertEqual(sent_count, 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["elena@minimexitas.org"])
+
+    def test_from_email_dynamic_resolution(self):
+        with override_settings(EMAIL_HOST_USER="community@gmail.com", DEFAULT_FROM_EMAIL="MiniMexitas Community <no-reply@minimexitas.org>"):
+            resolved = _get_from_email()
+            self.assertEqual(resolved, "MiniMexitas Community <community@gmail.com>")
+
+        with override_settings(EMAIL_HOST_USER="community@gmail.com", DEFAULT_FROM_EMAIL="Custom Sender <custom@verified.org>"):
+            resolved = _get_from_email()
+            self.assertEqual(resolved, "Custom Sender <custom@verified.org>")
+
+    def test_get_subscribed_members_auto_materializes_approved_membership(self):
+        # Create an approved membership request that doesn't have a MemberProfile yet
+        MembershipRequest.objects.create(
+            full_name="Auto Materialized",
+            email="auto_new@gmail.com",
+            phone_number="+1 555 123 4567",
+            status="approved"
+        )
+        members = get_subscribed_members()
+        member_emails = [m['email'] for m in members]
+        self.assertIn("auto_new@gmail.com", member_emails)
+        self.assertTrue(MemberProfile.objects.filter(email="auto_new@gmail.com").exists())
+
+    def test_send_survey_broadcast_email(self):
+        survey = CommunitySurvey.objects.create(
+            title="Next Meetup Location",
+            description="Where should we meet for tacos?",
+            category="meetup",
+            is_active=True
+        )
+        SurveyOption.objects.create(survey=survey, text="Mission District", order=0)
+        SurveyOption.objects.create(survey=survey, text="Fruitvale Oakland", order=1)
+
+        mail.outbox = []
+        request = self.factory.get('/surveys/')
+
+        sent_count = send_survey_broadcast_email(
+            survey_obj=survey,
+            broadcast_by_name="Admin Maria",
+            broadcast_by_email="admin@minimexitas.org",
+            request=request
+        )
+        self.assertEqual(sent_count, 2)
+        self.assertEqual(len(mail.outbox), 2)
+
+        email_sent = mail.outbox[0]
+        self.assertIn("Next Meetup Location", email_sent.subject)
+        self.assertIn("Mission District", email_sent.body)
+        self.assertIn("Fruitvale Oakland", email_sent.body)
+        self.assertIn("/surveys/", email_sent.body)
+        self.assertIn("/profile/", email_sent.body)
+
+    def test_send_survey_broadcast_skips_opted_out_members(self):
+        self.member.email_notifications = False
+        self.member.save()
+
+        survey = CommunitySurvey.objects.create(
+            title="Next Meetup Location",
+            category="meetup",
+            is_active=True
+        )
+        SurveyOption.objects.create(survey=survey, text="Option 1", order=0)
+        SurveyOption.objects.create(survey=survey, text="Option 2", order=1)
+
+        mail.outbox = []
+        request = self.factory.get('/surveys/')
+
+        sent_count = send_survey_broadcast_email(
+            survey_obj=survey,
+            broadcast_by_name="Admin Maria",
+            broadcast_by_email="admin@minimexitas.org",
+            request=request
+        )
+        # Only Elena has email_notifications=True
+        self.assertEqual(sent_count, 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["elena@minimexitas.org"])
 
     @patch('recommendations.sheets.get_gspread_client')
     def test_sync_event_rsvp_to_google_sheet(self, mock_get_client):

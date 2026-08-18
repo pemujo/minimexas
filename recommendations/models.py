@@ -49,6 +49,11 @@ class MemberProfile(models.Model):
         default=False, 
         verbose_name="Organizer / Admin"
     )
+    email_notifications = models.BooleanField(
+        default=True,
+        verbose_name="Receive Email Notifications",
+        help_text="Opt in or out of community event broadcasts and updates via email."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

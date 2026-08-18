@@ -692,12 +692,12 @@
                     <!-- Instant Broadcast Option -->
                     <div class="p-3 mt-3 bg-light rounded-3 border">
                         <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" role="switch" name="broadcast_now" id="createEventBroadcastNow" value="1">
+                            <input class="form-check-input" type="checkbox" role="switch" name="broadcast_now" id="createEventBroadcastNow" value="1" checked>
                             <label class="form-check-label fw-bold small text-dark" for="createEventBroadcastNow">
-                                <i class="bi bi-megaphone-fill text-primary me-1"></i> Send email announcement to all {{ total_members_count }} members immediately
+                                <i class="bi bi-megaphone-fill text-primary me-1"></i> Send email announcement to all {{ subscribed_members_count|default:total_members_count }} subscribed members immediately
                             </label>
                             <div class="text-muted small ms-0 mt-1" style="font-size: 0.76rem;">
-                                Members will receive a rich HTML invitation with dynamic 1-click RSVP buttons.
+                                Subscribed members will receive a rich HTML invitation with dynamic 1-click RSVP buttons.
                             </div>
                         </div>
                     </div>
@@ -836,7 +836,7 @@
                         <i class="bi bi-info-circle-fill fs-5 mt-1"></i>
                         <div class="small">
                             <strong>Ready to notify the community?</strong><br>
-                            This will send a rich HTML announcement email to all <strong>{{ total_members_count }} registered community members</strong> with Google Maps directions, 'Add to Calendar' button, and personalized 1-click RSVP action links.
+                            This will send a rich HTML announcement email to all <strong>{{ subscribed_members_count|default:total_members_count }} subscribed community members</strong> (out of {{ total_members_count }} registered members) with Google Maps directions, 'Add to Calendar' button, and personalized 1-click RSVP action links.
                         </div>
                     </div>
 

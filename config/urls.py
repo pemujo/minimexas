@@ -28,6 +28,7 @@ from recommendations.views import (
     organizer_survey_create_view,
     organizer_survey_toggle_status_view,
     organizer_survey_delete_view,
+    organizer_survey_broadcast_view,
 )
 
 urlpatterns = [
@@ -45,6 +46,7 @@ urlpatterns = [
     path('surveys/<int:survey_id>/vote/', survey_vote_view, name='survey_vote'),
     path('surveys/<int:survey_id>/toggle/', organizer_survey_toggle_status_view, name='survey_toggle_status'),
     path('surveys/<int:survey_id>/delete/', organizer_survey_delete_view, name='survey_delete'),
+    path('surveys/<int:survey_id>/broadcast/', organizer_survey_broadcast_view, name='survey_broadcast'),
     path('profile/', profile_view, name='profile'),
     path('profile/delete/', profile_delete_self_view, name='profile_delete_self'),
     path('organizers/', organizer_dashboard_view, name='organizer_dashboard'),

@@ -232,9 +232,17 @@ EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", _default_email_backend)
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MiniMexitas Community <no-reply@minimexitas.org>")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "").strip()
+
+_env_from = os.environ.get("DEFAULT_FROM_EMAIL", "").strip()
+if _env_from:
+    DEFAULT_FROM_EMAIL = _env_from
+elif EMAIL_HOST_USER:
+    DEFAULT_FROM_EMAIL = f"MiniMexitas Community <{EMAIL_HOST_USER}>"
+else:
+    DEFAULT_FROM_EMAIL = "MiniMexitas Community <no-reply@minimexitas.org>"
+
 PORTAL_BASE_URL = os.environ.get("PORTAL_BASE_URL", "").rstrip("/")
 
 if not DEBUG:

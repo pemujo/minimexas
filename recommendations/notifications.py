@@ -80,6 +80,23 @@ def build_whatsapp_decline_link(full_name: str, phone_number: str, reason: str =
     return f"https://wa.me/{clean_phone}?text={urllib.parse.quote(message)}"
 
 
+def _get_from_email() -> str:
+    """
+    Resolves a safe FROM email address.
+    If EMAIL_HOST_USER is configured, ensures the sender matches or uses EMAIL_HOST_USER
+    so that Google/Gmail SMTP does not reject the message for sender mismatch.
+    """
+    default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', '').strip()
+    host_user = getattr(settings, 'EMAIL_HOST_USER', '').strip()
+    if default_from and 'no-reply@minimexitas.org' not in default_from:
+        return default_from
+    if host_user:
+        return f"MiniMexitas Community <{host_user}>"
+    if default_from:
+        return default_from
+    return "MiniMexitas Community <no-reply@minimexitas.org>"
+
+
 def send_membership_approval_email(request_obj, portal_url: str = None, request = None) -> bool:
     """
     Sends an automated, welcoming approval confirmation email to an approved member.
@@ -98,7 +115,7 @@ def send_membership_approval_email(request_obj, portal_url: str = None, request 
     portal_url = f"{base}/login/" if base else "/login/"
 
     subject = "¡Bienvenido(a) a MiniMexitas! Tu solicitud ha sido aprobada 🎉"
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
+    from_email = _get_from_email()
 
     plain_text_content = f"""¡Hola {full_name}!
 
@@ -224,7 +241,7 @@ def send_membership_rejection_email(request_obj, reason: str = None, portal_url:
     reason_text = reason.strip() if reason and reason.strip() else "No fue posible verificar la conexión con la comunidad o los requisitos de registro en este momento."
 
     subject = "Actualización sobre tu solicitud para unirte a MiniMexitas"
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
+    from_email = _get_from_email()
 
     plain_text_content = f"""¡Hola {full_name}!
 
@@ -357,7 +374,7 @@ def send_admin_new_request_notification(request_obj, admin_emails=None, portal_u
     dashboard_url = f"{base}/organizers/" if base else "/organizers/"
 
     subject = f"🔔 Nueva solicitud para unirse a MiniMexitas: {applicant_name}"
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
+    from_email = _get_from_email()
 
     plain_text_content = f"""¡Hola equipo de Organizadores!
 
@@ -482,6 +499,55 @@ def verify_event_rsvp_token(token: str, max_age: int = 86400 * 60):
         return None
 
 
+def get_subscribed_members() -> list:
+    """
+    Returns a deduplicated list of {'email': email, 'full_name': full_name} for all active
+    community members who have email notifications enabled.
+    Auto-materializes local MemberProfile records for approved MembershipRequests if needed.
+    """
+    from .models import MemberProfile, MembershipRequest
+
+    # Step 1: Ensure approved requests have a corresponding MemberProfile
+    try:
+        approved_requests = (
+            MembershipRequest.objects.filter(status='approved')
+            .exclude(email__isnull=True)
+            .exclude(email='')
+        )
+        for req in approved_requests:
+            clean_email = req.email.strip().lower()
+            if clean_email and not MemberProfile.objects.filter(email__iexact=clean_email).exists():
+                MemberProfile.objects.create(
+                    email=clean_email,
+                    full_name=req.full_name or '',
+                    phone_number=req.phone_number or '',
+                    region=req.region or '',
+                    city=req.city or '',
+                    email_notifications=True
+                )
+    except Exception as e:
+        logger.warning(f"Error checking approved membership requests for notification recipients: {e}")
+
+    # Step 2: Fetch all profiles with email_notifications=True
+    members_qs = (
+        MemberProfile.objects.exclude(email__isnull=True)
+        .exclude(email='')
+        .filter(email_notifications=True)
+        .values('email', 'full_name')
+    )
+
+    seen = set()
+    unique_members = []
+    for m in members_qs:
+        em = m.get('email', '').strip().lower()
+        if em and '@' in em and em not in seen:
+            seen.add(em)
+            name = m.get('full_name', '').strip() or 'Miembro'
+            unique_members.append({'email': em, 'full_name': name})
+
+    return unique_members
+
+
 def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, broadcast_by_email: str = None, request = None) -> int:
     """
     Broadcasts a rich event announcement email to all active, verified community members.
@@ -489,14 +555,9 @@ def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, 
     and personalized 1-click RSVP action links (Going, Maybe, Decline).
     Returns total count of successfully dispatched emails.
     """
-    from .models import MemberProfile
-
-    members = list(
-        MemberProfile.objects.exclude(email='')
-        .values('email', 'full_name')
-    )
+    members = get_subscribed_members()
     if not members:
-        logger.info("No active member profiles found for event broadcast.")
+        logger.info("No active members with email notifications enabled found for event broadcast.")
         return 0
 
     event_id = str(event_data.get('id', '')).strip()
@@ -510,7 +571,7 @@ def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, 
     gcal_link = event_data.get('google_calendar_link') or event_data.get('gcal', '')
 
     base_url = _resolve_base_portal_url(request=request)
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
+    from_email = _get_from_email()
     subject = f"🎉 Nuevo Evento MiniMexitas: {event_title}"
 
     sent_count = 0
@@ -531,6 +592,7 @@ def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, 
         rsvp_url_maybe = f"{base_rsvp_endpoint}?token={token_maybe}"
         rsvp_url_declined = f"{base_rsvp_endpoint}?token={token_declined}"
         portal_events_url = f"{base_url}/events/" if base_url else "/events/"
+        portal_profile_url = f"{base_url}/profile/" if base_url else "/profile/"
 
         plain_text_content = f"""¡Hola {member_name}!
 
@@ -561,6 +623,9 @@ Detalles del Evento:
 
 Ver todos los eventos y detalles en el portal:
 {portal_events_url}
+
+Para configurar tus preferencias de notificaciones por correo:
+{portal_profile_url}
 
 ¡Esperamos verte pronto!
 Equipo de MiniMexitas
@@ -672,7 +737,8 @@ Equipo de MiniMexitas
 
     <div class="footer">
       <p style="margin: 0 0 4px 0;"><strong>MiniMexitas Community</strong> • San Francisco Bay Area</p>
-      <p style="margin: 0;">Recibes esta notificación como miembro activo y registrado del portal de la comunidad.</p>
+      <p style="margin: 0;">Recibes esta notificación como miembro activo registrado de la comunidad.</p>
+      <p style="margin: 6px 0 0 0; font-size: 11px; color: #64748b;">¿Prefieres no recibir estos correos? Puedes configurar tus <a href="{portal_profile_url}" style="color: #cbd5e1; text-decoration: underline;">preferencias de notificación</a> en tu perfil.</p>
     </div>
   </div>
 </body>
@@ -694,6 +760,165 @@ Equipo de MiniMexitas
 
     logger.info(f"Event broadcast '{event_title}' sent to {sent_count}/{len(members)} members.")
     return sent_count
+
+
+def send_survey_broadcast_email(survey_obj, broadcast_by_name: str = None, broadcast_by_email: str = None, request = None) -> int:
+    """
+    Broadcasts a rich survey announcement email to all active, verified community members
+    who have email notifications enabled. Includes the survey question, category, description,
+    voting options, and a direct link to cast their vote in the portal.
+    Returns total count of successfully dispatched emails.
+    """
+    members = get_subscribed_members()
+    if not members:
+        logger.info("No active members with email notifications enabled found for survey broadcast.")
+        return 0
+
+    survey_title = getattr(survey_obj, 'title', 'Nueva Consulta Comunitaria').strip()
+    survey_desc = getattr(survey_obj, 'description', '').strip()
+    
+    get_cat = getattr(survey_obj, 'get_category_display', None)
+    survey_category = get_cat() if callable(get_cat) else getattr(survey_obj, 'category', 'General')
+    
+    is_multi = getattr(survey_obj, 'is_multiple_choice', False)
+    mode_label = "Selección Múltiple (puedes elegir varias opciones)" if is_multi else "Opción Única (elige 1 opción)"
+
+    # Get options list
+    options = []
+    if hasattr(survey_obj, 'options'):
+        try:
+            options = list(survey_obj.options.all().order_by('order', 'id'))
+        except Exception:
+            options = []
+
+    base_url = _resolve_base_portal_url(request=request)
+    portal_surveys_url = f"{base_url}/surveys/" if base_url else "/surveys/"
+    portal_profile_url = f"{base_url}/profile/" if base_url else "/profile/"
+    from_email = _get_from_email()
+    subject = f"🗳️ Nueva Encuesta MiniMexitas: {survey_title}"
+
+    options_text_list = "\n".join([f"  {idx + 1}. {opt.text}" for idx, opt in enumerate(options)]) if options else "  (Opciones disponibles en el portal)"
+    options_html_items = "".join([
+        f'<li style="margin-bottom: 8px; font-size: 14px; color: #334155; line-height: 1.4;"><strong>{idx + 1}.</strong> {opt.text}</li>'
+        for idx, opt in enumerate(options)
+    ]) if options else '<li style="font-size: 14px; color: #64748b;">Opciones disponibles en el portal</li>'
+
+    sent_count = 0
+
+    for m in members:
+        member_email = m.get('email', '').strip().lower()
+        if not member_email or '@' not in member_email:
+            continue
+        member_name = m.get('full_name', '').strip() or "Miembro"
+
+        plain_text_content = f"""¡Hola {member_name}!
+
+Hay una nueva consulta comunitaria abierta en el portal de MiniMexitas:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🗳️ {survey_title}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🏷️ Categoría: {survey_category}
+⚙️ Modalidad: {mode_label}
+{f"📝 Contexto: {survey_desc}" if survey_desc else ""}
+
+Opciones de Votación:
+{options_text_list}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👉 ENTRA A VOTAR EN EL PORTAL:
+{portal_surveys_url}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tu voto es muy valioso para organizar nuestras próximas actividades y convivencias comunitarias.
+
+Para configurar tus preferencias de notificaciones por correo:
+{portal_profile_url}
+
+¡Gracias por participar!
+Equipo de MiniMexitas
+"""
+
+        html_content = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{survey_title} - MiniMexitas</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }}
+    .wrapper {{ max-width: 600px; margin: 24px auto; background-color: #ffffff; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.05); }}
+    .header {{ background: linear-gradient(135deg, #1e3a8a 0%, #0d9488 100%); padding: 36px 28px; text-align: center; color: #ffffff; }}
+    .header .tag {{ display: inline-block; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 50px; padding: 6px 16px; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 12px; }}
+    .header h1 {{ margin: 0; font-size: 24px; font-weight: 800; line-height: 1.3; }}
+    .content {{ padding: 32px 28px; }}
+    .greeting {{ font-size: 17px; font-weight: 600; color: #0f172a; margin-bottom: 14px; }}
+    .desc-box {{ background-color: #f8fafc; border-left: 4px solid #0d9488; border-radius: 8px; padding: 14px 18px; margin: 18px 0 22px 0; font-size: 14px; color: #334155; line-height: 1.6; }}
+    .options-card {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px 22px; margin-bottom: 26px; }}
+    .options-title {{ font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 0 0 14px 0; }}
+    .options-list {{ list-style-type: none; padding: 0; margin: 0; }}
+    .cta-container {{ text-align: center; margin: 28px 0 14px 0; }}
+    .btn-vote {{ display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #047857 100%); color: #ffffff !important; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 36px; border-radius: 50px; box-shadow: 0 4px 14px rgba(13,148,136,0.35); }}
+    .footer {{ background-color: #0f172a; color: #94a3b8; padding: 24px; text-align: center; font-size: 12px; line-height: 1.5; }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <div class="tag">🗳️ Consulta Comunitaria</div>
+      <h1>{survey_title}</h1>
+      <div style="margin-top: 8px; font-size: 13px; color: #e2e8f0;">🏷️ {survey_category} &bull; {mode_label}</div>
+    </div>
+
+    <div class="content">
+      <div class="greeting">¡Hola {member_name}!</div>
+      <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-top: 0;">
+        Se ha publicado una nueva encuesta para la comunidad de <strong>MiniMexitas</strong>. Tu opinión es fundamental para tomar las mejores decisiones juntos.
+      </p>
+
+      {f'<div class="desc-box"><strong>Contexto:</strong><br>{survey_desc}</div>' if survey_desc else ''}
+
+      <div class="options-card">
+        <div class="options-title">Opciones a votar:</div>
+        <ul class="options-list">
+          {options_html_items}
+        </ul>
+      </div>
+
+      <div class="cta-container">
+        <a href="{portal_surveys_url}" class="btn-vote">
+          🗳️ Participar y Votar en el Portal
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p style="margin: 0 0 4px 0;"><strong>MiniMexitas Community</strong> • San Francisco Bay Area</p>
+      <p style="margin: 0;">Recibes esta notificación como miembro activo registrado de la comunidad.</p>
+      <p style="margin: 6px 0 0 0; font-size: 11px; color: #64748b;">¿Prefieres no recibir estos correos? Puedes configurar tus <a href="{portal_profile_url}" style="color: #cbd5e1; text-decoration: underline;">preferencias de notificación</a> en tu perfil.</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+        try:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_text_content,
+                from_email=from_email,
+                to=[member_email]
+            )
+            msg.attach_alternative(html_content, "text/html")
+            msg.send(fail_silently=False)
+            sent_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to dispatch survey broadcast email to {member_email}: {e}")
+
+    logger.info(f"Survey broadcast '{survey_title}' sent to {sent_count}/{len(members)} members.")
+    return sent_count
+
 
 
 

@@ -122,6 +122,19 @@
                         </div>
                         {% endif %}
 
+                        <div class="mb-3">
+                            <label class="text-muted small text-uppercase fw-semibold mb-1 d-block">Email Notifications</label>
+                            {% if profile.email_notifications %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-bell-fill me-1"></i> Subscribed (Active)
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-2 fw-medium">
+                                <i class="bi bi-bell-slash me-1"></i> Unsubscribed (Muted)
+                            </span>
+                            {% endif %}
+                        </div>
+
                         <div class="pt-3 border-top text-muted" style="font-size: 0.78rem;">
                             <i class="bi bi-clock-history me-1"></i> Last updated {{ profile.updated_at|date:"M d, Y, g:i a" }}
                         </div>
@@ -311,6 +324,29 @@
                                     <span class="text-muted fw-normal small">Optional</span>
                                 </label>
                                 <textarea class="form-control" id="bioInput" name="bio" rows="3" placeholder="Tell us a little about where in Mexico you are from, what you do in the Bay Area, or any ideas you'd love to share!">{{ profile.bio }}</textarea>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 text-muted opacity-25">
+
+                        <!-- Section 4: Notification Preferences -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center">
+                                <i class="bi bi-bell-fill text-primary me-2"></i> Notification Preferences
+                            </h5>
+
+                            <div class="p-3 rounded-4 border bg-light">
+                                <div class="form-check form-switch d-flex align-items-center gap-3 ps-0 mb-0">
+                                    <input class="form-check-input ms-0 mt-0" type="checkbox" role="switch" id="emailNotificationsSwitch" name="email_notifications" value="1" {% if profile.email_notifications %}checked{% endif %} style="width: 2.75em; height: 1.45em; cursor: pointer;">
+                                    <div>
+                                        <label class="form-check-label fw-bold text-dark mb-0 d-block" for="emailNotificationsSwitch" style="cursor: pointer;">
+                                            Receive Email Notifications & Event Invitations
+                                        </label>
+                                        <div class="text-muted small" style="line-height: 1.4;">
+                                            Get notified via email when new community events, picnics, gatherings, and celebrations are posted, including 1-click RSVP options.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

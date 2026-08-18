@@ -657,6 +657,17 @@
                                     <div class="text-truncate" style="max-width: 170px;">
                                         <div class="fw-bold text-dark">{{ p.full_name|default:"Unnamed Member" }}</div>
                                         <div class="text-muted" style="font-size: 0.75rem;">{{ p.email }}</div>
+                                        <div class="mt-1">
+                                            {% if p.email_notifications %}
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;" title="Subscribed to event email notifications">
+                                                <i class="bi bi-bell-fill me-1"></i> Emails: On
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;" title="Unsubscribed from event email notifications">
+                                                <i class="bi bi-bell-slash me-1"></i> Emails: Off
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                             </td>
