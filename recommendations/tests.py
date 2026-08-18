@@ -209,11 +209,14 @@ class SheetsSyncTestCase(TestCase):
     @patch('recommendations.sheets.get_gspread_client')
     def test_fetch_recommendations_normalized(self, mock_get_client):
         mock_ws = MagicMock()
+        mock_ws.title = "Recomendaciones"
         mock_ws.get_all_records.return_value = [
             {"Shared By": "Carlos", "Category": "Doctors", "Recommendation": "Dr. Smith"}
         ]
         mock_sh = MagicMock()
         mock_sh.sheet1 = mock_ws
+        mock_sh.worksheet.return_value = mock_ws
+        mock_sh.worksheets.return_value = [mock_ws]
         mock_client = MagicMock()
         mock_client.open.return_value = mock_sh
         mock_client.open_by_key.return_value = mock_sh

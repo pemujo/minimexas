@@ -266,6 +266,10 @@ def home_view(request):
 
 @member_required
 def notes_list_view(request):
+    force_refresh = request.GET.get('refresh') == '1'
+    if force_refresh:
+        cache.delete('whatsapp_recommendations_cache')
+
     notes = cache.get('whatsapp_recommendations_cache')
     error = None
 
