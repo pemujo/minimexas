@@ -123,6 +123,10 @@ class MembershipAuditLog(models.Model):
     ACTION_SURVEY_CREATED = 'survey_created'
     ACTION_SURVEY_CLOSED = 'survey_closed'
     ACTION_SURVEY_DELETED = 'survey_deleted'
+    ACTION_EVENT_BROADCAST = 'event_broadcast'
+    ACTION_EVENT_CREATED = 'event_created'
+    ACTION_EVENT_UPDATED = 'event_updated'
+    ACTION_EVENT_DELETED = 'event_deleted'
 
     ACTION_CHOICES = [
         (ACTION_SUBMITTED, 'Request Submitted'),
@@ -133,6 +137,10 @@ class MembershipAuditLog(models.Model):
         (ACTION_SURVEY_CREATED, 'Survey Created'),
         (ACTION_SURVEY_CLOSED, 'Survey Closed/Reopened'),
         (ACTION_SURVEY_DELETED, 'Survey Deleted'),
+        (ACTION_EVENT_BROADCAST, 'Event Notification Broadcast'),
+        (ACTION_EVENT_CREATED, 'Event Created'),
+        (ACTION_EVENT_UPDATED, 'Event Updated'),
+        (ACTION_EVENT_DELETED, 'Event Deleted'),
     ]
 
     action = models.CharField(max_length=30, choices=ACTION_CHOICES, db_index=True, verbose_name="Action")
@@ -244,3 +252,89 @@ class SurveyVote(models.Model):
 
     def __str__(self):
         return f"{self.voter_name} ({self.voter_email}) voted '{self.option.text}' for '{self.survey.title}'"
+
+
+class CommunityEventRSVP(models.Model):
+    STATUS_GOING = 'going'
+    STATUS_MAYBE = 'maybe'
+    STATUS_DECLINED = 'declined'
+
+    STATUS_CHOICES = [
+        (STATUS_GOING, 'Going / Asistiré'),
+        (STATUS_MAYBE, 'Maybe / Tal vez'),
+        (STATUS_DECLINED, 'Not Going / No podré'),
+    ]
+
+    event_id = models.CharField(max_length=255, db_index=True, verbose_name="Event ID")
+    event_title = models.CharField(max_length=255, blank=True, verbose_name="Event Title")
+    member_email = models.EmailField(db_index=True, verbose_name="Member Email")
+    member_name = models.CharField(max_length=150, verbose_name="Member Name")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_GOING, verbose_name="RSVP Status")
+    notes = models.TextField(blank=True, verbose_name="Notes / Guests / Comments")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Event RSVP"
+        verbose_name_plural = "Event RSVPs"
+        unique_together = ('event_id', 'member_email')
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"{self.member_name} - {self.get_status_display()} for {self.event_title or self.event_id}"
+
+
+class CommunityEventBroadcast(models.Model):
+    event_id = models.CharField(max_length=255, unique=True, db_index=True, verbose_name="Event ID")
+    event_title = models.CharField(max_length=255, verbose_name="Event Title")
+    broadcast_by = models.CharField(max_length=150, verbose_name="Broadcasted By (Admin Name)")
+    broadcast_by_email = models.EmailField(verbose_name="Broadcasted By (Admin Email)")
+    recipient_count = models.PositiveIntegerField(default=0, verbose_name="Recipients Count")
+    broadcast_at = models.DateTimeField(auto_now=True, verbose_name="Last Broadcasted At")
+
+    class Meta:
+        verbose_name = "Event Broadcast"
+        verbose_name_plural = "Event Broadcasts"
+        ordering = ['-broadcast_at']
+
+    def __str__(self):
+        return f"{self.event_title} ({self.recipient_count} recipients on {self.broadcast_at.strftime('%Y-%m-%d %H:%M')})"
+
+
+class CommunityEvent(models.Model):
+    CATEGORY_CULTURAL = 'Cultural & Heritage'
+    CATEGORY_NETWORKING = 'Networking & Tech'
+    CATEGORY_FAMILY = 'Family & Outdoors'
+    CATEGORY_CULINARY = 'Culinary & Social'
+    CATEGORY_COMMUNITY = 'Community Gathering'
+
+    CATEGORY_CHOICES = [
+        (CATEGORY_CULTURAL, 'Cultural & Heritage'),
+        (CATEGORY_NETWORKING, 'Networking & Tech'),
+        (CATEGORY_FAMILY, 'Family & Outdoors'),
+        (CATEGORY_CULINARY, 'Culinary & Social'),
+        (CATEGORY_COMMUNITY, 'Community Gathering'),
+    ]
+
+    title = models.CharField(max_length=255, verbose_name="Event Title")
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_COMMUNITY, verbose_name="Category")
+    start_datetime = models.DateTimeField(verbose_name="Start Date & Time")
+    end_datetime = models.DateTimeField(blank=True, null=True, verbose_name="End Date & Time")
+    location = models.CharField(max_length=255, verbose_name="Location / Venue", default="San Francisco Bay Area")
+    location_url = models.URLField(blank=True, verbose_name="Google Maps or Location URL")
+    description = models.TextField(blank=True, verbose_name="Description / Details")
+    created_by_name = models.CharField(max_length=150, blank=True, verbose_name="Created By (Name)")
+    created_by_email = models.EmailField(blank=True, verbose_name="Created By (Email)")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="Active")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Community Event"
+        verbose_name_plural = "Community Events"
+        ordering = ['start_datetime']
+
+    def __str__(self):
+        return f"{self.title} ({self.start_datetime.strftime('%Y-%m-%d %H:%M')})"
+
+

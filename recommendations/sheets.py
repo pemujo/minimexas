@@ -90,6 +90,10 @@ def _get_worksheet_case_insensitive(sh, target_name):
             return ws
         if target_clean in ('surveys', 'survey', 'polls', 'poll') and title_clean in ('surveys', 'survey', 'polls', 'poll', 'encuestas', 'votaciones', 'votacion'):
             return ws
+        if target_clean in ('eventrsvps', 'rsvps', 'eventrsvp', 'rsvp') and title_clean in ('eventrsvps', 'rsvps', 'eventrsvp', 'rsvp', 'asistencia', 'asistencias', 'confirmaciones'):
+            return ws
+        if target_clean in ('events', 'communityevents', 'eventos') and title_clean in ('events', 'communityevents', 'eventos', 'eventoscomunidad'):
+            return ws
     return None
 
 
@@ -628,6 +632,230 @@ def delete_survey_from_google_sheet(survey_id):
         return True
     except Exception as e:
         logger.warning(f"Failed to delete survey #{survey_id} from Google Sheet: {e}")
+        return False
+
+
+def sync_event_rsvp_to_google_sheet(rsvp):
+    """
+    Synchronizes an event RSVP response to the 'Event_RSVPs' tab in Google Sheets.
+    Finds the row corresponding to (event_id, member_email) and updates it in-place,
+    or appends a new row if not present.
+    """
+    if not rsvp or not rsvp.event_id or not rsvp.member_email:
+        return False
+
+    try:
+        from datetime import datetime
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = _get_worksheet_case_insensitive(sh, "Event_RSVPs")
+        if not worksheet:
+            logger.info("Worksheet 'Event_RSVPs' not found. Creating it automatically...")
+            worksheet = sh.add_worksheet(title="Event_RSVPs", rows="100", cols="10")
+            headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Notes', 'Updated At']
+            worksheet.update(values=[headers], range_name="A1:G1")
+            headers = [h.strip() for h in headers]
+            all_values = [headers]
+        else:
+            all_values = worksheet.get_all_values()
+            if not all_values:
+                headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Notes', 'Updated At']
+                worksheet.update(values=[headers], range_name="A1:G1")
+                all_values = [headers]
+            else:
+                headers = [h.strip() for h in all_values[0]]
+
+        status_display = rsvp.get_status_display() if hasattr(rsvp, 'get_status_display') else rsvp.status
+        updated_at_str = rsvp.updated_at.strftime("%Y-%m-%d %H:%M") if rsvp.updated_at else datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        field_map = {
+            'event id': str(rsvp.event_id),
+            'event title': rsvp.event_title or '',
+            'member name': rsvp.member_name or '',
+            'member email': rsvp.member_email or '',
+            'rsvp status': status_display,
+            'status': status_display,
+            'notes': rsvp.notes or '',
+            'updated at': updated_at_str,
+        }
+
+        row_data = [field_map.get(h.lower(), '') for h in headers]
+
+        # Find existing row by matching Event ID and Member Email
+        event_id_idx = None
+        email_idx = None
+        for idx, h in enumerate(headers):
+            h_clean = h.lower()
+            if 'event' in h_clean and 'id' in h_clean:
+                event_id_idx = idx
+            elif 'email' in h_clean:
+                email_idx = idx
+
+        target_event_id = str(rsvp.event_id).strip().lower()
+        target_email = str(rsvp.member_email).strip().lower()
+
+        match_row_num = None
+        if event_id_idx is not None and email_idx is not None:
+            for row_idx, row in enumerate(all_values[1:], start=2):
+                if len(row) > max(event_id_idx, email_idx):
+                    r_ev_id = str(row[event_id_idx]).strip().lower()
+                    r_email = str(row[email_idx]).strip().lower()
+                    if r_ev_id == target_event_id and r_email == target_email:
+                        match_row_num = row_idx
+                        break
+
+        end_letter = chr(64 + len(headers)) if len(headers) <= 26 else 'G'
+
+        if match_row_num:
+            range_name = f"A{match_row_num}:{end_letter}{match_row_num}"
+            worksheet.update(values=[row_data], range_name=range_name)
+            logger.info(f"Updated RSVP for {rsvp.member_email} (event {rsvp.event_id}) at row {match_row_num}")
+        else:
+            worksheet.append_row(row_data)
+            logger.info(f"Appended new RSVP for {rsvp.member_email} (event {rsvp.event_id}) to Google Sheet")
+
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to sync RSVP for {getattr(rsvp, 'member_email', '')} to Google Sheet: {e}")
+        return False
+
+
+def sync_community_event_to_google_sheet(event):
+    """
+    Synchronizes a portal-created CommunityEvent to the 'Events' tab in Google Sheets.
+    Finds the row corresponding to Event ID and updates it in-place, or appends a new row if not present.
+    """
+    if not event or not event.id:
+        return False
+
+    try:
+        from datetime import datetime
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = _get_worksheet_case_insensitive(sh, "Events")
+        if not worksheet:
+            logger.info("Worksheet 'Events' not found. Creating it automatically...")
+            worksheet = sh.add_worksheet(title="Events", rows="100", cols="11")
+            headers = ['Event ID', 'Event Title', 'Category', 'Start Date & Time', 'End Date & Time', 'Location', 'Location URL', 'Description', 'Created By', 'Created At', 'Status']
+            worksheet.update(values=[headers], range_name="A1:K1")
+            headers = [h.strip() for h in headers]
+            all_values = [headers]
+        else:
+            all_values = worksheet.get_all_values()
+            if not all_values:
+                headers = ['Event ID', 'Event Title', 'Category', 'Start Date & Time', 'End Date & Time', 'Location', 'Location URL', 'Description', 'Created By', 'Created At', 'Status']
+                worksheet.update(values=[headers], range_name="A1:K1")
+                all_values = [headers]
+            else:
+                headers = [h.strip() for h in all_values[0]]
+
+        event_id_str = f"portal_{event.id}"
+        start_str = event.start_datetime.strftime("%Y-%m-%d %H:%M") if event.start_datetime else ""
+        end_str = event.end_datetime.strftime("%Y-%m-%d %H:%M") if event.end_datetime else ""
+        created_str = event.created_at.strftime("%Y-%m-%d %H:%M") if event.created_at else datetime.now().strftime("%Y-%m-%d %H:%M")
+        status_str = "Active" if event.is_active else "Inactive / Cancelled"
+
+        field_map = {
+            'event id': event_id_str,
+            'id': event_id_str,
+            'event title': event.title or '',
+            'title': event.title or '',
+            'category': event.category or '',
+            'start date & time': start_str,
+            'start date': start_str,
+            'end date & time': end_str,
+            'end date': end_str,
+            'location': event.location or '',
+            'location url': event.location_url or '',
+            'description': event.description or '',
+            'created by': f"{event.created_by_name} ({event.created_by_email})" if event.created_by_email else (event.created_by_name or ''),
+            'created at': created_str,
+            'status': status_str,
+        }
+
+        row_data = [field_map.get(h.lower(), '') for h in headers]
+
+        # Find existing row by Event ID
+        event_id_idx = None
+        for idx, h in enumerate(headers):
+            h_clean = h.lower()
+            if ('event' in h_clean and 'id' in h_clean) or h_clean == 'id':
+                event_id_idx = idx
+                break
+
+        match_row_num = None
+        if event_id_idx is not None:
+            for row_idx, row in enumerate(all_values[1:], start=2):
+                if len(row) > event_id_idx:
+                    r_ev_id = str(row[event_id_idx]).strip().lower()
+                    if r_ev_id in (event_id_str.lower(), str(event.id).lower()):
+                        match_row_num = row_idx
+                        break
+
+        end_letter = chr(64 + len(headers)) if len(headers) <= 26 else 'K'
+
+        if match_row_num:
+            range_name = f"A{match_row_num}:{end_letter}{match_row_num}"
+            worksheet.update(values=[row_data], range_name=range_name)
+            logger.info(f"Updated CommunityEvent {event_id_str} at row {match_row_num} in Google Sheet")
+        else:
+            worksheet.append_row(row_data)
+            logger.info(f"Appended new CommunityEvent {event_id_str} to Google Sheet")
+
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to sync CommunityEvent {getattr(event, 'id', '')} to Google Sheet: {e}")
+        return False
+
+
+def delete_community_event_from_google_sheet(event_id):
+    """
+    Marks a CommunityEvent as 'Deleted (Inactive)' or removes row in the 'Events' tab of Google Sheets.
+    """
+    if not event_id:
+        return False
+
+    try:
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = _get_worksheet_case_insensitive(sh, "Events")
+        if not worksheet:
+            return True
+
+        all_values = worksheet.get_all_values()
+        if not all_values:
+            return True
+
+        headers = [h.strip() for h in all_values[0]]
+        event_id_idx = None
+        status_idx = None
+        for idx, h in enumerate(headers):
+            h_clean = h.lower()
+            if ('event' in h_clean and 'id' in h_clean) or h_clean == 'id':
+                event_id_idx = idx
+            elif h_clean == 'status':
+                status_idx = idx
+
+        target_ids = {f"portal_{event_id}".lower(), str(event_id).lower()}
+        if event_id_idx is not None:
+            for row_idx, row in enumerate(all_values[1:], start=2):
+                if len(row) > event_id_idx:
+                    r_ev_id = str(row[event_id_idx]).strip().lower()
+                    if r_ev_id in target_ids:
+                        if status_idx is not None:
+                            col_letter = chr(65 + status_idx)
+                            worksheet.update_cell(row_idx, status_idx + 1, "Deleted (Inactive)")
+                            logger.info(f"Marked event {event_id} as deleted at row {row_idx} in Google Sheet")
+                        else:
+                            worksheet.delete_rows(row_idx)
+                            logger.info(f"Deleted row {row_idx} for event {event_id} in Google Sheet")
+                        return True
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to delete event #{event_id} from Google Sheet: {e}")
         return False
 
 

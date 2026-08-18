@@ -35,6 +35,81 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <!-- Custom Project CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <style>
+        .rsvp-btn-group {
+            display: inline-flex;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 50px;
+            padding: 3px;
+            gap: 3px;
+        }
+        .btn-rsvp-pill {
+            border: none;
+            background: transparent;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 50px;
+            color: #64748b;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        .btn-rsvp-pill:hover {
+            color: #0f172a;
+            background-color: rgba(255, 255, 255, 0.85);
+        }
+        .btn-rsvp-pill.active-going {
+            background-color: #16a34a !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35);
+        }
+        .btn-rsvp-pill.active-maybe {
+            background-color: #d97706 !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35);
+        }
+        .btn-rsvp-pill.active-declined {
+            background-color: #64748b !important;
+            color: #ffffff !important;
+        }
+        .attendee-pill {
+            font-size: 0.72rem;
+            padding: 3px 9px;
+            border-radius: 50px;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+            display: inline-block;
+        }
+        .btn-broadcast-cta {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff !important;
+            border: none;
+            font-weight: 600;
+            font-size: 0.76rem;
+            padding: 4px 12px;
+            border-radius: 50px;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+            transition: all 0.2s ease;
+        }
+        .btn-broadcast-cta:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.45);
+        }
+        .rsvp-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1090;
+            min-width: 300px;
+        }
+    </style>
 </head>
 <body>
 
@@ -44,16 +119,59 @@
     <!-- MAIN CONTAINER -->
     <div class="container main-container pt-4 mb-5">
 
+        <!-- FLASH NOTIFICATION BANNERS -->
+        {% if event_flash_message %}
+        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4 border-0 d-flex align-items-center" role="alert" style="border-radius: var(--radius-md); background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #065f46;">
+            <i class="bi bi-check-circle-fill fs-5 me-3 text-success"></i>
+            <div>{{ event_flash_message }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        {% if event_error_message %}
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4 border-0 d-flex align-items-center" role="alert" style="border-radius: var(--radius-md); background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #991b1b;">
+            <i class="bi bi-exclamation-triangle-fill fs-5 me-3 text-danger"></i>
+            <div>{{ event_error_message }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        {% if rsvp_flash_message %}
+        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4 border-0 d-flex align-items-center" role="alert" style="border-radius: var(--radius-md); background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #065f46;">
+            <i class="bi bi-check-circle-fill fs-5 me-3 text-success"></i>
+            <div>{{ rsvp_flash_message }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        {% if broadcast_flash_message %}
+        <div class="alert alert-info alert-dismissible fade show shadow-sm mb-4 border-0 d-flex align-items-center" role="alert" style="border-radius: var(--radius-md); background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1;">
+            <i class="bi bi-megaphone-fill fs-5 me-3 text-primary"></i>
+            <div>{{ broadcast_flash_message }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
         <!-- HEADER ROW -->
-        <div class="mb-4">
-            <div class="badge-pill-header mb-2">
-                <i class="bi bi-calendar-heart-fill text-warning me-2"></i>
-                <span>Community Calendar & Meetups</span>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+            <div>
+                <div class="badge-pill-header mb-2">
+                    <i class="bi bi-calendar-heart-fill text-warning me-2"></i>
+                    <span>Community Calendar & Meetups</span>
+                </div>
+                <h1 class="h2 fw-bold text-dark mb-1">Upcoming Events & Gatherings</h1>
+                <p class="text-secondary small mb-0">
+                    Stay connected with cultural festivals, tech mixers, family picnics, and gatherings across the San Francisco Bay Area.
+                </p>
             </div>
-            <h1 class="h2 fw-bold text-dark mb-1">Upcoming Events & Gatherings</h1>
-            <p class="text-secondary small mb-0">
-                Stay connected with cultural festivals, tech mixers, family picnics, and gatherings across the San Francisco Bay Area.
-            </p>
+            {% if is_admin %}
+            <div>
+                <button type="button" class="btn btn-primary px-3 py-2 rounded-pill fw-semibold shadow-sm d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createEventModal" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%); border: none;">
+                    <i class="bi bi-plus-circle-fill fs-6"></i>
+                    <span>Create Event</span>
+                </button>
+            </div>
+            {% endif %}
         </div>
 
         <!-- FILTER & VIEW CONTROLS -->
@@ -114,25 +232,99 @@
                          data-category="{{ event.category }}"
                          data-desc="{{ event.description|lower }}">
                         
-                        <div class="event-item-card h-100 p-4 d-flex flex-column justify-content-between">
+                        <div class="event-item-card h-100 p-4 d-flex flex-column justify-content-between" id="event-card-{{ event.id }}">
                             <div>
                                 
-                                <!-- Date Box & Category Header -->
-                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                <!-- Date Box, Category & Broadcast Badge -->
+                                <div class="d-flex align-items-start justify-content-between mb-3 gap-2">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="event-date-box shadow-sm">
                                             <span class="event-date-month">{{ event.start_datetime|date:"M" }}</span>
                                             <span class="event-date-day">{{ event.day }}</span>
                                         </div>
                                         <div>
-                                            <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
-                                                {{ event.category }}
-                                            </span>
-                                            <div class="text-muted small mt-1">
+                                            <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
+                                                <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                                    {{ event.category }}
+                                                </span>
+                                                {% if event.is_portal_event %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Created directly in MiniMexitas portal">
+                                                    <i class="bi bi-stars me-1"></i>Portal
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
+                                                    <i class="bi bi-google me-1"></i>Google Cal
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-muted small">
                                                 <i class="bi bi-clock me-1 text-primary"></i> {{ event.time_formatted }}
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Admin Controls (Broadcast, Edit, Delete) -->
+                                    {% if is_admin %}
+                                    <div class="d-flex align-items-center gap-1">
+                                        {% if event.is_portal_event %}
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-edit-event"
+                                                style="width: 28px; height: 28px; padding: 0; line-height: 1;"
+                                                title="Edit portal event"
+                                                data-event-id="{{ event.portal_event_pk }}"
+                                                data-title="{{ event.title }}"
+                                                data-category="{{ event.category }}"
+                                                data-start-date="{{ event.start_datetime|date:'Y-m-d' }}"
+                                                data-start-time="{{ event.start_datetime|date:'H:i' }}"
+                                                data-end-date="{{ event.end_datetime|date:'Y-m-d' }}"
+                                                data-end-time="{{ event.end_datetime|date:'H:i' }}"
+                                                data-location="{{ event.location }}"
+                                                data-locurl="{{ event.location_url }}"
+                                                data-desc="{{ event.description }}">
+                                            <i class="bi bi-pencil" style="font-size: 0.72rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-circle btn-open-delete-event"
+                                                style="width: 28px; height: 28px; padding: 0; line-height: 1;"
+                                                title="Delete portal event"
+                                                data-event-id="{{ event.portal_event_pk }}"
+                                                data-title="{{ event.title }}">
+                                            <i class="bi bi-trash3" style="font-size: 0.72rem;"></i>
+                                        </button>
+                                        {% endif %}
+
+                                        {% if event.is_broadcasted %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.72rem;" title="Notified {{ event.broadcast_info.recipient_count }} members on {{ event.broadcast_info.broadcast_at|date:'M d, H:i' }}">
+                                            <i class="bi bi-check2-all me-1"></i> Sent ({{ event.broadcast_info.recipient_count }})
+                                        </span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-broadcast" 
+                                                style="width: 28px; height: 28px; padding: 0; line-height: 1;"
+                                                title="Re-broadcast announcement to all members"
+                                                data-event-id="{{ event.id }}"
+                                                data-title="{{ event.title }}"
+                                                data-date="{{ event.date_formatted }}"
+                                                data-time="{{ event.time_formatted }}"
+                                                data-location="{{ event.location }}"
+                                                data-locurl="{{ event.location_url }}"
+                                                data-category="{{ event.category }}"
+                                                data-desc="{{ event.description }}"
+                                                data-gcal="{{ event.google_calendar_link }}">
+                                            <i class="bi bi-arrow-clockwise" style="font-size: 0.7rem;"></i>
+                                        </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-sm btn-broadcast-cta btn-open-broadcast"
+                                                data-event-id="{{ event.id }}"
+                                                data-title="{{ event.title }}"
+                                                data-date="{{ event.date_formatted }}"
+                                                data-time="{{ event.time_formatted }}"
+                                                data-location="{{ event.location }}"
+                                                data-locurl="{{ event.location_url }}"
+                                                data-category="{{ event.category }}"
+                                                data-desc="{{ event.description }}"
+                                                data-gcal="{{ event.google_calendar_link }}">
+                                            <i class="bi bi-megaphone-fill me-1"></i> Broadcast
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
 
                                 <!-- Event Title -->
@@ -149,9 +341,52 @@
                                 </div>
 
                                 <!-- Description -->
-                                <p class="text-muted small mb-4" style="line-height: 1.5;">
+                                <p class="text-muted small mb-3" style="line-height: 1.5;">
                                     {{ event.description|truncatewords:28 }}
                                 </p>
+
+                                <!-- Interactive Member RSVP Widget -->
+                                <div class="rsvp-card-container mb-3 p-2 bg-light rounded-3 border">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="text-muted small fw-semibold" style="font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                                            🎟️ Your Attendance:
+                                        </span>
+                                        <button class="btn btn-link p-0 text-decoration-none small text-muted" 
+                                                type="button" 
+                                                data-bs-toggle="collapse" 
+                                                data-bs-target="#attendees-{{ forloop.counter }}" 
+                                                aria-expanded="false" 
+                                                style="font-size: 0.74rem;">
+                                            <span class="fw-bold text-success going-count-badge">{{ event.going_count }}</span> Going <i class="bi bi-chevron-down ms-1" style="font-size: 0.65rem;"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="rsvp-btn-group w-100 justify-content-between" data-event-id="{{ event.id }}" data-event-title="{{ event.title }}">
+                                        <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if event.my_rsvp == 'going' %}active-going{% endif %}" data-status="going">
+                                            <i class="bi bi-check-circle-fill"></i> Going
+                                        </button>
+                                        <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if event.my_rsvp == 'maybe' %}active-maybe{% endif %}" data-status="maybe">
+                                            <i class="bi bi-question-circle-fill"></i> Maybe
+                                        </button>
+                                        <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if event.my_rsvp == 'declined' %}active-declined{% endif %}" data-status="declined">
+                                            <i class="bi bi-x-circle-fill"></i> Can't Go
+                                        </button>
+                                    </div>
+
+                                    <!-- Collapsible Attendees List -->
+                                    <div class="collapse mt-2 attendees-collapse-box" id="attendees-{{ forloop.counter }}">
+                                        <div class="pt-2 border-top">
+                                            <div class="small fw-semibold text-dark mb-1" style="font-size: 0.72rem;">Confirmed Attendees:</div>
+                                            <div class="attendees-chips-container d-flex flex-wrap gap-1">
+                                                {% for attendee in event.attendees %}
+                                                <span class="attendee-pill">{{ attendee }}</span>
+                                                {% empty %}
+                                                <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
                             </div>
 
@@ -161,6 +396,7 @@
                                     <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
                                 </a>
                                 <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
+                                        data-id="{{ event.id }}"
                                         data-title="{{ event.title }}"
                                         data-date="{{ event.date_formatted }}"
                                         data-time="{{ event.time_formatted }}"
@@ -169,7 +405,9 @@
                                         data-category="{{ event.category }}"
                                         data-desc="{{ event.description }}"
                                         data-organizer="{{ event.organizer }}"
-                                        data-gcal="{{ event.google_calendar_link }}">
+                                        data-gcal="{{ event.google_calendar_link }}"
+                                        data-my-rsvp="{{ event.my_rsvp|default:'' }}"
+                                        data-going-count="{{ event.going_count }}">
                                     Details
                                 </button>
                             </div>
@@ -219,17 +457,53 @@
                                             <span class="event-date-day">{{ event.day }}</span>
                                         </div>
                                         <div>
-                                            <div class="d-flex align-items-center gap-1 mb-1">
+                                            <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
                                                 <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
                                                     {{ event.category }}
                                                 </span>
-                                                <span class="badge bg-light text-secondary border" style="font-size: 0.7rem;">Concluded</span>
+                                                {% if event.is_portal_event %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Created directly in MiniMexitas portal">
+                                                    <i class="bi bi-stars me-1"></i>Portal
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
+                                                    <i class="bi bi-google me-1"></i>Google Cal
+                                                </span>
+                                                {% endif %}
+                                                <span class="badge bg-light text-secondary border" style="font-size: 0.68rem;">Concluded</span>
                                             </div>
                                             <div class="text-muted small">
                                                 <i class="bi bi-calendar-check me-1 text-secondary"></i> {{ event.start_datetime|date:"M d, Y" }}
                                             </div>
                                         </div>
                                     </div>
+
+                                    {% if is_admin and event.is_portal_event %}
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-edit-event"
+                                                style="width: 28px; height: 28px; padding: 0; line-height: 1;"
+                                                title="Edit portal event"
+                                                data-event-id="{{ event.portal_event_pk }}"
+                                                data-title="{{ event.title }}"
+                                                data-category="{{ event.category }}"
+                                                data-start-date="{{ event.start_datetime|date:'Y-m-d' }}"
+                                                data-start-time="{{ event.start_datetime|date:'H:i' }}"
+                                                data-end-date="{{ event.end_datetime|date:'Y-m-d' }}"
+                                                data-end-time="{{ event.end_datetime|date:'H:i' }}"
+                                                data-location="{{ event.location }}"
+                                                data-locurl="{{ event.location_url }}"
+                                                data-desc="{{ event.description }}">
+                                            <i class="bi bi-pencil" style="font-size: 0.72rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-circle btn-open-delete-event"
+                                                style="width: 28px; height: 28px; padding: 0; line-height: 1;"
+                                                title="Delete portal event"
+                                                data-event-id="{{ event.portal_event_pk }}"
+                                                data-title="{{ event.title }}">
+                                            <i class="bi bi-trash3" style="font-size: 0.72rem;"></i>
+                                        </button>
+                                    </div>
+                                    {% endif %}
                                 </div>
 
                                 <!-- Event Title -->
@@ -337,6 +611,251 @@
     </div>
 
     <!-- EVENT DETAILS MODAL -->
+    <!-- ORGANIZER EVENT BROADCAST MODAL -->
+    {% if is_admin %}
+    <!-- CREATE EVENT MODAL -->
+    <div class="modal fade" id="createEventModal" tabindex="-1" aria-labelledby="createEventModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
+                    <h5 class="modal-title fw-bold" id="createEventModalLabel">
+                        <i class="bi bi-calendar-plus-fill me-2 text-warning"></i> Create Community Event
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="{% url 'event_create' %}">
+                    {% csrf_token %}
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-dark">Event Title <span class="text-danger">*</span></label>
+                                <input type="text" name="title" class="form-control" placeholder="e.g. Fiesta Mexicana & Networking Mixer" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Category <span class="text-danger">*</span></label>
+                                <select name="category" class="form-select" required>
+                                    <option value="Cultural & Heritage">Cultural & Heritage</option>
+                                    <option value="Networking & Tech">Networking & Tech</option>
+                                    <option value="Family & Outdoors">Family & Outdoors</option>
+                                    <option value="Culinary & Social">Culinary & Social</option>
+                                    <option value="Community Gathering" selected>Community Gathering</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Location / Venue <span class="text-danger">*</span></label>
+                                <input type="text" name="location" class="form-control" placeholder="e.g. Mission Dolores Park, SF" value="San Francisco Bay Area" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Start Date <span class="text-danger">*</span></label>
+                                <input type="date" name="start_date" id="createEventStartDate" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Start Time <span class="text-danger">*</span></label>
+                                <input type="time" name="start_time" class="form-control" value="18:00" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">End Date <span class="text-muted fw-normal">(Optional)</span></label>
+                                <input type="date" name="end_date" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">End Time <span class="text-muted fw-normal">(Optional)</span></label>
+                                <input type="time" name="end_time" class="form-control" value="20:30">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-dark">Google Maps / Location Link <span class="text-muted fw-normal">(Optional)</span></label>
+                                <input type="url" name="location_url" class="form-control" placeholder="https://maps.google.com/?q=...">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-dark">Event Description <span class="text-danger">*</span></label>
+                                <textarea name="description" class="form-control" rows="3" placeholder="Tell the community what to expect, what to bring, etc." required></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Instant Broadcast Option -->
+                        <div class="p-3 mt-3 bg-light rounded-3 border">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" name="broadcast_now" id="createEventBroadcastNow" value="1">
+                                <label class="form-check-label fw-bold small text-dark" for="createEventBroadcastNow">
+                                    <i class="bi bi-megaphone-fill text-primary me-1"></i> Send email announcement to all {{ total_members_count }} members immediately
+                                </label>
+                                <div class="text-muted small ms-0 mt-1" style="font-size: 0.76rem;">
+                                    Members will receive a rich HTML invitation with dynamic 1-click RSVP buttons.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-0 px-4 py-3">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
+                            <i class="bi bi-check2-circle me-1"></i> Save Event
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT EVENT MODAL -->
+    <div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
+                    <h5 class="modal-title fw-bold" id="editEventModalLabel">
+                        <i class="bi bi-pencil-square me-2 text-warning"></i> Edit Community Event
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" id="editEventForm" action="">
+                    {% csrf_token %}
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-dark">Event Title <span class="text-danger">*</span></label>
+                                <input type="text" name="title" id="editEventTitle" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Category <span class="text-danger">*</span></label>
+                                <select name="category" id="editEventCategory" class="form-select" required>
+                                    <option value="Cultural & Heritage">Cultural & Heritage</option>
+                                    <option value="Networking & Tech">Networking & Tech</option>
+                                    <option value="Family & Outdoors">Family & Outdoors</option>
+                                    <option value="Culinary & Social">Culinary & Social</option>
+                                    <option value="Community Gathering">Community Gathering</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Location / Venue <span class="text-danger">*</span></label>
+                                <input type="text" name="location" id="editEventLocation" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Start Date <span class="text-danger">*</span></label>
+                                <input type="date" name="start_date" id="editEventStartDate" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">Start Time <span class="text-danger">*</span></label>
+                                <input type="time" name="start_time" id="editEventStartTime" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">End Date <span class="text-muted fw-normal">(Optional)</span></label>
+                                <input type="date" name="end_date" id="editEventEndDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-dark">End Time <span class="text-muted fw-normal">(Optional)</span></label>
+                                <input type="time" name="end_time" id="editEventEndTime" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-dark">Google Maps / Location Link <span class="text-muted fw-normal">(Optional)</span></label>
+                                <input type="url" name="location_url" id="editEventLocUrl" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-dark">Event Description <span class="text-danger">*</span></label>
+                                <textarea name="description" id="editEventDesc" class="form-control" rows="3" required></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-0 px-4 py-3">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
+                            <i class="bi bi-check2-circle me-1"></i> Update Event
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE EVENT MODAL -->
+    <div class="modal fade" id="deleteEventModal" tabindex="-1" aria-labelledby="deleteEventModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+                <div class="modal-header text-white bg-danger">
+                    <h5 class="modal-title fw-bold" id="deleteEventModalLabel">
+                        <i class="bi bi-trash3-fill me-2"></i> Delete Community Event
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" id="deleteEventForm" action="">
+                    {% csrf_token %}
+                    <div class="modal-body p-4 text-center">
+                        <div class="mb-3">
+                            <i class="bi bi-exclamation-octagon-fill text-danger" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-2">Are you sure?</h5>
+                        <p class="text-muted small mb-0">
+                            You are about to delete <strong id="deleteEventTitle" class="text-dark"></strong>. This action will deactivate the event and sync the removal with Google Sheets and the audit log.
+                        </p>
+                    </div>
+                    <div class="modal-footer bg-light border-0 px-4 py-3 justify-content-center">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger rounded-pill px-4">
+                            <i class="bi bi-trash3 me-1"></i> Yes, Delete Event
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- BROADCAST EVENT MODAL -->
+    <div class="modal fade" id="broadcastModal" tabindex="-1" aria-labelledby="broadcastModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+                    <h5 class="modal-title fw-bold" id="broadcastModalLabel">
+                        <i class="bi bi-megaphone-fill me-2"></i> Broadcast Event Announcement
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="{% url 'event_broadcast' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="event_id" id="bcastEventId">
+                    <input type="hidden" name="event_title" id="bcastEventTitle">
+                    <input type="hidden" name="date_formatted" id="bcastEventDate">
+                    <input type="hidden" name="time_formatted" id="bcastEventTime">
+                    <input type="hidden" name="location" id="bcastEventLocation">
+                    <input type="hidden" name="location_url" id="bcastEventLocUrl">
+                    <input type="hidden" name="category" id="bcastEventCategory">
+                    <input type="hidden" name="description" id="bcastEventDesc">
+                    <input type="hidden" name="google_calendar_link" id="bcastEventGcal">
+
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info border-0 d-flex align-items-start gap-2 mb-3" style="background-color: #e0f2fe; color: #0369a1; border-radius: 12px;">
+                            <i class="bi bi-info-circle-fill fs-5 mt-1"></i>
+                            <div class="small">
+                                <strong>Ready to notify the community?</strong><br>
+                                This will send a rich HTML announcement email to all <strong>{{ total_members_count }} registered community members</strong> with Google Maps directions, 'Add to Calendar' button, and personalized 1-click RSVP action links.
+                            </div>
+                        </div>
+
+                        <div class="bg-light p-3 rounded-3 border mb-3">
+                            <div class="text-muted small text-uppercase fw-bold mb-1" id="bcastPreviewCategory">Category</div>
+                            <h5 class="fw-bold text-dark mb-2" id="bcastPreviewTitle">Event Title</h5>
+                            <div class="small text-secondary mb-1">
+                                <i class="bi bi-calendar-date text-primary me-2"></i> <span id="bcastPreviewDate">Date</span> &bull; <span id="bcastPreviewTime">Time</span>
+                            </div>
+                            <div class="small text-secondary">
+                                <i class="bi bi-geo-alt text-danger me-2"></i> <span id="bcastPreviewLocation">Location</span>
+                            </div>
+                        </div>
+
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-shield-check text-success me-1"></i> This broadcast will be logged to the official <strong>MembershipAuditLog</strong> and synchronized with Google Sheets.
+                        </p>
+                    </div>
+
+                    <div class="modal-footer bg-light border-0 px-4 py-3">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+                            <i class="bi bi-send-fill me-1"></i> Send Announcement Email
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- EVENT DETAILS MODAL -->
     <div class="modal fade" id="eventDetailModal" tabindex="-1" aria-labelledby="eventDetailModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
@@ -374,13 +893,42 @@
                     <h6 class="fw-bold text-dark mb-2">About This Event</h6>
                     <p class="text-muted small mb-4" id="modalEventDescription" style="line-height: 1.6;"></p>
 
-                    <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                    <!-- Modal RSVP Box -->
+                    <div class="p-3 bg-light rounded-3 border mb-4" id="modalRsvpContainer">
+                        <div class="small fw-bold text-dark mb-2">🎟️ Your Attendance (RSVP)</div>
+                        <div class="rsvp-btn-group w-100 justify-content-between" id="modalRsvpBtnGroup" data-event-id="" data-event-title="">
+                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="going">
+                                <i class="bi bi-check-circle-fill"></i> Going
+                            </button>
+                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="maybe">
+                                <i class="bi bi-question-circle-fill"></i> Maybe
+                            </button>
+                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="declined">
+                                <i class="bi bi-x-circle-fill"></i> Can't Go
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <a id="modalEventGcalLink" href="#" target="_blank" rel="noopener" class="btn btn-google py-2 px-3 rounded-pill fw-semibold">
-                            <i class="bi bi-google me-1 text-primary"></i> Add to Google Calendar
+                            <i class="bi bi-google me-1 text-primary"></i> Add to Calendar
                         </a>
-                        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING TOAST NOTIFICATION -->
+    <div class="toast-container rsvp-toast">
+        <div id="rsvpLiveToast" class="toast align-items-center text-white bg-dark border-0 shadow-lg rounded-4" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body d-flex align-items-center gap-2 py-3 px-3">
+                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                    <span id="rsvpToastText">RSVP confirmed!</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
     </div>
@@ -391,25 +939,35 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Interactive Calendar Logic & Search -->
+    <!-- Interactive Calendar Logic, RSVP & Search -->
     <script>
     document.addEventListener("DOMContentLoaded", function() {
         const eventsData = JSON.parse(document.getElementById("eventsJsonData").textContent || "[]");
-        
+        const memberName = "{{ member_name|default:'You'|escapejs }}";
+
+        // Toast instance
+        const toastEl = document.getElementById("rsvpLiveToast");
+        const rsvpToast = new bootstrap.Toast(toastEl, { delay: 3500 });
+
+        function showRsvpToast(msg) {
+            document.getElementById("rsvpToastText").textContent = msg;
+            rsvpToast.show();
+        }
+
         // --- View Switching (List vs Calendar Grid) ---
         const btnViewList = document.getElementById("btnViewList");
         const btnViewCalendar = document.getElementById("btnViewCalendar");
         const eventsListView = document.getElementById("eventsListView");
         const eventsCalendarView = document.getElementById("eventsCalendarView");
 
-        btnViewList.addEventListener("click", () => {
+        btnViewList?.addEventListener("click", () => {
             btnViewList.classList.add("active");
             btnViewCalendar.classList.remove("active");
             eventsListView.classList.remove("d-none");
             eventsCalendarView.classList.add("d-none");
         });
 
-        btnViewCalendar.addEventListener("click", () => {
+        btnViewCalendar?.addEventListener("click", () => {
             btnViewCalendar.classList.add("active");
             btnViewList.classList.remove("active");
             eventsListView.classList.add("d-none");
@@ -452,7 +1010,7 @@
             }
         }
 
-        searchInput.addEventListener("input", filterEvents);
+        searchInput?.addEventListener("input", filterEvents);
 
         categoryButtons.forEach(btn => {
             btn.addEventListener("click", function() {
@@ -471,26 +1029,213 @@
             filterEvents();
         });
 
+        // --- Organizer Event Creation, Edit & Delete ---
+        const createStartDateInput = document.getElementById("createEventStartDate");
+        if (createStartDateInput && !createStartDateInput.value) {
+            const today = new Date().toISOString().split("T")[0];
+            createStartDateInput.value = today;
+        }
+
+        const editEventModalEl = document.getElementById("editEventModal");
+        const editEventModal = editEventModalEl ? new bootstrap.Modal(editEventModalEl) : null;
+        const editEventForm = document.getElementById("editEventForm");
+
+        document.querySelectorAll(".btn-open-edit-event").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const d = this.dataset;
+                if (!editEventForm) return;
+                editEventForm.action = `/events/${d.eventId}/edit/`;
+                document.getElementById("editEventTitle").value = d.title || "";
+                document.getElementById("editEventCategory").value = d.category || "Community Gathering";
+                document.getElementById("editEventLocation").value = d.location || "";
+                document.getElementById("editEventStartDate").value = d.startDate || "";
+                document.getElementById("editEventStartTime").value = d.startTime || "18:00";
+                document.getElementById("editEventEndDate").value = d.endDate || "";
+                document.getElementById("editEventEndTime").value = d.endTime || "";
+                document.getElementById("editEventLocUrl").value = d.locurl || "";
+                document.getElementById("editEventDesc").value = d.desc || "";
+                editEventModal?.show();
+            });
+        });
+
+        const deleteEventModalEl = document.getElementById("deleteEventModal");
+        const deleteEventModal = deleteEventModalEl ? new bootstrap.Modal(deleteEventModalEl) : null;
+        const deleteEventForm = document.getElementById("deleteEventForm");
+
+        document.querySelectorAll(".btn-open-delete-event").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const d = this.dataset;
+                if (!deleteEventForm) return;
+                deleteEventForm.action = `/events/${d.eventId}/delete/`;
+                document.getElementById("deleteEventTitle").textContent = `"${d.title}"`;
+                deleteEventModal?.show();
+            });
+        });
+
+        // --- Organizer Broadcast Modal Trigger ---
+        const broadcastModalEl = document.getElementById("broadcastModal");
+        const broadcastModal = broadcastModalEl ? new bootstrap.Modal(broadcastModalEl) : null;
+
+        document.querySelectorAll(".btn-open-broadcast").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const d = this.dataset;
+                document.getElementById("bcastEventId").value = d.eventId || "";
+                document.getElementById("bcastEventTitle").value = d.title || "";
+                document.getElementById("bcastEventDate").value = d.date || "";
+                document.getElementById("bcastEventTime").value = d.time || "";
+                document.getElementById("bcastEventLocation").value = d.location || "";
+                document.getElementById("bcastEventLocUrl").value = d.locurl || "";
+                document.getElementById("bcastEventCategory").value = d.category || "";
+                document.getElementById("bcastEventDesc").value = d.desc || "";
+                document.getElementById("bcastEventGcal").value = d.gcal || "";
+
+                document.getElementById("bcastPreviewTitle").textContent = d.title || "Evento";
+                document.getElementById("bcastPreviewCategory").textContent = d.category || "Comunidad";
+                document.getElementById("bcastPreviewDate").textContent = d.date || "";
+                document.getElementById("bcastPreviewTime").textContent = d.time || "";
+                document.getElementById("bcastPreviewLocation").textContent = d.location || "";
+
+                broadcastModal?.show();
+            });
+        });
+
+        // --- Interactive AJAX RSVP Mechanism ---
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        async function submitRSVP(eventId, eventTitle, status, triggeringBtnGroup) {
+            const formData = new FormData();
+            formData.append("event_id", eventId);
+            formData.append("event_title", eventTitle);
+            formData.append("status", status);
+            formData.append("ajax", "1");
+
+            try {
+                const response = await fetch("{% url 'event_rsvp' %}", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": getCookie("csrftoken"),
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        // Update button groups for this event everywhere (card and modal)
+                        document.querySelectorAll(`.rsvp-btn-group[data-event-id="${eventId}"]`).forEach(group => {
+                            group.querySelectorAll(".btn-rsvp-pill").forEach(b => {
+                                b.classList.remove("active-going", "active-maybe", "active-declined");
+                                if (b.getAttribute("data-status") === status) {
+                                    b.classList.add(`active-${status}`);
+                                }
+                            });
+                        });
+
+                        // Update card attendee counter and attendee chip list
+                        const eventCard = document.getElementById(`event-card-${eventId}`);
+                        if (eventCard) {
+                            const goingBadge = eventCard.querySelector(".going-count-badge");
+                            if (goingBadge) goingBadge.textContent = data.going_count;
+
+                            const chipsContainer = eventCard.querySelector(".attendees-chips-container");
+                            if (chipsContainer && data.attendees) {
+                                if (data.attendees.length > 0) {
+                                    chipsContainer.innerHTML = data.attendees.map(name => `<span class="attendee-pill">${name}</span>`).join(" ");
+                                } else {
+                                    chipsContainer.innerHTML = `<span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>`;
+                                }
+                            }
+                        }
+
+                        const statusDisplayNames = {
+                            'going': '✅ Going / ¡Confirmado!',
+                            'maybe': '🟡 Maybe / Tal vez',
+                            'declined': '❌ Not Going / No podré'
+                        };
+                        showRsvpToast(`RSVP updated: ${statusDisplayNames[status] || status}`);
+                    }
+                }
+            } catch (err) {
+                console.error("RSVP Error:", err);
+            }
+        }
+
+        document.addEventListener("click", function(e) {
+            const rsvpBtn = e.target.closest(".rsvp-trigger-btn");
+            if (rsvpBtn) {
+                const group = rsvpBtn.closest(".rsvp-btn-group");
+                if (group) {
+                    const eventId = group.getAttribute("data-event-id");
+                    const eventTitle = group.getAttribute("data-event-title");
+                    const status = rsvpBtn.getAttribute("data-status");
+                    submitRSVP(eventId, eventTitle, status, group);
+                }
+            }
+        });
+
         // --- Modal Event Details ---
-        const modal = new bootstrap.Modal(document.getElementById("eventDetailModal"));
+        const detailModal = new bootstrap.Modal(document.getElementById("eventDetailModal"));
         const detailButtons = document.querySelectorAll(".view-details-btn");
 
         function openModalForEvent(evt) {
-            document.getElementById("modalEventHeading").textContent = evt.title;
-            document.getElementById("modalEventCategory").textContent = evt.category;
-            document.getElementById("modalEventDate").textContent = evt.date_formatted || evt.date;
-            document.getElementById("modalEventTime").textContent = evt.time_formatted || evt.time;
-            document.getElementById("modalEventLocation").textContent = evt.location;
-            document.getElementById("modalEventLocUrl").href = evt.location_url || evt.locurl;
-            document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexitas Events";
-            document.getElementById("modalEventDescription").textContent = evt.description || evt.desc;
-            document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal;
-            modal.show();
+            const eventId = evt.id || evt.dataset?.id || "";
+            const eventTitle = evt.title || "";
+            const myRsvp = evt.my_rsvp || evt.myRsvp || evt.dataset?.myRsvp || "";
+
+            document.getElementById("modalEventHeading").textContent = eventTitle;
+            document.getElementById("modalEventCategory").textContent = evt.category || "";
+            document.getElementById("modalEventDate").textContent = evt.date_formatted || evt.date || "";
+            document.getElementById("modalEventTime").textContent = evt.time_formatted || evt.time || "";
+            document.getElementById("modalEventLocation").textContent = evt.location || "";
+            document.getElementById("modalEventLocUrl").href = evt.location_url || evt.locurl || "#";
+            document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexitas Community";
+            document.getElementById("modalEventDescription").textContent = evt.description || evt.desc || "";
+            document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal || "#";
+
+            // Configure modal RSVP button group
+            const modalRsvpGroup = document.getElementById("modalRsvpBtnGroup");
+            modalRsvpGroup.setAttribute("data-event-id", eventId);
+            modalRsvpGroup.setAttribute("data-event-title", eventTitle);
+
+            modalRsvpGroup.querySelectorAll(".btn-rsvp-pill").forEach(b => {
+                b.classList.remove("active-going", "active-maybe", "active-declined");
+                if (b.getAttribute("data-status") === myRsvp) {
+                    b.classList.add(`active-${myRsvp}`);
+                }
+            });
+
+            detailModal.show();
         }
 
         detailButtons.forEach(btn => {
             btn.addEventListener("click", function() {
-                openModalForEvent(this.dataset);
+                openModalForEvent({
+                    id: this.dataset.id,
+                    title: this.dataset.title,
+                    date_formatted: this.dataset.date,
+                    time_formatted: this.dataset.time,
+                    location: this.dataset.location,
+                    location_url: this.dataset.locurl,
+                    category: this.dataset.category,
+                    description: this.dataset.desc,
+                    organizer: this.dataset.organizer,
+                    google_calendar_link: this.dataset.gcal,
+                    my_rsvp: this.dataset.myRsvp,
+                });
             });
         });
 
@@ -573,17 +1318,17 @@
             }
         }
 
-        document.getElementById("btnCalPrev").addEventListener("click", () => {
+        document.getElementById("btnCalPrev")?.addEventListener("click", () => {
             currentCalDate.setMonth(currentCalDate.getMonth() - 1);
             renderCalendarMonth();
         });
 
-        document.getElementById("btnCalNext").addEventListener("click", () => {
+        document.getElementById("btnCalNext")?.addEventListener("click", () => {
             currentCalDate.setMonth(currentCalDate.getMonth() + 1);
             renderCalendarMonth();
         });
 
-        document.getElementById("btnCalToday").addEventListener("click", () => {
+        document.getElementById("btnCalToday")?.addEventListener("click", () => {
             currentCalDate = new Date();
             renderCalendarMonth();
         });

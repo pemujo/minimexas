@@ -452,3 +452,248 @@ MiniMexitas Portal Bot
         return False
 
 
+from django.core import signing
+
+RSVP_SALT = "minimexitas.event.rsvp.token.salt"
+
+
+def generate_event_rsvp_token(event_id: str, email: str, status: str) -> str:
+    """
+    Generates a secure, signed token for 1-click email RSVP actions.
+    """
+    payload = {
+        'event_id': str(event_id).strip(),
+        'email': str(email).strip().lower(),
+        'status': str(status).strip().lower(),
+    }
+    return signing.dumps(payload, salt=RSVP_SALT)
+
+
+def verify_event_rsvp_token(token: str, max_age: int = 86400 * 60):
+    """
+    Verifies and unpacks a signed RSVP token.
+    Returns payload dict or None if invalid/expired.
+    """
+    try:
+        payload = signing.loads(token, salt=RSVP_SALT, max_age=max_age)
+        return payload
+    except Exception as e:
+        logger.warning(f"Invalid or expired RSVP token: {e}")
+        return None
+
+
+def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, broadcast_by_email: str = None, request = None) -> int:
+    """
+    Broadcasts a rich event announcement email to all active, verified community members.
+    Includes full event details, Google Maps link, 1-click Add to Google Calendar button,
+    and personalized 1-click RSVP action links (Going, Maybe, Decline).
+    Returns total count of successfully dispatched emails.
+    """
+    from .models import MemberProfile
+
+    members = list(
+        MemberProfile.objects.exclude(email='')
+        .values('email', 'full_name')
+    )
+    if not members:
+        logger.info("No active member profiles found for event broadcast.")
+        return 0
+
+    event_id = str(event_data.get('id', '')).strip()
+    event_title = str(event_data.get('title', 'Evento de la Comunidad')).strip()
+    event_date = str(event_data.get('date_formatted') or event_data.get('date', '')).strip()
+    event_time = str(event_data.get('time_formatted') or event_data.get('time', '')).strip()
+    event_location = str(event_data.get('location', 'San Francisco Bay Area')).strip()
+    location_url = event_data.get('location_url') or event_data.get('locurl') or f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(event_location)}"
+    event_category = str(event_data.get('category', 'Comunidad')).strip()
+    event_description = str(event_data.get('description') or event_data.get('desc', '')).strip()
+    gcal_link = event_data.get('google_calendar_link') or event_data.get('gcal', '')
+
+    base_url = _resolve_base_portal_url(request=request)
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'MiniMexitas Community <no-reply@minimexitas.org>')
+    subject = f"🎉 Nuevo Evento MiniMexitas: {event_title}"
+
+    sent_count = 0
+
+    for m in members:
+        member_email = m.get('email', '').strip().lower()
+        if not member_email or '@' not in member_email:
+            continue
+        member_name = m.get('full_name', '').strip() or "Miembro"
+
+        # Generate unique 1-click RSVP action links for this member
+        token_going = generate_event_rsvp_token(event_id, member_email, 'going')
+        token_maybe = generate_event_rsvp_token(event_id, member_email, 'maybe')
+        token_declined = generate_event_rsvp_token(event_id, member_email, 'declined')
+
+        base_rsvp_endpoint = f"{base_url}/events/rsvp/" if base_url else "/events/rsvp/"
+        rsvp_url_going = f"{base_rsvp_endpoint}?token={token_going}"
+        rsvp_url_maybe = f"{base_rsvp_endpoint}?token={token_maybe}"
+        rsvp_url_declined = f"{base_rsvp_endpoint}?token={token_declined}"
+        portal_events_url = f"{base_url}/events/" if base_url else "/events/"
+
+        plain_text_content = f"""¡Hola {member_name}!
+
+Hay un nuevo evento programado para la comunidad de MiniMexitas en el Área de la Bahía:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 {event_title}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 Fecha: {event_date}
+⏰ Horario: {event_time}
+📍 Ubicación: {event_location}
+🗺️ Ver en Google Maps: {location_url}
+🏷️ Categoría: {event_category}
+
+Detalles del Evento:
+{event_description if event_description else "Acompáñanos a convivir y compartir con la comunidad."}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎟️ CONFIRMA TU ASISTENCIA (1-Click RSVP):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• ✅ ¡Sí, Asistiré! (Going): {rsvp_url_going}
+• 🟡 Tal Vez (Maybe): {rsvp_url_maybe}
+• ❌ No Podré (Declined): {rsvp_url_declined}
+
+🗓️ Agregar a tu Google Calendar:
+{gcal_link}
+
+Ver todos los eventos y detalles en el portal:
+{portal_events_url}
+
+¡Esperamos verte pronto!
+Equipo de MiniMexitas
+"""
+
+        html_content = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{event_title} - MiniMexitas</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }}
+    .container {{ max-width: 600px; margin: 24px auto; background-color: #ffffff; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.05); }}
+    .header {{ background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0369a1 100%); padding: 36px 28px; text-align: center; color: #ffffff; }}
+    .header-badge {{ display: inline-block; background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 50px; padding: 6px 16px; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 12px; }}
+    .header h1 {{ margin: 0; font-size: 26px; font-weight: 800; line-height: 1.25; }}
+    .content {{ padding: 32px 28px; }}
+    .greeting {{ font-size: 17px; font-weight: 600; color: #0f172a; margin-bottom: 16px; }}
+    .event-card {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; margin: 20px 0; }}
+    .meta-row {{ display: flex; margin-bottom: 12px; font-size: 14px; align-items: flex-start; }}
+    .meta-icon {{ font-size: 16px; margin-right: 10px; min-width: 22px; }}
+    .meta-label {{ font-weight: 700; color: #334155; margin-right: 6px; }}
+    .meta-val {{ color: #0f172a; }}
+    .desc-box {{ margin-top: 16px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 14px; line-height: 1.6; color: #475569; }}
+    
+    /* RSVP Box */
+    .rsvp-section {{ background: linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 16px; padding: 24px 20px; margin: 28px 0; text-align: center; }}
+    .rsvp-title {{ font-size: 16px; font-weight: 800; color: #14532d; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }}
+    .rsvp-subtitle {{ font-size: 13px; color: #166534; margin-bottom: 18px; }}
+    .rsvp-buttons {{ display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }}
+    .btn-rsvp {{ display: inline-block; padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; text-align: center; transition: transform 0.1s ease; }}
+    .btn-going {{ background-color: #16a34a; color: #ffffff !important; box-shadow: 0 4px 10px rgba(22,163,74,0.3); }}
+    .btn-maybe {{ background-color: #f59e0b; color: #ffffff !important; box-shadow: 0 4px 10px rgba(245,158,11,0.3); }}
+    .btn-declined {{ background-color: #64748b; color: #ffffff !important; }}
+
+    /* Secondary Action */
+    .secondary-actions {{ text-align: center; margin: 24px 0 10px; }}
+    .btn-cal {{ display: inline-block; background-color: #0284c7; color: #ffffff !important; font-size: 14px; font-weight: 600; text-decoration: none; padding: 10px 22px; border-radius: 50px; margin: 0 6px 8px; }}
+    .btn-portal {{ display: inline-block; background-color: #ffffff; color: #334155 !important; border: 1px solid #cbd5e1; font-size: 14px; font-weight: 600; text-decoration: none; padding: 10px 22px; border-radius: 50px; margin: 0 6px 8px; }}
+
+    .footer {{ background-color: #0f172a; color: #94a3b8; padding: 24px; text-align: center; font-size: 12px; line-height: 1.5; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-badge">📅 {event_category}</div>
+      <h1>{event_title}</h1>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">¡Hola {member_name}!</div>
+      <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-top: 0;">
+        Te invitamos a participar en el próximo evento organizado para los miembros de <strong>MiniMexitas</strong> en el Área de la Bahía.
+      </p>
+
+      <!-- Event Details Card -->
+      <div class="event-card">
+        <div class="meta-row">
+          <span class="meta-icon">📅</span>
+          <div><span class="meta-label">Fecha:</span> <span class="meta-val">{event_date}</span></div>
+        </div>
+        <div class="meta-row">
+          <span class="meta-icon">⏰</span>
+          <div><span class="meta-label">Horario:</span> <span class="meta-val">{event_time}</span></div>
+        </div>
+        <div class="meta-row">
+          <span class="meta-icon">📍</span>
+          <div>
+            <span class="meta-label">Lugar:</span> 
+            <span class="meta-val">{event_location}</span>
+            <div style="margin-top: 4px;">
+              <a href="{location_url}" target="_blank" style="color: #0284c7; text-decoration: none; font-size: 13px; font-weight: 600;">🗺️ Ver mapa en Google Maps &rarr;</a>
+            </div>
+          </div>
+        </div>
+
+        {f'<div class="desc-box"><strong>Detalles:</strong><br>{event_description}</div>' if event_description else ''}
+      </div>
+
+      <!-- 1-Click RSVP Box -->
+      <div class="rsvp-section">
+        <div class="rsvp-title">🎟️ ¿Nos acompañas? Confirma tu asistencia</div>
+        <div class="rsvp-subtitle">Haz clic en una opción para responder directamente con 1 solo clic:</div>
+        
+        <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+          <tr>
+            <td style="padding: 5px;">
+              <a href="{rsvp_url_going}" class="btn-rsvp btn-going" style="display: block;">✅ ¡Sí Asistiré!</a>
+            </td>
+            <td style="padding: 5px;">
+              <a href="{rsvp_url_maybe}" class="btn-rsvp btn-maybe" style="display: block;">🟡 Tal Vez</a>
+            </td>
+            <td style="padding: 5px;">
+              <a href="{rsvp_url_declined}" class="btn-rsvp btn-declined" style="display: block;">❌ No Podré</a>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Calendar & Portal Actions -->
+      <div class="secondary-actions">
+        {f'<a href="{gcal_link}" target="_blank" class="btn-cal">🗓️ Agregar a Google Calendar</a>' if gcal_link else ''}
+        <a href="{portal_events_url}" class="btn-portal">Ver Evento en el Portal</a>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      <p style="margin: 0 0 4px 0;"><strong>MiniMexitas Community</strong> • San Francisco Bay Area</p>
+      <p style="margin: 0;">Recibes esta notificación como miembro activo y registrado del portal de la comunidad.</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+        try:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_text_content,
+                from_email=from_email,
+                to=[member_email]
+            )
+            msg.attach_alternative(html_content, "text/html")
+            msg.send(fail_silently=False)
+            sent_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to dispatch event broadcast email to {member_email}: {e}")
+
+    logger.info(f"Event broadcast '{event_title}' sent to {sent_count}/{len(members)} members.")
+    return sent_count
+
+
+

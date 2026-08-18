@@ -4,9 +4,10 @@ from functools import wraps
 import requests
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Count
-from django.http import HttpResponse
+from django.db.models import Count, Q
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from urllib.parse import quote_plus
 from django.urls import reverse
 from django.utils import timezone
 from .sheets import (
@@ -17,15 +18,32 @@ from .sheets import (
     sync_audit_log_to_google_sheet,
     sync_survey_to_google_sheet,
     delete_survey_from_google_sheet,
+    sync_event_rsvp_to_google_sheet,
+    sync_community_event_to_google_sheet,
+    delete_community_event_from_google_sheet,
     delete_profile_from_google_sheet,
     reconcile_members_with_google_sheet,
 )
 from .auth_helpers import is_gmail_allowed
-from .models import MemberProfile, MembershipRequest, MembershipAuditLog, CommunitySurvey, SurveyOption, SurveyVote
+from .models import (
+    MemberProfile,
+    MembershipRequest,
+    MembershipAuditLog,
+    CommunitySurvey,
+    SurveyOption,
+    SurveyVote,
+    CommunityEvent,
+    CommunityEventRSVP,
+    CommunityEventBroadcast,
+)
+from .calendar_sync import get_google_calendar_add_url, CACHE_KEY_EVENTS
 from .notifications import (
     send_membership_approval_email,
     send_membership_rejection_email,
     send_admin_new_request_notification,
+    send_event_broadcast_email,
+    verify_event_rsvp_token,
+    generate_event_rsvp_token,
     build_whatsapp_approval_link,
     build_whatsapp_decline_link,
 )
@@ -268,12 +286,48 @@ def notes_list_view(request):
 
 from .calendar_sync import fetch_community_events
 import json
+import datetime
 
 
 @member_required
 def events_view(request):
     force_refresh = request.GET.get('refresh') == '1'
     all_events = fetch_community_events(force_refresh=force_refresh)
+
+    member_email = request.session.get('member_email', '').strip().lower()
+    member_name = request.session.get('member_name', 'Member')
+    is_admin = request.session.get('is_admin', False)
+
+    # Fetch all RSVPs and Broadcast records from database
+    all_rsvps = list(CommunityEventRSVP.objects.all())
+    broadcast_map = {b.event_id: b for b in CommunityEventBroadcast.objects.all()}
+    total_members_count = MemberProfile.objects.exclude(email='').count()
+
+    # Organize RSVPs by event_id
+    rsvps_by_event = {}
+    for r in all_rsvps:
+        rsvps_by_event.setdefault(str(r.event_id), []).append(r)
+
+    # Enrich all events with RSVP & broadcast metadata
+    for e in all_events:
+        e_id = str(e.get('id', ''))
+        e_rsvps = rsvps_by_event.get(e_id, [])
+        going_list = [r for r in e_rsvps if r.status == CommunityEventRSVP.STATUS_GOING]
+        maybe_list = [r for r in e_rsvps if r.status == CommunityEventRSVP.STATUS_MAYBE]
+        declined_list = [r for r in e_rsvps if r.status == CommunityEventRSVP.STATUS_DECLINED]
+
+        my_rsvp_obj = next((r for r in e_rsvps if r.member_email.lower() == member_email), None)
+        broadcast_obj = broadcast_map.get(e_id)
+
+        e['going_count'] = len(going_list)
+        e['maybe_count'] = len(maybe_list)
+        e['declined_count'] = len(declined_list)
+        e['total_rsvps'] = len(e_rsvps)
+        e['attendees'] = [r.member_name for r in going_list if r.member_name]
+        e['my_rsvp'] = my_rsvp_obj.status if my_rsvp_obj else None
+        e['my_rsvp_notes'] = my_rsvp_obj.notes if my_rsvp_obj else ''
+        e['broadcast_info'] = broadcast_obj
+        e['is_broadcasted'] = broadcast_obj is not None
 
     upcoming_events = [e for e in all_events if not e.get('is_past')]
     past_events = [e for e in all_events if e.get('is_past')]
@@ -284,6 +338,8 @@ def events_view(request):
     # Prepare JSON serializable events for client-side interactive calendar navigation
     events_payload = []
     for e in all_events:
+        start_dt = e.get("start_datetime")
+        end_dt = e.get("end_datetime")
         events_payload.append({
             "id": e["id"],
             "title": e["title"],
@@ -299,7 +355,23 @@ def events_view(request):
             "organizer": e["organizer"],
             "google_calendar_link": e["google_calendar_link"],
             "is_past": e.get("is_past", False),
+            "going_count": e.get("going_count", 0),
+            "my_rsvp": e.get("my_rsvp"),
+            "is_broadcasted": e.get("is_broadcasted", False),
+            "is_portal_event": e.get("is_portal_event", False),
+            "portal_event_pk": e.get("portal_event_pk"),
+            "source": e.get("source", "portal" if e.get("is_portal_event") else "google_calendar"),
+            "start_date_input": start_dt.strftime("%Y-%m-%d") if hasattr(start_dt, 'strftime') else "",
+            "start_time_input": start_dt.strftime("%H:%M") if hasattr(start_dt, 'strftime') else "",
+            "end_date_input": end_dt.strftime("%Y-%m-%d") if hasattr(end_dt, 'strftime') else "",
+            "end_time_input": end_dt.strftime("%H:%M") if hasattr(end_dt, 'strftime') else "",
         })
+
+    # Flash / status messages
+    rsvp_msg = request.session.pop('rsvp_flash_message', None)
+    broadcast_msg = request.session.pop('broadcast_flash_message', None)
+    event_flash_msg = request.session.pop('event_flash_message', None)
+    event_error_msg = request.session.pop('event_error_message', None)
 
     return render(request, 'recommendations/events.html', {
         'events': upcoming_events,
@@ -308,8 +380,464 @@ def events_view(request):
         'all_events': all_events,
         'events_payload': events_payload,
         'events_json': json.dumps(events_payload),
-        'member_name': request.session.get('member_name', 'Member')
+        'member_name': member_name,
+        'member_email': member_email,
+        'is_admin': is_admin,
+        'total_members_count': total_members_count,
+        'rsvp_flash_message': rsvp_msg,
+        'broadcast_flash_message': broadcast_msg,
+        'event_flash_message': event_flash_msg,
+        'event_error_message': event_error_msg,
     })
+
+
+def event_rsvp_view(request):
+    """
+    Handles RSVP submissions from both in-app UI buttons/modals and 1-click signed email links.
+    Dual-syncs response to Google Sheet 'Event_RSVPs' tab.
+    """
+    token = request.GET.get('token')
+
+    # Path 1: 1-Click RSVP token from email link
+    if token:
+        payload = verify_event_rsvp_token(token)
+        if not payload:
+            return render(request, 'recommendations/login.html', {
+                'error': 'The RSVP link is invalid or has expired. Please log in to view and respond to the event.'
+            })
+
+        event_id = payload.get('event_id')
+        member_email = payload.get('email', '').strip().lower()
+        status = payload.get('status', 'going').strip().lower()
+
+        # Find member name from MemberProfile
+        profile = MemberProfile.objects.filter(email__iexact=member_email).first()
+        member_name = profile.full_name if profile else member_email.split('@')[0].capitalize()
+
+        # Try to resolve event title from calendar cache/fetch
+        all_events = fetch_community_events()
+        event_match = next((e for e in all_events if str(e.get('id')) == str(event_id)), None)
+        event_title = event_match.get('title', 'Community Event') if event_match else ''
+
+        rsvp_obj, created = CommunityEventRSVP.objects.update_or_create(
+            event_id=event_id,
+            member_email=member_email,
+            defaults={
+                'event_title': event_title,
+                'member_name': member_name,
+                'status': status,
+            }
+        )
+
+        # Dual-sync to Google Sheet
+        try:
+            sync_event_rsvp_to_google_sheet(rsvp_obj)
+        except Exception as e:
+            logger.warning(f"Failed to sync RSVP to Google Sheet: {e}")
+
+        # Automatically log user into member session if profile exists
+        if profile:
+            request.session['is_verified_member'] = True
+            request.session['member_email'] = profile.email
+            request.session['member_name'] = profile.full_name
+            request.session['is_admin'] = profile.is_admin
+
+        status_text = {
+            'going': '¡Confirmado! Asistirás al evento.',
+            'maybe': 'Respuesta registrada: Tal vez asistas.',
+            'declined': 'Respuesta registrada: No podrás asistir.',
+        }.get(status, f'Respuesta registrada ({status}).')
+
+        request.session['rsvp_flash_message'] = f"🎟️ {status_text} ({event_title or 'Evento'})"
+        return redirect('events')
+
+    # Path 2: In-app Authenticated RSVP POST
+    if request.method == 'POST':
+        if not is_authenticated_member(request):
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == '1':
+                return JsonResponse({'success': False, 'error': 'Authentication required'}, status=401)
+            return redirect('login_page')
+
+        member_email = request.session.get('member_email', '').strip().lower()
+        member_name = request.session.get('member_name', 'Member')
+
+        event_id = request.POST.get('event_id', '').strip()
+        event_title = request.POST.get('event_title', '').strip()
+        status = request.POST.get('status', 'going').strip().lower()
+        notes = request.POST.get('notes', '').strip()
+
+        if not event_id or status not in [CommunityEventRSVP.STATUS_GOING, CommunityEventRSVP.STATUS_MAYBE, CommunityEventRSVP.STATUS_DECLINED]:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == '1':
+                return JsonResponse({'success': False, 'error': 'Invalid event or status'}, status=400)
+            return redirect('events')
+
+        rsvp_obj, created = CommunityEventRSVP.objects.update_or_create(
+            event_id=event_id,
+            member_email=member_email,
+            defaults={
+                'event_title': event_title,
+                'member_name': member_name,
+                'status': status,
+                'notes': notes,
+            }
+        )
+
+        # Dual-sync to Google Sheet
+        try:
+            sync_event_rsvp_to_google_sheet(rsvp_obj)
+        except Exception as e:
+            logger.warning(f"Failed to sync RSVP to Google Sheet: {e}")
+
+        # Compute updated stats for AJAX response
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == '1':
+            event_rsvps = CommunityEventRSVP.objects.filter(event_id=event_id)
+            going_list = [r.member_name for r in event_rsvps if r.status == CommunityEventRSVP.STATUS_GOING and r.member_name]
+            return JsonResponse({
+                'success': True,
+                'status': status,
+                'status_display': rsvp_obj.get_status_display(),
+                'going_count': len(going_list),
+                'maybe_count': event_rsvps.filter(status=CommunityEventRSVP.STATUS_MAYBE).count(),
+                'declined_count': event_rsvps.filter(status=CommunityEventRSVP.STATUS_DECLINED).count(),
+                'attendees': going_list,
+            })
+
+        status_text = {
+            'going': '¡Confirmado! Asistirás al evento.',
+            'maybe': 'Respuesta registrada: Tal vez asistas.',
+            'declined': 'Respuesta registrada: No podrás asistir.',
+        }.get(status, f'Respuesta registrada ({status}).')
+
+        request.session['rsvp_flash_message'] = f"🎟️ {status_text} ({event_title or 'Evento'})"
+        return redirect('events')
+
+    return redirect('events')
+
+
+@admin_required
+def organizer_event_broadcast_view(request):
+    """
+    Allows organizers to broadcast an email announcement to all registered community members
+    for any community event, with 1-click RSVP action links and 'Add to Calendar' links.
+    Records an immutable entry in MembershipAuditLog and dual-syncs to Google Sheet.
+    """
+    if request.method != 'POST':
+        return redirect('events')
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    event_id = request.POST.get('event_id', '').strip()
+    event_title = request.POST.get('event_title', 'Evento Comunitario').strip()
+    date_formatted = request.POST.get('date_formatted', '').strip()
+    time_formatted = request.POST.get('time_formatted', '').strip()
+    location = request.POST.get('location', '').strip()
+    location_url = request.POST.get('location_url', '').strip()
+    category = request.POST.get('category', 'Comunidad').strip()
+    description = request.POST.get('description', '').strip()
+    gcal_link = request.POST.get('google_calendar_link', '').strip()
+
+    if not event_id:
+        return redirect('events')
+
+    event_data = {
+        'id': event_id,
+        'title': event_title,
+        'date_formatted': date_formatted,
+        'time_formatted': time_formatted,
+        'location': location,
+        'location_url': location_url,
+        'category': category,
+        'description': description,
+        'google_calendar_link': gcal_link,
+    }
+
+    sent_count = send_event_broadcast_email(
+        event_data=event_data,
+        broadcast_by_name=admin_name,
+        broadcast_by_email=admin_email,
+        request=request
+    )
+
+    # Record / Update Broadcast record
+    CommunityEventBroadcast.objects.update_or_create(
+        event_id=event_id,
+        defaults={
+            'event_title': event_title,
+            'broadcast_by': admin_name,
+            'broadcast_by_email': admin_email,
+            'recipient_count': sent_count,
+        }
+    )
+
+    # Create immutable audit log entry
+    audit_entry = MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_EVENT_BROADCAST,
+        target_name=f"Event: {event_title}",
+        target_email=f"broadcast_{event_id[:30]}",
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Broadcasted event notification to {sent_count} active community members with 1-click RSVP."
+    )
+
+    # Dual-sync audit log to Google Sheet
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync event broadcast audit log to Google Sheet: {e}")
+
+    request.session['broadcast_flash_message'] = f"📢 ¡Notificación del evento '{event_title}' enviada exitosamente a {sent_count} miembros registrados!"
+    return redirect('events')
+
+
+@admin_required
+def organizer_create_event_view(request):
+    """
+    Allows admins/organizers to create a new community event directly in the portal.
+    Dual-syncs to Google Sheet 'Events' tab, logs to MembershipAuditLog,
+    and optionally sends email broadcast to all members immediately.
+    """
+    if request.method != 'POST':
+        return redirect('events')
+
+    title = request.POST.get('title', '').strip()
+    category = request.POST.get('category', 'Community Gathering').strip()
+    start_date = request.POST.get('start_date', '').strip()
+    start_time = request.POST.get('start_time', '').strip()
+    end_date = request.POST.get('end_date', '').strip()
+    end_time = request.POST.get('end_time', '').strip()
+    location = request.POST.get('location', '').strip() or 'San Francisco Bay Area'
+    location_url = request.POST.get('location_url', '').strip()
+    description = request.POST.get('description', '').strip()
+    broadcast_now = request.POST.get('broadcast_now') in ('on', 'true', '1', True)
+
+    if not title or not start_date or not start_time:
+        request.session['event_error_message'] = "Please provide event title, date, and start time."
+        return redirect('events')
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    # Parse start and end datetimes
+    try:
+        start_str = f"{start_date} {start_time}"
+        naive_start = datetime.datetime.strptime(start_str, "%Y-%m-%d %H:%M")
+        start_dt = timezone.make_aware(naive_start) if timezone.is_naive(naive_start) else naive_start
+    except Exception as e:
+        logger.warning(f"Error parsing start datetime: {e}")
+        request.session['event_error_message'] = "Invalid start date or time format."
+        return redirect('events')
+
+    end_dt = None
+    if end_date and end_time:
+        try:
+            end_str = f"{end_date} {end_time}"
+            naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
+            end_dt = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+        except Exception:
+            end_dt = start_dt + datetime.timedelta(hours=2)
+    elif end_time:
+        try:
+            end_str = f"{start_date} {end_time}"
+            naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
+            end_dt = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+        except Exception:
+            end_dt = start_dt + datetime.timedelta(hours=2)
+    else:
+        end_dt = start_dt + datetime.timedelta(hours=2)
+
+    event = CommunityEvent.objects.create(
+        title=title,
+        category=category,
+        start_datetime=start_dt,
+        end_datetime=end_dt,
+        location=location,
+        location_url=location_url,
+        description=description,
+        created_by_name=admin_name,
+        created_by_email=admin_email,
+        is_active=True
+    )
+
+    # Invalidate events cache
+    cache.delete(CACHE_KEY_EVENTS)
+
+    # Audit log
+    audit_entry = MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_EVENT_CREATED,
+        target_name=f"Event: {event.title}",
+        target_email=f"portal_evt_{event.id}",
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Created in-portal community event '{event.title}' scheduled for {start_dt.strftime('%Y-%m-%d %H:%M')}."
+    )
+
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync event creation audit log: {e}")
+
+    try:
+        sync_community_event_to_google_sheet(event)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync new event to Google Sheet: {e}")
+
+    # If immediate broadcast requested
+    if broadcast_now:
+        event_data = {
+            'id': f"portal_{event.id}",
+            'title': event.title,
+            'date_formatted': start_dt.strftime("%A, %B %d, %Y"),
+            'time_formatted': f"{start_dt.strftime('%I:%M %p').lstrip('0')} - {end_dt.strftime('%I:%M %p').lstrip('0')}",
+            'location': event.location,
+            'location_url': event.location_url or f"https://www.google.com/maps/search/?api=1&query={quote_plus(event.location)}",
+            'category': event.category,
+            'description': event.description,
+            'google_calendar_link': get_google_calendar_add_url(event.title, start_dt, end_dt, event.description, event.location),
+        }
+        sent_count = send_event_broadcast_email(
+            event_data=event_data,
+            broadcast_by_name=admin_name,
+            broadcast_by_email=admin_email,
+            request=request
+        )
+        CommunityEventBroadcast.objects.update_or_create(
+            event_id=f"portal_{event.id}",
+            defaults={
+                'event_title': event.title,
+                'broadcast_by': admin_name,
+                'broadcast_by_email': admin_email,
+                'recipient_count': sent_count,
+            }
+        )
+        request.session['event_flash_message'] = f"🎉 ¡Evento '{event.title}' creado exitosamente y notificado a {sent_count} miembros!"
+    else:
+        request.session['event_flash_message'] = f"🎉 ¡Evento '{event.title}' creado exitosamente!"
+
+    return redirect('events')
+
+
+@admin_required
+def organizer_edit_event_view(request, event_id):
+    """
+    Allows admins/organizers to edit an existing in-portal event.
+    """
+    if request.method != 'POST':
+        return redirect('events')
+
+    event = get_object_or_404(CommunityEvent, id=event_id)
+
+    title = request.POST.get('title', '').strip()
+    category = request.POST.get('category', event.category).strip()
+    start_date = request.POST.get('start_date', '').strip()
+    start_time = request.POST.get('start_time', '').strip()
+    end_date = request.POST.get('end_date', '').strip()
+    end_time = request.POST.get('end_time', '').strip()
+    location = request.POST.get('location', '').strip()
+    location_url = request.POST.get('location_url', '').strip()
+    description = request.POST.get('description', '').strip()
+
+    if title:
+        event.title = title
+    if category:
+        event.category = category
+    if location:
+        event.location = location
+    event.location_url = location_url
+    event.description = description
+
+    if start_date and start_time:
+        try:
+            start_str = f"{start_date} {start_time}"
+            naive_start = datetime.datetime.strptime(start_str, "%Y-%m-%d %H:%M")
+            event.start_datetime = timezone.make_aware(naive_start) if timezone.is_naive(naive_start) else naive_start
+        except Exception as e:
+            logger.warning(f"Error parsing edit start datetime: {e}")
+
+    if end_date and end_time:
+        try:
+            end_str = f"{end_date} {end_time}"
+            naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
+            event.end_datetime = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+        except Exception:
+            pass
+    elif end_time and start_date:
+        try:
+            end_str = f"{start_date} {end_time}"
+            naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
+            event.end_datetime = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+        except Exception:
+            pass
+
+    event.save()
+    cache.delete(CACHE_KEY_EVENTS)
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    # Audit log
+    audit_entry = MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_EVENT_UPDATED,
+        target_name=f"Event: {event.title}",
+        target_email=f"portal_evt_{event.id}",
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Updated in-portal community event '{event.title}'."
+    )
+
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync event update audit log: {e}")
+
+    try:
+        sync_community_event_to_google_sheet(event)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync updated event to Google Sheet: {e}")
+
+    request.session['event_flash_message'] = f"✏️ Evento '{event.title}' actualizado exitosamente."
+    return redirect('events')
+
+
+@admin_required
+def organizer_delete_event_view(request, event_id):
+    """
+    Allows admins/organizers to delete/deactivate an in-portal event.
+    """
+    if request.method != 'POST':
+        return redirect('events')
+
+    event = get_object_or_404(CommunityEvent, id=event_id)
+    event_title = event.title
+    event.is_active = False
+    event.save()
+    cache.delete(CACHE_KEY_EVENTS)
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    # Audit log
+    audit_entry = MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_EVENT_DELETED,
+        target_name=f"Event: {event_title}",
+        target_email=f"portal_evt_{event.id}",
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Deactivated/deleted in-portal community event '{event_title}'."
+    )
+
+    try:
+        sync_audit_log_to_google_sheet(audit_entry)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync event deletion audit log: {e}")
+
+    try:
+        delete_community_event_from_google_sheet(event.id)
+    except Exception as e:
+        logger.warning(f"Failed to dual-sync event deletion to Google Sheet: {e}")
+
+    request.session['event_flash_message'] = f"🗑️ Evento '{event_title}' eliminado exitosamente."
+    return redirect('events')
 
 
 @member_required

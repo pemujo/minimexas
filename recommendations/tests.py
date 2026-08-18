@@ -5,7 +5,17 @@ from django.urls import reverse
 from django.core import mail
 from django.core.cache import cache
 
-from recommendations.models import MemberProfile, MembershipRequest, MembershipAuditLog, CommunitySurvey, SurveyOption, SurveyVote
+from recommendations.models import (
+    MemberProfile, 
+    MembershipRequest, 
+    MembershipAuditLog, 
+    CommunitySurvey, 
+    SurveyOption, 
+    SurveyVote,
+    CommunityEventRSVP,
+    CommunityEventBroadcast,
+    CommunityEvent,
+)
 from recommendations.auth_helpers import is_gmail_allowed
 from recommendations.sheets import (
     _normalize_record_keys,
@@ -21,6 +31,9 @@ from recommendations.sheets import (
     delete_survey_from_google_sheet,
     delete_profile_from_google_sheet,
     reconcile_members_with_google_sheet,
+    sync_event_rsvp_to_google_sheet,
+    sync_community_event_to_google_sheet,
+    delete_community_event_from_google_sheet,
 )
 from recommendations.calendar_sync import (
     get_google_calendar_add_url,
@@ -35,6 +48,9 @@ from recommendations.notifications import (
     build_whatsapp_approval_link,
     build_whatsapp_decline_link,
     clean_phone_for_whatsapp,
+    generate_event_rsvp_token,
+    verify_event_rsvp_token,
+    send_event_broadcast_email,
 )
 
 
@@ -2293,6 +2309,688 @@ class SurveysFeatureTestCase(TestCase):
         res = delete_survey_from_google_sheet(self.survey.id)
         self.assertTrue(res)
         mock_ws.update.assert_called_once()
+
+
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
+class EventRSVPAndBroadcastTestCase(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+        self.factory = RequestFactory()
+        
+        self.member = MemberProfile.objects.create(
+            full_name="Carlos Santana",
+            email="carlos@minimexitas.org",
+            is_admin=False
+        )
+        self.admin = MemberProfile.objects.create(
+            full_name="Elena Organizer",
+            email="elena@minimexitas.org",
+            is_admin=True
+        )
+        self.mock_event = {
+            'id': 'evt_tacos_2026',
+            'title': 'Mexican Food Tour & Taco Picnic',
+            'category': 'Culinary & Social',
+            'date': 'Aug 25, 2026',
+            'time': '12:00 PM',
+            'location': 'Mission Dolores Park, SF',
+            'locurl': 'https://maps.google.com/?q=Mission+Dolores+Park',
+            'desc': 'Join us for tacos and cultural chats!',
+            'gcal': 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Tacos',
+            'organizer': 'Elena Organizer',
+        }
+
+    def test_rsvp_model_str_and_broadcast_model(self):
+        rsvp = CommunityEventRSVP.objects.create(
+            event_id="evt_123",
+            event_title="Taco Picnic",
+            member_email="carlos@minimexitas.org",
+            member_name="Carlos Santana",
+            status=CommunityEventRSVP.STATUS_GOING,
+            notes="Bringing guacamole"
+        )
+        self.assertIn("Carlos Santana", str(rsvp))
+        self.assertIn("Taco Picnic", str(rsvp))
+        self.assertIn("Going", str(rsvp))
+
+        bcast = CommunityEventBroadcast.objects.create(
+            event_id="evt_123",
+            event_title="Taco Picnic",
+            broadcast_by="Elena Organizer",
+            broadcast_by_email="elena@minimexitas.org",
+            recipient_count=10
+        )
+        self.assertIn("Taco Picnic", str(bcast))
+        self.assertIn("10 recipients", str(bcast))
+
+    def test_rsvp_signed_token_generation_and_verification(self):
+        token = generate_event_rsvp_token(
+            event_id="evt_tacos_2026",
+            email="carlos@minimexitas.org",
+            status="going"
+        )
+        self.assertIsInstance(token, str)
+        self.assertTrue(len(token) > 20)
+
+        data = verify_event_rsvp_token(token)
+        self.assertIsNotNone(data)
+        self.assertEqual(data['event_id'], "evt_tacos_2026")
+        self.assertEqual(data['email'], "carlos@minimexitas.org")
+        self.assertEqual(data['status'], "going")
+
+        # Invalid token verification
+        invalid_data = verify_event_rsvp_token("tampered_token_invalid_signature")
+        self.assertIsNone(invalid_data)
+
+    def test_send_event_broadcast_email(self):
+        mail.outbox = []
+        request = self.factory.get('/events/')
+        
+        sent_count = send_event_broadcast_email(
+            event_data=self.mock_event,
+            broadcast_by_name="Elena Organizer",
+            broadcast_by_email="elena@minimexitas.org",
+            request=request
+        )
+        self.assertEqual(sent_count, 2)
+        self.assertEqual(len(mail.outbox), 2)
+        
+        email_sent = mail.outbox[0]
+        self.assertIn("Mexican Food Tour & Taco Picnic", email_sent.subject)
+        self.assertIn("Mission Dolores Park", email_sent.body)
+        self.assertIn("Google Calendar", email_sent.body)
+        self.assertIn("/events/rsvp/?token=", email_sent.body)
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_event_rsvp_to_google_sheet(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Notes', 'Updated At'],
+            ['evt_old', 'Old Event', 'Old Member', 'old@test.org', 'maybe', '', '2026-08-10 10:00']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        rsvp = CommunityEventRSVP.objects.create(
+            event_id="evt_tacos_2026",
+            event_title="Mexican Food Tour & Taco Picnic",
+            member_email="carlos@minimexitas.org",
+            member_name="Carlos Santana",
+            status="going"
+        )
+
+        res = sync_event_rsvp_to_google_sheet(rsvp)
+        self.assertTrue(res)
+        mock_ws.append_row.assert_called_once()
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_events_view_loads_rsvps_and_broadcast_status(self, mock_fetch_events):
+        mock_fetch_events.return_value = [{
+            'id': 'evt_tacos_2026',
+            'title': 'Mexican Food Tour & Taco Picnic',
+            'category': 'Culinary & Social',
+            'start_datetime': datetime.datetime(2026, 8, 25, 12, 0),
+            'year': 2026,
+            'month': 8,
+            'day': '25',
+            'date_formatted': 'Aug 25, 2026',
+            'time_formatted': '12:00 PM',
+            'location': 'Mission Dolores Park, SF',
+            'location_url': 'https://maps.google.com/?q=Mission+Dolores+Park',
+            'description': 'Join us for tacos!',
+            'google_calendar_link': 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Tacos',
+            'organizer': 'Elena Organizer',
+            'is_past': False,
+        }]
+
+        CommunityEventRSVP.objects.create(
+            event_id="evt_tacos_2026",
+            event_title="Mexican Food Tour & Taco Picnic",
+            member_email="carlos@minimexitas.org",
+            member_name="Carlos Santana",
+            status="going"
+        )
+        CommunityEventBroadcast.objects.create(
+            event_id="evt_tacos_2026",
+            event_title="Mexican Food Tour & Taco Picnic",
+            broadcast_by="Elena Organizer",
+            broadcast_by_email="elena@minimexitas.org",
+            recipient_count=2
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "carlos@minimexitas.org"
+        session['member_name'] = "Carlos Santana"
+        session.save()
+
+        response = self.client.get(reverse('events'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Mexican Food Tour")
+        self.assertContains(response, "Going")
+        self.assertContains(response, "Carlos Santana")
+
+    @patch('recommendations.views.sync_event_rsvp_to_google_sheet')
+    def test_event_rsvp_view_token_get(self, mock_sheet_sync):
+        mock_sheet_sync.return_value = True
+        
+        token = generate_event_rsvp_token(
+            event_id="evt_tacos_2026",
+            email="carlos@minimexitas.org",
+            status="going"
+        )
+
+        response = self.client.get(f"{reverse('event_rsvp')}?token={token}")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/events/', response.url)
+
+        rsvp = CommunityEventRSVP.objects.get(event_id="evt_tacos_2026", member_email="carlos@minimexitas.org")
+        self.assertEqual(rsvp.status, "going")
+        self.assertEqual(rsvp.member_name, "Carlos Santana")
+        mock_sheet_sync.assert_called_once()
+
+    @patch('recommendations.views.sync_event_rsvp_to_google_sheet')
+    def test_event_rsvp_view_ajax_post(self, mock_sheet_sync):
+        mock_sheet_sync.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "carlos@minimexitas.org"
+        session['member_name'] = "Carlos Santana"
+        session.save()
+
+        response = self.client.post(
+            reverse('event_rsvp'),
+            {
+                'event_id': 'evt_tacos_2026',
+                'event_title': 'Mexican Food Tour & Taco Picnic',
+                'status': 'maybe',
+                'ajax': '1',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['status'], 'maybe')
+
+        rsvp = CommunityEventRSVP.objects.get(event_id="evt_tacos_2026", member_email="carlos@minimexitas.org")
+        self.assertEqual(rsvp.status, "maybe")
+
+    @patch('recommendations.views.send_event_broadcast_email')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_event_broadcast_view_authorized_admin(self, mock_sheet_audit, mock_send_email):
+        mock_send_email.return_value = 2
+        mock_sheet_audit.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena@minimexitas.org"
+        session['member_name'] = "Elena Organizer"
+        session.save()
+
+        response = self.client.post(reverse('event_broadcast'), {
+            'event_id': 'evt_tacos_2026',
+            'event_title': 'Mexican Food Tour & Taco Picnic',
+            'date_formatted': 'Aug 25, 2026',
+            'time_formatted': '12:00 PM',
+            'location': 'Mission Dolores Park, SF',
+            'location_url': 'https://maps.google.com/?q=Mission+Dolores+Park',
+            'category': 'Culinary & Social',
+            'description': 'Join us for tacos!',
+            'google_calendar_link': 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Tacos',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/events/', response.url)
+        mock_send_email.assert_called_once()
+        
+        # Verify broadcast record
+        bcast = CommunityEventBroadcast.objects.get(event_id="evt_tacos_2026")
+        self.assertEqual(bcast.recipient_count, 2)
+        self.assertEqual(bcast.broadcast_by_email, "elena@minimexitas.org")
+
+        # Verify audit log
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_EVENT_BROADCAST).first()
+        self.assertIsNotNone(audit)
+        self.assertIn("Mexican Food Tour & Taco Picnic", audit.target_name)
+        self.assertIn("2 active community members", audit.notes)
+
+    def test_organizer_event_broadcast_view_unauthorized_non_admin(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = False
+        session['member_email'] = "carlos@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_broadcast'), {
+            'event_id': 'evt_tacos_2026',
+            'event_title': 'Mexican Food Tour & Taco Picnic',
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(CommunityEventBroadcast.objects.count(), 0)
+
+
+@override_settings(GOOGLE_SHEET_KEY="mock_sheet_key_community_events")
+class CommunityEventDualSourceTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = MemberProfile.objects.create(
+            full_name="Elena Gomez",
+            email="elena.organizer@minimexitas.org",
+            region="san_francisco",
+            is_admin=True
+        )
+        self.member = MemberProfile.objects.create(
+            full_name="Mateo Silva",
+            email="mateo.silva@minimexitas.org",
+            region="east_bay",
+            is_admin=False
+        )
+
+    def test_community_event_model_creation_and_str(self):
+        event = CommunityEvent.objects.create(
+            title="Noche Mexicana",
+            category="Cultural & Heritage",
+            start_datetime=datetime.datetime(2026, 9, 15, 18, 0, tzinfo=datetime.timezone.utc),
+            end_datetime=datetime.datetime(2026, 9, 15, 21, 0, tzinfo=datetime.timezone.utc),
+            location="Mission Cultural Center, SF",
+            location_url="https://maps.google.com/?q=Mission+Cultural+Center",
+            description="Celebrate Mexican Independence Day with live music and appetizers.",
+            created_by_email="elena.organizer@minimexitas.org"
+        )
+        self.assertEqual(str(event), "Noche Mexicana (2026-09-15 18:00)")
+        self.assertTrue(event.is_active)
+        self.assertEqual(event.category, "Cultural & Heritage")
+
+    @patch('recommendations.views.sync_community_event_to_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_create_event_view_success(self, mock_sheet_audit, mock_sheet_event):
+        mock_sheet_audit.return_value = True
+        mock_sheet_event.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session['member_name'] = "Elena Gomez"
+        session.save()
+
+        response = self.client.post(reverse('event_create'), {
+            'title': 'Dia de Muertos Community Altar',
+            'category': 'Cultural & Heritage',
+            'start_date': '2026-11-01',
+            'start_time': '16:00',
+            'end_date': '2026-11-01',
+            'end_time': '20:00',
+            'location': 'Garfield Square, SF',
+            'location_url': 'https://maps.google.com/?q=Garfield+Square',
+            'description': 'Community altar gathering with pan de muerto and hot chocolate.',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/events/', response.url)
+
+        # Verify CommunityEvent in database
+        event = CommunityEvent.objects.get(title="Dia de Muertos Community Altar")
+        self.assertEqual(event.location, "Garfield Square, SF")
+        self.assertEqual(event.created_by_email, "elena.organizer@minimexitas.org")
+        self.assertEqual(event.created_by_name, "Elena Gomez")
+        self.assertTrue(event.is_active)
+
+        # Verify Google Sheet sync was invoked
+        mock_sheet_event.assert_called_once_with(event)
+
+        # Verify MembershipAuditLog
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_EVENT_CREATED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.target_name, "Event: Dia de Muertos Community Altar")
+        self.assertEqual(audit.actor_email, "elena.organizer@minimexitas.org")
+
+    @patch('recommendations.views.send_event_broadcast_email')
+    @patch('recommendations.views.sync_community_event_to_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_create_event_view_with_instant_broadcast(self, mock_sheet_audit, mock_sheet_event, mock_send_bcast):
+        mock_sheet_audit.return_value = True
+        mock_sheet_event.return_value = True
+        mock_send_bcast.return_value = 2
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session['member_name'] = "Elena Gomez"
+        session.save()
+
+        response = self.client.post(reverse('event_create'), {
+            'title': 'Tech & Tacos Networking',
+            'category': 'Networking & Tech',
+            'start_date': '2026-10-10',
+            'start_time': '18:30',
+            'end_date': '2026-10-10',
+            'end_time': '21:00',
+            'location': 'Salesforce Park, SF',
+            'description': 'Connect with Mexican engineers and designers in the Bay.',
+            'broadcast_now': '1',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/events/', response.url)
+
+        event = CommunityEvent.objects.get(title="Tech & Tacos Networking")
+        mock_send_bcast.assert_called_once()
+        
+        # Verify CommunityEventBroadcast was recorded
+        bcast = CommunityEventBroadcast.objects.get(event_id=f"portal_{event.id}")
+        self.assertEqual(bcast.recipient_count, 2)
+        self.assertEqual(bcast.broadcast_by_email, "elena.organizer@minimexitas.org")
+
+    def test_organizer_create_event_view_missing_fields(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_create'), {
+            'title': '',  # missing title
+            'start_date': '2026-10-10',
+            'start_time': '18:30',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(CommunityEvent.objects.count(), 0)
+
+    def test_organizer_create_event_view_forbidden_for_non_admin(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = False
+        session['member_email'] = "mateo.silva@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_create'), {
+            'title': 'Unauthorized Event',
+            'start_date': '2026-10-10',
+            'start_time': '18:30',
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(CommunityEvent.objects.count(), 0)
+
+    def test_organizer_create_event_view_unauthenticated(self):
+        response = self.client.post(reverse('event_create'), {
+            'title': 'Unauthorized Event',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    @patch('recommendations.views.sync_community_event_to_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_edit_event_view_success(self, mock_sheet_audit, mock_sheet_event):
+        mock_sheet_audit.return_value = True
+        mock_sheet_event.return_value = True
+
+        event = CommunityEvent.objects.create(
+            title="Initial Title",
+            category="Community Gathering",
+            start_datetime=datetime.datetime(2026, 9, 20, 15, 0, tzinfo=datetime.timezone.utc),
+            location="Dolores Park",
+            description="Initial description",
+            created_by_email="elena.organizer@minimexitas.org"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session['member_name'] = "Elena Gomez"
+        session.save()
+
+        response = self.client.post(reverse('event_edit', kwargs={'event_id': event.id}), {
+            'title': 'Updated Fiesta de Primavera',
+            'category': 'Cultural & Heritage',
+            'start_date': '2026-09-21',
+            'start_time': '16:00',
+            'end_date': '2026-09-21',
+            'end_time': '19:00',
+            'location': 'Yerba Buena Gardens, SF',
+            'location_url': 'https://maps.google.com/?q=Yerba+Buena',
+            'description': 'Updated description with music and food.',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/events/', response.url)
+
+        event.refresh_from_db()
+        self.assertEqual(event.title, "Updated Fiesta de Primavera")
+        self.assertEqual(event.category, "Cultural & Heritage")
+        self.assertEqual(event.location, "Yerba Buena Gardens, SF")
+
+        # Verify audit log
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_EVENT_UPDATED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.target_name, "Event: Updated Fiesta de Primavera")
+        self.assertEqual(audit.actor_email, "elena.organizer@minimexitas.org")
+
+    def test_organizer_edit_event_view_forbidden_for_non_admin(self):
+        event = CommunityEvent.objects.create(
+            title="Sample Event",
+            category="Community Gathering",
+            start_datetime=datetime.datetime(2026, 9, 20, 15, 0, tzinfo=datetime.timezone.utc),
+            location="Dolores Park",
+            description="Sample description"
+        )
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = False
+        session['member_email'] = "mateo.silva@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_edit', kwargs={'event_id': event.id}), {
+            'title': 'Attempted Update',
+        })
+        self.assertEqual(response.status_code, 403)
+
+    def test_organizer_edit_event_view_not_found(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_edit', kwargs={'event_id': 99999}), {
+            'title': 'Non-existent Event',
+            'start_date': '2026-09-21',
+            'start_time': '16:00',
+        })
+        self.assertEqual(response.status_code, 404)
+
+    @patch('recommendations.views.delete_community_event_from_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_delete_event_view_success(self, mock_sheet_audit, mock_sheet_delete):
+        mock_sheet_audit.return_value = True
+        mock_sheet_delete.return_value = True
+
+        event = CommunityEvent.objects.create(
+            title="Event to be Cancelled",
+            category="Culinary & Social",
+            start_datetime=datetime.datetime(2026, 9, 25, 12, 0, tzinfo=datetime.timezone.utc),
+            location="Presidio Picnic",
+            description="Cancelled picnic event",
+            created_by_email="elena.organizer@minimexitas.org"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session['member_name'] = "Elena Gomez"
+        session.save()
+
+        response = self.client.post(reverse('event_delete', kwargs={'event_id': event.id}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/events/', response.url)
+
+        event.refresh_from_db()
+        self.assertFalse(event.is_active)
+
+        mock_sheet_delete.assert_called_once_with(event.id)
+
+        # Verify audit log
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_EVENT_DELETED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.target_name, "Event: Event to be Cancelled")
+        self.assertEqual(audit.actor_email, "elena.organizer@minimexitas.org")
+
+    def test_organizer_delete_event_view_forbidden_for_non_admin(self):
+        event = CommunityEvent.objects.create(
+            title="Event to Keep",
+            category="Culinary & Social",
+            start_datetime=datetime.datetime(2026, 9, 25, 12, 0, tzinfo=datetime.timezone.utc),
+            location="Presidio Picnic",
+            description="Picnic event"
+        )
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = False
+        session['member_email'] = "mateo.silva@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_delete', kwargs={'event_id': event.id}))
+        self.assertEqual(response.status_code, 403)
+        event.refresh_from_db()
+        self.assertTrue(event.is_active)
+
+    @patch('recommendations.calendar_sync._fetch_from_google_calendar_api')
+    def test_fetch_community_events_dual_source_merging(self, mock_gcal):
+        cache.clear()
+        
+        # 1. Create a portal event
+        now = datetime.datetime.now(datetime.timezone.utc)
+        portal_event = CommunityEvent.objects.create(
+            title="Portal Artisan Fair",
+            category="Cultural & Heritage",
+            start_datetime=now + datetime.timedelta(days=2),
+            end_datetime=now + datetime.timedelta(days=2, hours=3),
+            location="Mission Dolores, SF",
+            location_url="https://maps.google.com/?q=Mission+Dolores",
+            description="Handmade crafts from Oaxaca and Jalisco.",
+            created_by_name="Elena Gomez"
+        )
+
+        # Inactive portal event (should NOT appear)
+        CommunityEvent.objects.create(
+            title="Cancelled Event",
+            category="Cultural & Heritage",
+            start_datetime=now + datetime.timedelta(days=1),
+            location="SF",
+            description="Cancelled",
+            is_active=False
+        )
+
+        # 2. Mock Google Calendar return
+        mock_gcal.return_value = [
+            {
+                'id': 'gcal_event_101',
+                'title': 'Google Cal Mezcal Tasting',
+                'category': 'Culinary & Social',
+                'date_formatted': (now + datetime.timedelta(days=5)).strftime('%b %d, %Y'),
+                'time_formatted': '7:00 PM - 9:00 PM',
+                'location': 'Oakland, CA',
+                'location_url': 'https://maps.google.com/?q=Oakland',
+                'description': 'Mezcal tasting workshop.',
+                'organizer': 'MiniMexitas Calendar',
+                'google_calendar_link': 'https://calendar.google.com',
+                'start_datetime': now + datetime.timedelta(days=5),
+                'end_datetime': now + datetime.timedelta(days=5, hours=2),
+                'day': (now + datetime.timedelta(days=5)).strftime('%d'),
+                'is_past': False,
+                'source': 'google_calendar',
+                'is_portal_event': False,
+                'portal_event_pk': None,
+            }
+        ]
+
+        events = fetch_community_events()
+        self.assertEqual(len(events), 2)
+
+        # Verify portal event properties
+        p_evt = next(e for e in events if e['title'] == 'Portal Artisan Fair')
+        self.assertTrue(p_evt['is_portal_event'])
+        self.assertEqual(p_evt['portal_event_pk'], portal_event.id)
+        self.assertEqual(p_evt['source'], 'portal')
+        self.assertEqual(p_evt['organizer'], 'Elena Gomez')
+
+        # Verify Google Cal event properties
+        g_evt = next(e for e in events if e['title'] == 'Google Cal Mezcal Tasting')
+        self.assertFalse(g_evt['is_portal_event'])
+        self.assertEqual(g_evt['source'], 'google_calendar')
+
+
+class CommunityEventSheetSyncTestCase(TestCase):
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_community_event_to_google_sheet_new_row(self, mock_get_client):
+        mock_worksheet = MagicMock()
+        mock_worksheet.get_all_values.return_value = [
+            ['Event ID', 'Event Title', 'Category', 'Start Date & Time', 'End Date & Time', 'Location', 'Location URL', 'Description', 'Created By', 'Created At', 'Status']
+        ]
+        mock_worksheet.title = "Events"
+        
+        mock_sheet = MagicMock()
+        mock_sheet.worksheets.return_value = [mock_worksheet]
+        mock_sheet.worksheet.return_value = mock_worksheet
+        
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sheet
+        mock_client.open_by_key.return_value = mock_sheet
+        mock_get_client.return_value = mock_client
+
+        event = CommunityEvent(
+            id=42,
+            title="Pan de Muerto Baking Workshop",
+            category="Culinary & Social",
+            start_datetime=datetime.datetime(2026, 10, 28, 14, 0, tzinfo=datetime.timezone.utc),
+            end_datetime=datetime.datetime(2026, 10, 28, 17, 0, tzinfo=datetime.timezone.utc),
+            location="San Jose, CA",
+            location_url="https://maps.google.com/?q=San+Jose",
+            description="Learn authentic baking techniques.",
+            created_by_name="Chef Maria",
+            created_by_email="maria@minimexitas.org",
+            is_active=True
+        )
+
+        success = sync_community_event_to_google_sheet(event)
+        self.assertTrue(success)
+        mock_worksheet.append_row.assert_called_once()
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_delete_community_event_from_google_sheet(self, mock_get_client):
+        mock_worksheet = MagicMock()
+        mock_worksheet.get_all_values.return_value = [
+            ['Event ID', 'Event Title', 'Status'],
+            ['portal_42', 'Pan de Muerto Baking Workshop', 'Active']
+        ]
+        mock_worksheet.title = "Events"
+
+        mock_sheet = MagicMock()
+        mock_sheet.worksheets.return_value = [mock_worksheet]
+        mock_sheet.worksheet.return_value = mock_worksheet
+
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sheet
+        mock_client.open_by_key.return_value = mock_sheet
+        mock_get_client.return_value = mock_client
+
+        success = delete_community_event_from_google_sheet("portal_42")
+        self.assertTrue(success)
+        mock_worksheet.update_cell.assert_called_once_with(2, 3, "Deleted (Inactive)")
+
+
 
 
 
