@@ -55,7 +55,10 @@
                 </p>
             </div>
             
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <a href="?refresh=1" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center rounded-pill px-3 shadow-sm" title="Refresh recommendations" style="border-color: rgba(255,255,255,0.15); font-size: 0.85rem;">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                </a>
                 <span id="total-count-badge" class="count-badge">
                     <i class="bi bi-bookmark-check-fill me-1" style="color: #60a5fa;"></i>
                     <span id="visible-count">{{ notes|length }}</span>&nbsp;Items

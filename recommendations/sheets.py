@@ -94,16 +94,24 @@ def _get_worksheet_case_insensitive(sh, target_name):
             return ws
         if target_clean in ('events', 'communityevents', 'eventos') and title_clean in ('events', 'communityevents', 'eventos', 'eventoscomunidad'):
             return ws
+        if target_clean in ('recomendaciones', 'recommendations', 'notes') and title_clean in ('recomendaciones', 'recommendations', 'notes', 'recs', 'directoriorecs'):
+            return ws
     return None
 
 
 def fetch_recommendations():
     """
     Fetches rows from the Google Sheet and returns normalized dictionaries.
+    Prioritizes 'Recomendaciones', 'Recommendations', or 'Notes' tab before fallback.
     """
     gc = get_gspread_client()
     sh = open_google_spreadsheet(gc)
-    worksheet = getattr(sh, 'sheet1', None) or _get_worksheet_case_insensitive(sh, "Recomendaciones")
+    worksheet = (
+        _get_worksheet_case_insensitive(sh, "Recomendaciones")
+        or _get_worksheet_case_insensitive(sh, "Recommendations")
+        or _get_worksheet_case_insensitive(sh, "Notes")
+        or getattr(sh, 'sheet1', None)
+    )
     
     raw_records = worksheet.get_all_records() if worksheet else []
     return [_normalize_record_keys(row) for row in raw_records]
