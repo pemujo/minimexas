@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.core import mail
 from django.core.cache import cache
 
-from recommendations.models import MemberProfile, MembershipRequest, MembershipAuditLog
+from recommendations.models import MemberProfile, MembershipRequest, MembershipAuditLog, CommunitySurvey, SurveyOption, SurveyVote
 from recommendations.auth_helpers import is_gmail_allowed
 from recommendations.sheets import (
     _normalize_record_keys,
@@ -17,6 +17,8 @@ from recommendations.sheets import (
     update_pending_request_status_in_google_sheet,
     sync_audit_log_to_google_sheet,
     backfill_audit_logs_to_google_sheet,
+    sync_survey_to_google_sheet,
+    delete_survey_from_google_sheet,
     delete_profile_from_google_sheet,
     reconcile_members_with_google_sheet,
 )
@@ -2030,6 +2032,249 @@ class AdminNotificationAndAuditLogTestCase(TestCase):
         self.assertContains(response, "Admin Two")
         self.assertContains(response, "Approved after review")
         self.assertContains(response, "No connection to Bay Area")
+
+
+class SurveysFeatureTestCase(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+
+        self.survey = CommunitySurvey.objects.create(
+            title="Where should we host the 2026 Fall Picnic?",
+            description="Cast your vote for our next community gathering.",
+            category=CommunitySurvey.CATEGORY_EVENT,
+            is_multiple_choice=False,
+            is_active=True,
+            created_by="Admin Maria",
+            created_by_email="admin.maria@gmail.com"
+        )
+        self.opt1 = SurveyOption.objects.create(survey=self.survey, text="Coyote Point (San Mateo)", order=0)
+        self.opt2 = SurveyOption.objects.create(survey=self.survey, text="Vasona Lake (Los Gatos)", order=1)
+        self.opt3 = SurveyOption.objects.create(survey=self.survey, text="Lake Merritt (Oakland)", order=2)
+
+    def test_survey_models_and_properties(self):
+        self.assertEqual(self.survey.options.count(), 3)
+        self.assertEqual(self.survey.total_votes, 0)
+        self.assertEqual(self.survey.unique_voters_count, 0)
+        self.assertFalse(self.survey.has_user_voted("member@gmail.com"))
+
+        SurveyVote.objects.create(
+            survey=self.survey,
+            option=self.opt1,
+            voter_email="member@gmail.com",
+            voter_name="Member One"
+        )
+        self.assertEqual(self.survey.total_votes, 1)
+        self.assertEqual(self.survey.unique_voters_count, 1)
+        self.assertTrue(self.survey.has_user_voted("member@gmail.com"))
+        self.assertEqual(self.opt1.vote_count, 1)
+        self.assertEqual(self.opt1.percentage(1), 100.0)
+        self.assertEqual(self.opt2.percentage(1), 0.0)
+        self.assertIn("Member One", self.opt1.voter_names)
+
+    def test_surveys_list_view_requires_auth(self):
+        response = self.client.get(reverse('surveys'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login_page'), response.url)
+
+    def test_surveys_list_view_authenticated(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(reverse('surveys'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Surveys & Decision Center")
+        self.assertContains(response, "Where should we host the 2026 Fall Picnic?")
+        self.assertContains(response, "Coyote Point (San Mateo)")
+
+    @patch('recommendations.views.sync_survey_to_google_sheet')
+    def test_survey_vote_view_single_choice(self, mock_sync):
+        mock_sync.return_value = True
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.post(reverse('survey_vote', args=[self.survey.id]), {
+            'options': [str(self.opt2.id)]
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('voted=1', response.url)
+        self.assertEqual(SurveyVote.objects.filter(survey=self.survey).count(), 1)
+        vote = SurveyVote.objects.get(survey=self.survey)
+        self.assertEqual(vote.option, self.opt2)
+        self.assertEqual(vote.voter_email, "voter@gmail.com")
+        mock_sync.assert_called_once_with(self.survey)
+
+    @patch('recommendations.views.sync_survey_to_google_sheet')
+    def test_survey_vote_view_multiple_choice(self, mock_sync):
+        mock_sync.return_value = True
+        multi_survey = CommunitySurvey.objects.create(
+            title="Which cuisines should we feature?",
+            is_multiple_choice=True,
+            is_active=True
+        )
+        opt_a = SurveyOption.objects.create(survey=multi_survey, text="Oaxacan", order=0)
+        opt_b = SurveyOption.objects.create(survey=multi_survey, text="Yucatecan", order=1)
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "foodie@gmail.com"
+        session['member_name'] = "Foodie Member"
+        session.save()
+
+        response = self.client.post(reverse('survey_vote', args=[multi_survey.id]), {
+            'options': [str(opt_a.id), str(opt_b.id)]
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(SurveyVote.objects.filter(survey=multi_survey).count(), 2)
+
+    @patch('recommendations.views.sync_survey_to_google_sheet')
+    def test_survey_vote_view_update_existing_vote(self, mock_sync):
+        mock_sync.return_value = True
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        # Vote 1
+        self.client.post(reverse('survey_vote', args=[self.survey.id]), {
+            'options': [str(self.opt1.id)]
+        })
+        self.assertEqual(SurveyVote.objects.filter(survey=self.survey).count(), 1)
+        self.assertEqual(self.opt1.votes.count(), 1)
+
+        # Vote 2 (Change to opt2)
+        self.client.post(reverse('survey_vote', args=[self.survey.id]), {
+            'options': [str(self.opt2.id)]
+        })
+        self.assertEqual(SurveyVote.objects.filter(survey=self.survey).count(), 1)
+        self.assertEqual(self.opt1.votes.count(), 0)
+        self.assertEqual(self.opt2.votes.count(), 1)
+
+    def test_survey_vote_view_rejects_closed_survey(self):
+        self.survey.is_active = False
+        self.survey.save()
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session.save()
+
+        response = self.client.post(reverse('survey_vote', args=[self.survey.id]), {
+            'options': [str(self.opt1.id)]
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('error=survey_closed', response.url)
+        self.assertEqual(SurveyVote.objects.count(), 0)
+
+    @patch('recommendations.views.sync_survey_to_google_sheet')
+    def test_organizer_survey_create_view(self, mock_sync):
+        mock_sync.return_value = True
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "admin@minimexitas.org"
+        session['member_name'] = "Super Admin"
+        session.save()
+
+        response = self.client.post(reverse('survey_create'), {
+            'title': "Favorite Dia de los Muertos activity?",
+            'description': "Let organizers know your preference.",
+            'category': 'community',
+            'is_multiple_choice': 'on',
+            'options': ['Altar Workshop', 'Catrina Contest', 'Pan de Muerto Tasting']
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('created=1', response.url)
+
+        new_survey = CommunitySurvey.objects.get(title="Favorite Dia de los Muertos activity?")
+        self.assertTrue(new_survey.is_multiple_choice)
+        self.assertEqual(new_survey.options.count(), 3)
+        self.assertTrue(MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_SURVEY_CREATED).exists())
+
+    def test_organizer_survey_create_requires_admin(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('survey_create'), {
+            'title': "Non admin test",
+            'options': ['Option 1', 'Option 2']
+        })
+        self.assertEqual(response.status_code, 403)
+
+    @patch('recommendations.views.sync_survey_to_google_sheet')
+    def test_organizer_survey_toggle_status_view(self, mock_sync):
+        mock_sync.return_value = True
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "admin@minimexitas.org"
+        session.save()
+
+        self.assertTrue(self.survey.is_active)
+        response = self.client.post(reverse('survey_toggle_status', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 302)
+        self.survey.refresh_from_db()
+        self.assertFalse(self.survey.is_active)
+
+    @patch('recommendations.views.delete_survey_from_google_sheet')
+    def test_organizer_survey_delete_view(self, mock_delete_sheet):
+        mock_delete_sheet.return_value = True
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "admin@minimexitas.org"
+        session.save()
+
+        survey_id = self.survey.id
+        response = self.client.post(reverse('survey_delete', args=[survey_id]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(CommunitySurvey.objects.filter(id=survey_id).exists())
+        mock_delete_sheet.assert_called_once_with(survey_id)
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_survey_to_google_sheet(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Survey ID', 'Survey Question', 'Category', 'Mode', 'Status', 'Option Text', 'Votes Count', 'Percentage', 'Voter Names', 'Created By', 'Created At']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        res = sync_survey_to_google_sheet(self.survey)
+        self.assertTrue(res)
+        mock_ws.update.assert_called_once()
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_delete_survey_from_google_sheet(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.get_all_values.return_value = [
+            ['Survey ID', 'Survey Question', 'Category', 'Mode', 'Status', 'Option Text', 'Votes Count', 'Percentage', 'Voter Names', 'Created By', 'Created At'],
+            [str(self.survey.id), 'Where to host?', 'Event & Meetup', 'Single Choice', 'Active', 'Coyote Point', '1', '100%', 'Maria', 'Admin', '2026-08-17 10:00']
+        ]
+        mock_sh = MagicMock()
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        res = delete_survey_from_google_sheet(self.survey.id)
+        self.assertTrue(res)
+        mock_ws.update.assert_called_once()
+
 
 
 

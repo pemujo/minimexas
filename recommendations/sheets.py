@@ -88,6 +88,8 @@ def _get_worksheet_case_insensitive(sh, target_name):
             return ws
         if target_clean in ('auditlog', 'auditlogs') and title_clean in ('auditlog', 'auditlogs', 'bitacora', 'auditoria', 'registro', 'audit'):
             return ws
+        if target_clean in ('surveys', 'survey', 'polls', 'poll') and title_clean in ('surveys', 'survey', 'polls', 'poll', 'encuestas', 'votaciones', 'votacion'):
+            return ws
     return None
 
 
@@ -481,6 +483,152 @@ def backfill_audit_logs_to_google_sheet():
         if sync_audit_log_to_google_sheet(log_entry):
             count += 1
     return count
+
+
+def sync_survey_to_google_sheet(survey):
+    """
+    Synchronizes a CommunitySurvey model and its options/votes to the 'Surveys' tab in Google Sheets.
+    Creates or updates rows corresponding to each option with current vote counts, percentages, and transparent voter names.
+    """
+    if not survey:
+        return False
+
+    try:
+        from datetime import datetime
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = _get_worksheet_case_insensitive(sh, "Surveys")
+        if not worksheet:
+            worksheet = sh.add_worksheet(title="Surveys", rows=100, cols=11)
+
+        all_values = worksheet.get_all_values()
+        expected_headers = [
+            'Survey ID', 'Survey Question', 'Category', 'Mode', 'Status', 
+            'Option Text', 'Votes Count', 'Percentage', 'Voter Names', 'Created By', 'Created At'
+        ]
+
+        if not all_values:
+            worksheet.update(values=[expected_headers], range_name='A1:K1')
+            all_values = [expected_headers]
+
+        headers = all_values[0]
+        # Auto-heal missing headers
+        missing_cols = [col for col in expected_headers if col.lower() not in [h.strip().lower() for h in headers]]
+        if missing_cols:
+            new_headers = headers + missing_cols
+            end_letter = chr(64 + len(new_headers)) if len(new_headers) <= 26 else 'Z'
+            worksheet.update(values=[new_headers], range_name=f"A1:{end_letter}1")
+            headers = new_headers
+
+        survey_id_str = str(survey.id)
+        category_display = survey.get_category_display() if hasattr(survey, 'get_category_display') else survey.category
+        mode_display = "Multiple Choice" if survey.is_multiple_choice else "Single Choice"
+        status_display = "Active" if survey.is_active else "Closed"
+        created_by_str = survey.created_by or survey.created_by_email or "Admin"
+        created_at_str = survey.created_at.strftime("%Y-%m-%d %H:%M") if survey.created_at else datetime.now().strftime("%Y-%m-%d %H:%M")
+        total_votes = survey.total_votes
+
+        options = list(survey.options.all().order_by('order', 'id'))
+        if not options:
+            return True
+
+        # Build new rows for all options of this survey
+        fresh_survey_rows = []
+        for opt in options:
+            vote_count = opt.vote_count
+            pct_str = f"{opt.percentage(total_votes)}%"
+            voters_str = ", ".join(opt.voter_names)
+
+            field_map = {
+                'survey id': survey_id_str,
+                'survey question': survey.title,
+                'category': category_display,
+                'mode': mode_display,
+                'status': status_display,
+                'option text': opt.text,
+                'votes count': str(vote_count),
+                'percentage': pct_str,
+                'voter names': voters_str,
+                'created by': created_by_str,
+                'created at': created_at_str,
+            }
+
+            row_data = [field_map.get(h.strip().lower(), '') for h in headers]
+            fresh_survey_rows.append(row_data)
+
+        # Retain existing non-survey rows and replace this survey's rows
+        kept_rows = [headers]
+        id_col_idx = 0
+        for idx, h in enumerate(headers):
+            if h.strip().lower() == 'survey id':
+                id_col_idx = idx
+                break
+
+        for row in all_values[1:]:
+            if len(row) > id_col_idx and str(row[id_col_idx]).strip() == survey_id_str:
+                continue
+            kept_rows.append(row)
+
+        full_sheet_matrix = kept_rows + fresh_survey_rows
+
+        # Clear worksheet content safely and write all rows
+        worksheet.clear()
+        end_letter = chr(64 + len(headers)) if len(headers) <= 26 else 'K'
+        worksheet.update(values=full_sheet_matrix, range_name=f"A1:{end_letter}{len(full_sheet_matrix)}")
+        logger.info(f"Successfully synced survey #{survey.id} '{survey.title}' to Google Sheet Surveys tab.")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to sync survey #{getattr(survey, 'id', '')} to Google Sheet: {e}")
+        return False
+
+
+def delete_survey_from_google_sheet(survey_id):
+    """
+    Deletes all option rows corresponding to `survey_id` from the 'Surveys' tab in Google Sheets.
+    """
+    if not survey_id:
+        return False
+
+    try:
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = _get_worksheet_case_insensitive(sh, "Surveys")
+        if not worksheet:
+            return True
+
+        all_values = worksheet.get_all_values()
+        if not all_values or len(all_values) <= 1:
+            return True
+
+        headers = all_values[0]
+        id_col_idx = 0
+        for idx, h in enumerate(headers):
+            if h.strip().lower() == 'survey id':
+                id_col_idx = idx
+                break
+
+        target_id_str = str(survey_id).strip()
+        remaining_rows = [headers]
+        removed_count = 0
+
+        for row in all_values[1:]:
+            if len(row) > id_col_idx and str(row[id_col_idx]).strip() == target_id_str:
+                removed_count += 1
+                continue
+            remaining_rows.append(row)
+
+        if removed_count > 0:
+            worksheet.clear()
+            end_letter = chr(64 + len(headers)) if len(headers) <= 26 else 'K'
+            worksheet.update(values=remaining_rows, range_name=f"A1:{end_letter}{len(remaining_rows)}")
+            logger.info(f"Removed survey #{survey_id} ({removed_count} rows) from Google Sheet Surveys tab.")
+
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to delete survey #{survey_id} from Google Sheet: {e}")
+        return False
 
 
 def delete_profile_from_google_sheet(email):

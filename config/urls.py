@@ -17,7 +17,12 @@ from recommendations.views import (
     organizer_reject_request_view,
     organizer_direct_add_member_view,
     organizer_delete_member_view,
-    organizer_sync_sheets_view
+    organizer_sync_sheets_view,
+    surveys_list_view,
+    survey_vote_view,
+    organizer_survey_create_view,
+    organizer_survey_toggle_status_view,
+    organizer_survey_delete_view,
 )
 
 urlpatterns = [
@@ -25,6 +30,11 @@ urlpatterns = [
     path('join/', join_request_view, name='join_request'),
     path('events/', events_view, name='events'),
     path('directory/', member_directory_view, name='member_directory'),
+    path('surveys/', surveys_list_view, name='surveys'),
+    path('surveys/create/', organizer_survey_create_view, name='survey_create'),
+    path('surveys/<int:survey_id>/vote/', survey_vote_view, name='survey_vote'),
+    path('surveys/<int:survey_id>/toggle/', organizer_survey_toggle_status_view, name='survey_toggle_status'),
+    path('surveys/<int:survey_id>/delete/', organizer_survey_delete_view, name='survey_delete'),
     path('profile/', profile_view, name='profile'),
     path('profile/delete/', profile_delete_self_view, name='profile_delete_self'),
     path('organizers/', organizer_dashboard_view, name='organizer_dashboard'),

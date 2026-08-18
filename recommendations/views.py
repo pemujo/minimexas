@@ -15,11 +15,13 @@ from .sheets import (
     sync_pending_request_to_google_sheet,
     update_pending_request_status_in_google_sheet,
     sync_audit_log_to_google_sheet,
+    sync_survey_to_google_sheet,
+    delete_survey_from_google_sheet,
     delete_profile_from_google_sheet,
     reconcile_members_with_google_sheet,
 )
 from .auth_helpers import is_gmail_allowed
-from .models import MemberProfile, MembershipRequest, MembershipAuditLog
+from .models import MemberProfile, MembershipRequest, MembershipAuditLog, CommunitySurvey, SurveyOption, SurveyVote
 from .notifications import (
     send_membership_approval_email,
     send_membership_rejection_email,
@@ -994,6 +996,265 @@ def organizer_sync_sheets_view(request):
         err = result.get('error', 'Failed to communicate with Google Sheets.')
         request.session['sync_flash_error'] = err
         return redirect(reverse('organizer_dashboard') + '?sync_error=1')
+
+
+def surveys_list_view(request):
+    """
+    Renders active and past community surveys.
+    Allows verified members to cast and update votes with live result percentages and transparent voter lists.
+    """
+    if not is_authenticated_member(request):
+        return redirect('login_page')
+
+    user_email = request.session.get('member_email', '').strip().lower()
+    is_admin = request.session.get('is_admin', False)
+
+    category_filter = request.GET.get('category', '').strip()
+    status_filter = request.GET.get('status', 'active').strip()
+
+    surveys_qs = CommunitySurvey.objects.all().prefetch_related('options__votes', 'votes')
+
+    if category_filter and category_filter in [c[0] for c in CommunitySurvey.CATEGORY_CHOICES]:
+        surveys_qs = surveys_qs.filter(category=category_filter)
+
+    if status_filter == 'active':
+        surveys_qs = surveys_qs.filter(is_active=True)
+    elif status_filter == 'closed':
+        surveys_qs = surveys_qs.filter(is_active=False)
+
+    surveys_data = []
+    for s in surveys_qs:
+        total_votes = s.total_votes
+        unique_voters = s.unique_voters_count
+        user_option_ids = s.user_voted_option_ids(user_email)
+        has_voted = len(user_option_ids) > 0
+
+        options_data = []
+        for opt in s.options.all():
+            opt_votes = opt.vote_count
+            pct = round((opt_votes / total_votes * 100), 1) if total_votes > 0 else 0
+            is_selected = opt.id in user_option_ids
+            voters = opt.voter_names
+
+            options_data.append({
+                'id': opt.id,
+                'text': opt.text,
+                'vote_count': opt_votes,
+                'percentage': pct,
+                'is_selected': is_selected,
+                'voters': voters,
+            })
+
+        surveys_data.append({
+            'id': s.id,
+            'title': s.title,
+            'description': s.description,
+            'category': s.category,
+            'category_label': s.get_category_display(),
+            'is_multiple_choice': s.is_multiple_choice,
+            'is_active': s.is_active,
+            'created_by': s.created_by,
+            'created_at': s.created_at,
+            'total_votes': total_votes,
+            'unique_voters': unique_voters,
+            'has_voted': has_voted,
+            'user_option_ids': user_option_ids,
+            'options': options_data,
+        })
+
+    active_count = CommunitySurvey.objects.filter(is_active=True).count()
+    closed_count = CommunitySurvey.objects.filter(is_active=False).count()
+
+    return render(request, 'recommendations/surveys.html', {
+        'surveys': surveys_data,
+        'category_filter': category_filter,
+        'status_filter': status_filter,
+        'category_choices': CommunitySurvey.CATEGORY_CHOICES,
+        'active_count': active_count,
+        'closed_count': closed_count,
+        'is_admin': is_admin,
+        'active_page': 'surveys',
+    })
+
+
+def survey_vote_view(request, survey_id):
+    """
+    Processes a member's vote for a survey.
+    Supports single-choice and multiple-choice voting, vote updates, and Google Sheets synchronization.
+    """
+    if not is_authenticated_member(request):
+        return redirect('login_page')
+
+    if request.method != 'POST':
+        return redirect('surveys')
+
+    survey = get_object_or_404(CommunitySurvey, id=survey_id)
+    if not survey.is_active:
+        return redirect(reverse('surveys') + '?error=survey_closed')
+
+    selected_option_ids = request.POST.getlist('options')
+    if not selected_option_ids:
+        return redirect(reverse('surveys') + '?error=no_selection')
+
+    user_email = request.session.get('member_email', '').strip().lower()
+    user_name = request.session.get('member_name', 'Member')
+
+    # If single choice, restrict to first option selected
+    if not survey.is_multiple_choice and len(selected_option_ids) > 1:
+        selected_option_ids = selected_option_ids[:1]
+
+    # Validate option IDs belong to this survey
+    valid_options = survey.options.filter(id__in=selected_option_ids)
+    if not valid_options.exists():
+        return redirect(reverse('surveys') + '?error=invalid_option')
+
+    # Clear previous votes for this user on this survey
+    SurveyVote.objects.filter(survey=survey, voter_email__iexact=user_email).delete()
+
+    # Create new votes
+    for opt in valid_options:
+        SurveyVote.objects.create(
+            survey=survey,
+            option=opt,
+            voter_email=user_email,
+            voter_name=user_name
+        )
+
+    # Sync to Google Sheets
+    try:
+        sync_survey_to_google_sheet(survey)
+    except Exception as e:
+        logger.warning(f"Failed to sync survey #{survey.id} to Google Sheet: {e}")
+
+    return redirect(reverse('surveys') + '?voted=1')
+
+
+@admin_required
+def organizer_survey_create_view(request):
+    """
+    Allows admins/organizers to create a new survey with dynamic options.
+    """
+    if request.method != 'POST':
+        return redirect('surveys')
+
+    title = request.POST.get('title', '').strip()
+    description = request.POST.get('description', '').strip()
+    category = request.POST.get('category', CommunitySurvey.CATEGORY_EVENT).strip()
+    is_multiple_choice = request.POST.get('is_multiple_choice') in ('on', 'true', '1', True)
+    options_raw = request.POST.getlist('options')
+
+    clean_options = [opt.strip() for opt in options_raw if opt.strip()]
+
+    if not title:
+        return redirect(reverse('surveys') + '?error=missing_title')
+
+    if len(clean_options) < 2:
+        return redirect(reverse('surveys') + '?error=min_options')
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '')
+
+    survey = CommunitySurvey.objects.create(
+        title=title,
+        description=description,
+        category=category,
+        is_multiple_choice=is_multiple_choice,
+        is_active=True,
+        created_by=admin_name,
+        created_by_email=admin_email
+    )
+
+    for idx, opt_text in enumerate(clean_options):
+        SurveyOption.objects.create(
+            survey=survey,
+            text=opt_text,
+            order=idx
+        )
+
+    # Audit log
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_SURVEY_CREATED,
+        target_email=admin_email,
+        target_name=survey.title,
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Created survey '{survey.title}' with {len(clean_options)} options. Mode: {'Multiple Choice' if is_multiple_choice else 'Single Choice'}."
+    )
+
+    try:
+        sync_survey_to_google_sheet(survey)
+    except Exception as e:
+        logger.warning(f"Failed to sync new survey to Google Sheet: {e}")
+
+    return redirect(reverse('surveys') + '?created=1')
+
+
+@admin_required
+def organizer_survey_toggle_status_view(request, survey_id):
+    """
+    Allows admins to close or re-open a survey.
+    """
+    if request.method != 'POST':
+        return redirect('surveys')
+
+    survey = get_object_or_404(CommunitySurvey, id=survey_id)
+    survey.is_active = not survey.is_active
+    survey.save()
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '')
+
+    action_label = "Re-opened" if survey.is_active else "Closed"
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_SURVEY_CLOSED,
+        target_email=admin_email,
+        target_name=survey.title,
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Survey '{survey.title}' {action_label.lower()} by organizer."
+    )
+
+    try:
+        sync_survey_to_google_sheet(survey)
+    except Exception as e:
+        logger.warning(f"Failed to sync toggled survey status to Google Sheet: {e}")
+
+    return redirect(reverse('surveys') + '?toggled=1')
+
+
+@admin_required
+def organizer_survey_delete_view(request, survey_id):
+    """
+    Allows admins to delete a survey and purge its entries from Google Sheets.
+    """
+    if request.method != 'POST':
+        return redirect('surveys')
+
+    survey = get_object_or_404(CommunitySurvey, id=survey_id)
+    survey_title = survey.title
+    survey_id_num = survey.id
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '')
+
+    survey.delete()
+
+    MembershipAuditLog.objects.create(
+        action=MembershipAuditLog.ACTION_SURVEY_DELETED,
+        target_email=admin_email,
+        target_name=survey_title,
+        actor_name=admin_name,
+        actor_email=admin_email,
+        notes=f"Survey '{survey_title}' deleted by organizer."
+    )
+
+    try:
+        delete_survey_from_google_sheet(survey_id_num)
+    except Exception as e:
+        logger.warning(f"Failed to delete survey from Google Sheet: {e}")
+
+    return redirect(reverse('surveys') + '?deleted=1')
+
 
 
 
