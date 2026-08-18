@@ -3089,8 +3089,10 @@ class CommunityEventDualSourceTestCase(TestCase):
             }
         ]
 
-        events = fetch_community_events()
-        self.assertEqual(len(events), 2)
+        with patch.dict('os.environ', {'GOOGLE_CALENDAR_ID': 'mock_calendar_id_123'}):
+            with override_settings(GOOGLE_SERVICE_ACCOUNT_INFO={'type': 'service_account', 'client_email': 'mock@test.iam.gserviceaccount.com'}):
+                events = fetch_community_events(force_refresh=True)
+                self.assertEqual(len(events), 2)
 
         # Verify portal event properties
         p_evt = next(e for e in events if e['title'] == 'Portal Artisan Fair')
