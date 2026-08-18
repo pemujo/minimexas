@@ -635,241 +635,234 @@
     <!-- CREATE EVENT MODAL -->
     <div class="modal fade" id="createEventModal" tabindex="-1" aria-labelledby="createEventModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+            <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'event_create' %}" style="border-radius: var(--radius-xl); overflow: hidden;">
+                {% csrf_token %}
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
                     <h5 class="modal-title fw-bold" id="createEventModalLabel">
                         <i class="bi bi-calendar-plus-fill me-2 text-warning"></i> Create Community Event
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="POST" action="{% url 'event_create' %}">
-                    {% csrf_token %}
-                    <div class="modal-body p-4">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label fw-bold small text-dark">Event Title <span class="text-danger">*</span></label>
-                                <input type="text" name="title" class="form-control" placeholder="e.g. Fiesta Mexicana & Networking Mixer" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Category <span class="text-danger">*</span></label>
-                                <select name="category" class="form-select" required>
-                                    <option value="Cultural & Heritage">Cultural & Heritage</option>
-                                    <option value="Networking & Tech">Networking & Tech</option>
-                                    <option value="Family & Outdoors">Family & Outdoors</option>
-                                    <option value="Culinary & Social">Culinary & Social</option>
-                                    <option value="Community Gathering" selected>Community Gathering</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Location / Venue <span class="text-danger">*</span></label>
-                                <input type="text" name="location" class="form-control" placeholder="e.g. Mission Dolores Park, SF" value="San Francisco Bay Area" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Start Date <span class="text-danger">*</span></label>
-                                <input type="date" name="start_date" id="createEventStartDate" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Start Time <span class="text-danger">*</span></label>
-                                <input type="time" name="start_time" class="form-control" value="18:00" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">End Date <span class="text-muted fw-normal">(Optional)</span></label>
-                                <input type="date" name="end_date" class="form-control">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">End Time <span class="text-muted fw-normal">(Optional)</span></label>
-                                <input type="time" name="end_time" class="form-control" value="20:30">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold small text-dark">Google Maps / Location Link <span class="text-muted fw-normal">(Optional)</span></label>
-                                <input type="url" name="location_url" class="form-control" placeholder="https://maps.google.com/?q=...">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold small text-dark">Event Description <span class="text-danger">*</span></label>
-                                <textarea name="description" class="form-control" rows="3" placeholder="Tell the community what to expect, what to bring, etc." required></textarea>
-                            </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-dark">Event Title <span class="text-danger">*</span></label>
+                            <input type="text" name="title" class="form-control" placeholder="e.g. Fiesta Mexicana & Networking Mixer" required>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Category <span class="text-danger">*</span></label>
+                            <select name="category" class="form-select" required>
+                                <option value="Cultural & Heritage">Cultural & Heritage</option>
+                                <option value="Networking & Tech">Networking & Tech</option>
+                                <option value="Family & Outdoors">Family & Outdoors</option>
+                                <option value="Culinary & Social">Culinary & Social</option>
+                                <option value="Community Gathering" selected>Community Gathering</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Location / Venue <span class="text-danger">*</span></label>
+                            <input type="text" name="location" class="form-control" placeholder="e.g. Mission Dolores Park, SF" value="San Francisco Bay Area" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" name="start_date" id="createEventStartDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Start Time <span class="text-danger">*</span></label>
+                            <input type="time" name="start_time" class="form-control" value="18:00" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">End Date <span class="text-muted fw-normal">(Optional)</span></label>
+                            <input type="date" name="end_date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">End Time <span class="text-muted fw-normal">(Optional)</span></label>
+                            <input type="time" name="end_time" class="form-control" value="20:30">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-dark">Google Maps / Location Link <span class="text-muted fw-normal">(Optional)</span></label>
+                            <input type="url" name="location_url" class="form-control" placeholder="https://maps.google.com/?q=...">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-dark">Event Description <span class="text-danger">*</span></label>
+                            <textarea name="description" class="form-control" rows="3" placeholder="Tell the community what to expect, what to bring, etc." required></textarea>
+                        </div>
+                    </div>
 
-                        <!-- Instant Broadcast Option -->
-                        <div class="p-3 mt-3 bg-light rounded-3 border">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" role="switch" name="broadcast_now" id="createEventBroadcastNow" value="1">
-                                <label class="form-check-label fw-bold small text-dark" for="createEventBroadcastNow">
-                                    <i class="bi bi-megaphone-fill text-primary me-1"></i> Send email announcement to all {{ total_members_count }} members immediately
-                                </label>
-                                <div class="text-muted small ms-0 mt-1" style="font-size: 0.76rem;">
-                                    Members will receive a rich HTML invitation with dynamic 1-click RSVP buttons.
-                                </div>
+                    <!-- Instant Broadcast Option -->
+                    <div class="p-3 mt-3 bg-light rounded-3 border">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" name="broadcast_now" id="createEventBroadcastNow" value="1">
+                            <label class="form-check-label fw-bold small text-dark" for="createEventBroadcastNow">
+                                <i class="bi bi-megaphone-fill text-primary me-1"></i> Send email announcement to all {{ total_members_count }} members immediately
+                            </label>
+                            <div class="text-muted small ms-0 mt-1" style="font-size: 0.76rem;">
+                                Members will receive a rich HTML invitation with dynamic 1-click RSVP buttons.
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer bg-light border-0 px-4 py-3">
-                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
-                            <i class="bi bi-check2-circle me-1"></i> Save Event
-                        </button>
-                    </div>
-                </form>
-            </div>
+                </div>
+                <div class="modal-footer bg-light border-0 px-4 py-3">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
+                        <i class="bi bi-check2-circle me-1"></i> Save Event
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- EDIT EVENT MODAL -->
     <div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+            <form class="modal-content border-0 shadow-lg" method="POST" id="editEventForm" action="" style="border-radius: var(--radius-xl); overflow: hidden;">
+                {% csrf_token %}
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
                     <h5 class="modal-title fw-bold" id="editEventModalLabel">
                         <i class="bi bi-pencil-square me-2 text-warning"></i> Edit Community Event
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="POST" id="editEventForm" action="">
-                    {% csrf_token %}
-                    <div class="modal-body p-4">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label fw-bold small text-dark">Event Title <span class="text-danger">*</span></label>
-                                <input type="text" name="title" id="editEventTitle" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Category <span class="text-danger">*</span></label>
-                                <select name="category" id="editEventCategory" class="form-select" required>
-                                    <option value="Cultural & Heritage">Cultural & Heritage</option>
-                                    <option value="Networking & Tech">Networking & Tech</option>
-                                    <option value="Family & Outdoors">Family & Outdoors</option>
-                                    <option value="Culinary & Social">Culinary & Social</option>
-                                    <option value="Community Gathering">Community Gathering</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Location / Venue <span class="text-danger">*</span></label>
-                                <input type="text" name="location" id="editEventLocation" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Start Date <span class="text-danger">*</span></label>
-                                <input type="date" name="start_date" id="editEventStartDate" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">Start Time <span class="text-danger">*</span></label>
-                                <input type="time" name="start_time" id="editEventStartTime" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">End Date <span class="text-muted fw-normal">(Optional)</span></label>
-                                <input type="date" name="end_date" id="editEventEndDate" class="form-control">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small text-dark">End Time <span class="text-muted fw-normal">(Optional)</span></label>
-                                <input type="time" name="end_time" id="editEventEndTime" class="form-control">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold small text-dark">Google Maps / Location Link <span class="text-muted fw-normal">(Optional)</span></label>
-                                <input type="url" name="location_url" id="editEventLocUrl" class="form-control">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold small text-dark">Event Description <span class="text-danger">*</span></label>
-                                <textarea name="description" id="editEventDesc" class="form-control" rows="3" required></textarea>
-                            </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-dark">Event Title <span class="text-danger">*</span></label>
+                            <input type="text" name="title" id="editEventTitle" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Category <span class="text-danger">*</span></label>
+                            <select name="category" id="editEventCategory" class="form-select" required>
+                                <option value="Cultural & Heritage">Cultural & Heritage</option>
+                                <option value="Networking & Tech">Networking & Tech</option>
+                                <option value="Family & Outdoors">Family & Outdoors</option>
+                                <option value="Culinary & Social">Culinary & Social</option>
+                                <option value="Community Gathering">Community Gathering</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Location / Venue <span class="text-danger">*</span></label>
+                            <input type="text" name="location" id="editEventLocation" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" name="start_date" id="editEventStartDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Start Time <span class="text-danger">*</span></label>
+                            <input type="time" name="start_time" id="editEventStartTime" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">End Date <span class="text-muted fw-normal">(Optional)</span></label>
+                            <input type="date" name="end_date" id="editEventEndDate" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">End Time <span class="text-muted fw-normal">(Optional)</span></label>
+                            <input type="time" name="end_time" id="editEventEndTime" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-dark">Google Maps / Location Link <span class="text-muted fw-normal">(Optional)</span></label>
+                            <input type="url" name="location_url" id="editEventLocUrl" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-dark">Event Description <span class="text-danger">*</span></label>
+                            <textarea name="description" id="editEventDesc" class="form-control" rows="3" required></textarea>
                         </div>
                     </div>
-                    <div class="modal-footer bg-light border-0 px-4 py-3">
-                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
-                            <i class="bi bi-check2-circle me-1"></i> Update Event
-                        </button>
-                    </div>
-                </form>
-            </div>
+                </div>
+                <div class="modal-footer bg-light border-0 px-4 py-3">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
+                        <i class="bi bi-check2-circle me-1"></i> Update Event
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- DELETE EVENT MODAL -->
     <div class="modal fade" id="deleteEventModal" tabindex="-1" aria-labelledby="deleteEventModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+            <form class="modal-content border-0 shadow-lg" method="POST" id="deleteEventForm" action="" style="border-radius: var(--radius-xl); overflow: hidden;">
+                {% csrf_token %}
                 <div class="modal-header text-white bg-danger">
                     <h5 class="modal-title fw-bold" id="deleteEventModalLabel">
                         <i class="bi bi-trash3-fill me-2"></i> Delete Community Event
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="POST" id="deleteEventForm" action="">
-                    {% csrf_token %}
-                    <div class="modal-body p-4 text-center">
-                        <div class="mb-3">
-                            <i class="bi bi-exclamation-octagon-fill text-danger" style="font-size: 3rem;"></i>
-                        </div>
-                        <h5 class="fw-bold text-dark mb-2">Are you sure?</h5>
-                        <p class="text-muted small mb-0">
-                            You are about to delete <strong id="deleteEventTitle" class="text-dark"></strong>. This action will deactivate the event and sync the removal with Google Sheets and the audit log.
-                        </p>
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-exclamation-octagon-fill text-danger" style="font-size: 3rem;"></i>
                     </div>
-                    <div class="modal-footer bg-light border-0 px-4 py-3 justify-content-center">
-                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger rounded-pill px-4">
-                            <i class="bi bi-trash3 me-1"></i> Yes, Delete Event
-                        </button>
-                    </div>
-                </form>
-            </div>
+                    <h5 class="fw-bold text-dark mb-2">Are you sure?</h5>
+                    <p class="text-muted small mb-0">
+                        You are about to delete <strong id="deleteEventTitle" class="text-dark"></strong>. This action will deactivate the event and sync the removal with Google Sheets and the audit log.
+                    </p>
+                </div>
+                <div class="modal-footer bg-light border-0 px-4 py-3 justify-content-center">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4">
+                        <i class="bi bi-trash3 me-1"></i> Yes, Delete Event
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- BROADCAST EVENT MODAL -->
     <div class="modal fade" id="broadcastModal" tabindex="-1" aria-labelledby="broadcastModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
+            <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'event_broadcast' %}" style="border-radius: var(--radius-xl); overflow: hidden;">
+                {% csrf_token %}
+                <input type="hidden" name="event_id" id="bcastEventId">
+                <input type="hidden" name="event_title" id="bcastEventTitle">
+                <input type="hidden" name="date_formatted" id="bcastEventDate">
+                <input type="hidden" name="time_formatted" id="bcastEventTime">
+                <input type="hidden" name="location" id="bcastEventLocation">
+                <input type="hidden" name="location_url" id="bcastEventLocUrl">
+                <input type="hidden" name="category" id="bcastEventCategory">
+                <input type="hidden" name="description" id="bcastEventDesc">
+                <input type="hidden" name="google_calendar_link" id="bcastEventGcal">
+
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
                     <h5 class="modal-title fw-bold" id="broadcastModalLabel">
                         <i class="bi bi-megaphone-fill me-2"></i> Broadcast Event Announcement
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="POST" action="{% url 'event_broadcast' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="event_id" id="bcastEventId">
-                    <input type="hidden" name="event_title" id="bcastEventTitle">
-                    <input type="hidden" name="date_formatted" id="bcastEventDate">
-                    <input type="hidden" name="time_formatted" id="bcastEventTime">
-                    <input type="hidden" name="location" id="bcastEventLocation">
-                    <input type="hidden" name="location_url" id="bcastEventLocUrl">
-                    <input type="hidden" name="category" id="bcastEventCategory">
-                    <input type="hidden" name="description" id="bcastEventDesc">
-                    <input type="hidden" name="google_calendar_link" id="bcastEventGcal">
 
-                    <div class="modal-body p-4">
-                        <div class="alert alert-info border-0 d-flex align-items-start gap-2 mb-3" style="background-color: #e0f2fe; color: #0369a1; border-radius: 12px;">
-                            <i class="bi bi-info-circle-fill fs-5 mt-1"></i>
-                            <div class="small">
-                                <strong>Ready to notify the community?</strong><br>
-                                This will send a rich HTML announcement email to all <strong>{{ total_members_count }} registered community members</strong> with Google Maps directions, 'Add to Calendar' button, and personalized 1-click RSVP action links.
-                            </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 d-flex align-items-start gap-2 mb-3" style="background-color: #e0f2fe; color: #0369a1; border-radius: 12px;">
+                        <i class="bi bi-info-circle-fill fs-5 mt-1"></i>
+                        <div class="small">
+                            <strong>Ready to notify the community?</strong><br>
+                            This will send a rich HTML announcement email to all <strong>{{ total_members_count }} registered community members</strong> with Google Maps directions, 'Add to Calendar' button, and personalized 1-click RSVP action links.
                         </div>
-
-                        <div class="bg-light p-3 rounded-3 border mb-3">
-                            <div class="text-muted small text-uppercase fw-bold mb-1" id="bcastPreviewCategory">Category</div>
-                            <h5 class="fw-bold text-dark mb-2" id="bcastPreviewTitle">Event Title</h5>
-                            <div class="small text-secondary mb-1">
-                                <i class="bi bi-calendar-date text-primary me-2"></i> <span id="bcastPreviewDate">Date</span> &bull; <span id="bcastPreviewTime">Time</span>
-                            </div>
-                            <div class="small text-secondary">
-                                <i class="bi bi-geo-alt text-danger me-2"></i> <span id="bcastPreviewLocation">Location</span>
-                            </div>
-                        </div>
-
-                        <p class="text-muted small mb-0">
-                            <i class="bi bi-shield-check text-success me-1"></i> This broadcast will be logged to the official <strong>MembershipAuditLog</strong> and synchronized with Google Sheets.
-                        </p>
                     </div>
 
-                    <div class="modal-footer bg-light border-0 px-4 py-3">
-                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
-                            <i class="bi bi-send-fill me-1"></i> Send Announcement Email
-                        </button>
+                    <div class="bg-light p-3 rounded-3 border mb-3">
+                        <div class="text-muted small text-uppercase fw-bold mb-1" id="bcastPreviewCategory">Category</div>
+                        <h5 class="fw-bold text-dark mb-2" id="bcastPreviewTitle">Event Title</h5>
+                        <div class="small text-secondary mb-1">
+                            <i class="bi bi-calendar-date text-primary me-2"></i> <span id="bcastPreviewDate">Date</span> &bull; <span id="bcastPreviewTime">Time</span>
+                        </div>
+                        <div class="small text-secondary">
+                            <i class="bi bi-geo-alt text-danger me-2"></i> <span id="bcastPreviewLocation">Location</span>
+                        </div>
                     </div>
-                </form>
-            </div>
+
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-shield-check text-success me-1"></i> This broadcast will be logged to the official <strong>MembershipAuditLog</strong> and synchronized with Google Sheets.
+                    </p>
+                </div>
+
+                <div class="modal-footer bg-light border-0 px-4 py-3">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+                        <i class="bi bi-send-fill me-1"></i> Send Announcement Email
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
     {% endif %}

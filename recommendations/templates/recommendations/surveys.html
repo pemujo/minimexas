@@ -1,17 +1,22 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Community Surveys & Polls - MiniMexitas</title>
-    <meta name="description" content="Vote in community surveys, event planning polls, and group decisions for MiniMexitas Bay Area members.">
+    <meta name="description"
+        content="Vote in community surveys, event planning polls, and group decisions for MiniMexitas Bay Area members.">
     <!-- Open Graph / WhatsApp -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="Community Surveys & Polls - MiniMexitas">
-    <meta property="og:description" content="Vote on upcoming event locations, dates, activities, and community decisions.">
-    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
-    <meta property="og:image:secure_url" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
+    <meta property="og:description"
+        content="Vote on upcoming event locations, dates, activities, and community decisions.">
+    <meta property="og:image"
+        content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
+    <meta property="og:image:secure_url"
+        content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="397">
     <meta property="og:image:height" content="360">
@@ -20,7 +25,8 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Community Surveys - MiniMexitas">
     <meta name="twitter:description" content="Vote on upcoming events and group decisions.">
-    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
+    <meta name="twitter:image"
+        content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <!-- Mobile PWA & Theme -->
     <meta name="theme-color" content="#0a0f1d">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,14 +48,17 @@
             background: #ffffff;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
+
         .survey-card:hover {
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.07), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
         }
+
         .survey-card.survey-closed {
             background: #fafbfc;
             border-color: #e2e8f0;
             opacity: 0.95;
         }
+
         .poll-option-row {
             position: relative;
             border: 1px solid #e2e8f0;
@@ -60,10 +69,12 @@
             overflow: hidden;
             transition: all 0.2s ease;
         }
+
         .poll-option-row.user-voted-option {
             border-color: #2563eb;
             background: #f0f7ff;
         }
+
         .poll-progress-bg {
             position: absolute;
             top: 0;
@@ -74,13 +85,16 @@
             transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 11px;
         }
+
         .poll-progress-bg.winning {
             background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.22));
         }
+
         .poll-option-content {
             position: relative;
             z-index: 2;
         }
+
         .voter-chip {
             display: inline-flex;
             align-items: center;
@@ -92,14 +106,16 @@
             font-weight: 500;
             color: #334155;
             margin: 2px 3px 2px 0;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
         }
+
         .voter-chip.highlight-you {
             background: #dbeafe;
             border-color: #93c5fd;
             color: #1e40af;
             font-weight: 600;
         }
+
         .option-selectable-card {
             display: block;
             border: 1.5px solid #e2e8f0;
@@ -110,14 +126,17 @@
             cursor: pointer;
             transition: all 0.2s ease;
         }
+
         .option-selectable-card:hover {
             border-color: #3b82f6;
             background: #f8fafc;
         }
-        .option-selectable-card input:checked ~ .option-label-text {
+
+        .option-selectable-card input:checked~.option-label-text {
             font-weight: 600;
             color: #1d4ed8;
         }
+
         .category-pill-badge {
             font-size: 0.75rem;
             font-weight: 600;
@@ -126,12 +145,29 @@
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
-        .cat-event { background: #fef3c7; color: #92400e; }
-        .cat-food { background: #fee2e2; color: #991b1b; }
-        .cat-community { background: #d1fae5; color: #065f46; }
-        .cat-general { background: #e0e7ff; color: #3730a3; }
+
+        .cat-event {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .cat-food {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .cat-community {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .cat-general {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
     </style>
 </head>
+
 <body>
 
     <!-- REUSABLE NAVBAR -->
@@ -141,7 +177,8 @@
     <div class="container main-container pt-4 mb-5">
 
         <!-- HEADER SECTION -->
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div
+            class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
             <div>
                 <div class="badge-pill-header mb-2">
                     <i class="bi bi-bar-chart-fill text-primary me-2"></i>
@@ -152,10 +189,11 @@
                     Vote on upcoming events, favorite picnic spots, community initiatives, and group questions.
                 </p>
             </div>
-            
+
             {% if is_admin %}
             <div>
-                <button type="button" class="btn btn-primary-action px-3 py-2 fw-semibold rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#createSurveyModal">
+                <button type="button" class="btn btn-primary-action px-3 py-2 fw-semibold rounded-pill shadow-sm"
+                    data-bs-toggle="modal" data-bs-target="#createSurveyModal">
                     <i class="bi bi-plus-circle-fill me-1"></i> Start New Survey
                 </button>
             </div>
@@ -164,27 +202,31 @@
 
         <!-- NOTIFICATION ALERTS -->
         {% if request.GET.voted %}
-        <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4" role="alert">
+        <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4"
+            role="alert">
             <i class="bi bi-check-circle-fill fs-4 me-3 text-success"></i>
             <div>
-                <strong>Vote Recorded!</strong> Thank you for participating. Your vote has been recorded and synced with Google Sheets in real-time.
+                <strong>Vote Recorded!</strong> Thank you for participating. Your vote has been recorded.
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {% endif %}
 
         {% if request.GET.created %}
-        <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4" role="alert">
+        <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4"
+            role="alert">
             <i class="bi bi-stars fs-4 me-3 text-success"></i>
             <div>
-                <strong>Survey Published!</strong> The new survey has been posted for members to vote on and synchronized to the Google Spreadsheet.
+                <strong>Survey Published!</strong> The new survey has been posted for members to vote on and
+                synchronized to the Google Spreadsheet.
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {% endif %}
 
         {% if request.GET.toggled %}
-        <div class="alert alert-info alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4" role="alert">
+        <div class="alert alert-info alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4"
+            role="alert">
             <i class="bi bi-info-circle-fill fs-4 me-3 text-info"></i>
             <div>
                 <strong>Status Updated:</strong> The survey's status was changed successfully.
@@ -194,17 +236,20 @@
         {% endif %}
 
         {% if request.GET.deleted %}
-        <div class="alert alert-warning alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4" role="alert">
+        <div class="alert alert-warning alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4"
+            role="alert">
             <i class="bi bi-trash-fill fs-4 me-3 text-warning"></i>
             <div>
-                <strong>Survey Deleted:</strong> The survey and its votes have been removed from the portal and Google Sheet.
+                <strong>Survey Deleted:</strong> The survey and its votes have been removed from the portal and Google
+                Sheet.
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {% endif %}
 
         {% if request.GET.error %}
-        <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm d-flex align-items-center mb-4"
+            role="alert">
             <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-danger"></i>
             <div>
                 {% if request.GET.error == 'no_selection' %}
@@ -225,20 +270,21 @@
 
         <!-- FILTER TABS & CATEGORIES -->
         <div class="card card-custom p-3 mb-4 shadow-sm">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-                
+            <div
+                class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+
                 <!-- Status Nav Tabs -->
                 <div class="nav nav-pills gap-1">
-                    <a href="?status=active{% if category_filter %}&category={{ category_filter }}{% endif %}" 
-                       class="btn btn-sm rounded-pill px-3 py-2 fw-semibold {% if status_filter == 'active' %}btn-primary-action{% else %}btn-outline-secondary border-0{% endif %}">
+                    <a href="?status=active{% if category_filter %}&category={{ category_filter }}{% endif %}"
+                        class="btn btn-sm rounded-pill px-3 py-2 fw-semibold {% if status_filter == 'active' %}btn-primary-action{% else %}btn-outline-secondary border-0{% endif %}">
                         <i class="bi bi-lightning-charge-fill me-1"></i> Active Surveys ({{ active_count }})
                     </a>
-                    <a href="?status=closed{% if category_filter %}&category={{ category_filter }}{% endif %}" 
-                       class="btn btn-sm rounded-pill px-3 py-2 fw-semibold {% if status_filter == 'closed' %}btn-primary-action{% else %}btn-outline-secondary border-0{% endif %}">
+                    <a href="?status=closed{% if category_filter %}&category={{ category_filter }}{% endif %}"
+                        class="btn btn-sm rounded-pill px-3 py-2 fw-semibold {% if status_filter == 'closed' %}btn-primary-action{% else %}btn-outline-secondary border-0{% endif %}">
                         <i class="bi bi-archive-fill me-1"></i> Completed / Closed ({{ closed_count }})
                     </a>
-                    <a href="?status=all{% if category_filter %}&category={{ category_filter }}{% endif %}" 
-                       class="btn btn-sm rounded-pill px-3 py-2 fw-semibold {% if status_filter == 'all' %}btn-primary-action{% else %}btn-outline-secondary border-0{% endif %}">
+                    <a href="?status=all{% if category_filter %}&category={{ category_filter }}{% endif %}"
+                        class="btn btn-sm rounded-pill px-3 py-2 fw-semibold {% if status_filter == 'all' %}btn-primary-action{% else %}btn-outline-secondary border-0{% endif %}">
                         All
                     </a>
                 </div>
@@ -246,13 +292,13 @@
                 <!-- Category Filters -->
                 <div class="d-flex flex-wrap gap-1 align-items-center">
                     <span class="text-muted small me-1 d-none d-lg-inline">Category:</span>
-                    <a href="?status={{ status_filter }}" 
-                       class="btn btn-sm btn-outline-pill {% if not category_filter %}active{% endif %}">
+                    <a href="?status={{ status_filter }}"
+                        class="btn btn-sm btn-outline-pill {% if not category_filter %}active{% endif %}">
                         All
                     </a>
                     {% for cat_key, cat_name in category_choices %}
-                    <a href="?status={{ status_filter }}&category={{ cat_key }}" 
-                       class="btn btn-sm btn-outline-pill {% if category_filter == cat_key %}active{% endif %}">
+                    <a href="?status={{ status_filter }}&category={{ cat_key }}"
+                        class="btn btn-sm btn-outline-pill {% if category_filter == cat_key %}active{% endif %}">
                         {{ cat_name }}
                     </a>
                     {% endfor %}
@@ -266,8 +312,9 @@
         <div class="row g-4">
             {% for survey in surveys %}
             <div class="col-12 col-lg-6">
-                <div class="card survey-card h-100 p-4 shadow-sm d-flex flex-column justify-content-between {% if not survey.is_active %}survey-closed{% endif %}">
-                    
+                <div
+                    class="card survey-card h-100 p-4 shadow-sm d-flex flex-column justify-content-between {% if not survey.is_active %}survey-closed{% endif %}">
+
                     <!-- Top Metadata Row -->
                     <div>
                         <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
@@ -275,19 +322,22 @@
                                 <span class="category-pill-badge cat-{{ survey.category }}">
                                     {{ survey.category_label }}
                                 </span>
-                                
+
                                 {% if survey.is_multiple_choice %}
-                                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill" style="font-size: 0.7rem;">
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill"
+                                    style="font-size: 0.7rem;">
                                     <i class="bi bi-check2-square me-1"></i> Multi-Choice
                                 </span>
                                 {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill" style="font-size: 0.7rem;">
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill"
+                                    style="font-size: 0.7rem;">
                                     <i class="bi bi-ui-radios me-1"></i> Single Choice
                                 </span>
                                 {% endif %}
 
                                 {% if not survey.is_active %}
-                                <span class="badge bg-danger-subtle text-danger rounded-pill" style="font-size: 0.7rem;">
+                                <span class="badge bg-danger-subtle text-danger rounded-pill"
+                                    style="font-size: 0.7rem;">
                                     <i class="bi bi-lock-fill me-1"></i> Closed
                                 </span>
                                 {% endif %}
@@ -296,12 +346,14 @@
                             <!-- Admin Controls Dropdown -->
                             {% if is_admin %}
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-light border rounded-circle p-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Admin actions">
+                                <button class="btn btn-sm btn-light border rounded-circle p-1" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false" title="Admin actions">
                                     <i class="bi bi-three-dots-vertical text-secondary"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                     <li>
-                                        <form action="{% url 'survey_toggle_status' survey.id %}" method="POST" class="d-inline">
+                                        <form action="{% url 'survey_toggle_status' survey.id %}" method="POST"
+                                            class="d-inline">
                                             {% csrf_token %}
                                             <button type="submit" class="dropdown-item small">
                                                 {% if survey.is_active %}
@@ -312,9 +364,12 @@
                                             </button>
                                         </form>
                                     </li>
-                                    <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form action="{% url 'survey_delete' survey.id %}" method="POST" onsubmit="return confirm('Are you sure you want to permanently delete this survey and its votes?');">
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li>
+                                        <form action="{% url 'survey_delete' survey.id %}" method="POST"
+                                            onsubmit="return confirm('Are you sure you want to permanently delete this survey and its votes?');">
                                             {% csrf_token %}
                                             <button type="submit" class="dropdown-item small text-danger">
                                                 <i class="bi bi-trash me-2"></i> Delete Survey
@@ -341,10 +396,13 @@
                         <div class="mb-3">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="text-muted small fw-semibold">
-                                    <i class="bi bi-bar-chart me-1"></i> Current Results ({{ survey.total_votes }} votes by {{ survey.unique_voters }} members)
+                                    <i class="bi bi-bar-chart me-1"></i> Current Results ({{ survey.total_votes }} votes
+                                    by {{ survey.unique_voters }} members)
                                 </span>
                                 {% if survey.has_voted and survey.is_active %}
-                                <button class="btn btn-link text-primary text-decoration-none p-0 small fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#changeVoteForm{{ survey.id }}">
+                                <button class="btn btn-link text-primary text-decoration-none p-0 small fw-semibold"
+                                    type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#changeVoteForm{{ survey.id }}">
                                     <i class="bi bi-pencil-square me-1"></i> Change Vote
                                 </button>
                                 {% endif %}
@@ -359,22 +417,27 @@
                                         <div class="d-flex align-items-center">
                                             <span class="fw-semibold text-dark small me-2">{{ opt.text }}</span>
                                             {% if opt.is_selected %}
-                                            <span class="badge bg-primary text-white rounded-pill" style="font-size: 0.65rem; padding: 2px 6px;">
+                                            <span class="badge bg-primary text-white rounded-pill"
+                                                style="font-size: 0.65rem; padding: 2px 6px;">
                                                 <i class="bi bi-check-lg me-1"></i> Your Vote
                                             </span>
                                             {% endif %}
                                         </div>
                                         <span class="text-dark fw-bold small">
-                                            {{ opt.vote_count }} <span class="text-muted fw-normal">({{ opt.percentage }}%)</span>
+                                            {{ opt.vote_count }} <span class="text-muted fw-normal">({{ opt.percentage
+                                                }}%)</span>
                                         </span>
                                     </div>
 
                                     <!-- Transparent Voter Names List -->
                                     {% if opt.voters %}
-                                    <div class="d-flex flex-wrap align-items-center mt-1 pt-1 border-top border-light-subtle">
-                                        <span class="text-muted me-1" style="font-size: 0.68rem;"><i class="bi bi-people text-secondary me-1"></i>Voters:</span>
+                                    <div
+                                        class="d-flex flex-wrap align-items-center mt-1 pt-1 border-top border-light-subtle">
+                                        <span class="text-muted me-1" style="font-size: 0.68rem;"><i
+                                                class="bi bi-people text-secondary me-1"></i>Voters:</span>
                                         {% for v_name in opt.voters %}
-                                        <span class="voter-chip {% if opt.is_selected and v_name == request.session.member_name %}highlight-you{% endif %}">
+                                        <span
+                                            class="voter-chip {% if opt.is_selected and v_name == request.session.member_name %}highlight-you{% endif %}">
                                             {{ v_name }}
                                         </span>
                                         {% endfor %}
@@ -387,26 +450,34 @@
                             <!-- Collapsible Change Vote Form (Active Surveys) -->
                             {% if survey.has_voted and survey.is_active %}
                             <div class="collapse mt-3 pt-3 border-top" id="changeVoteForm{{ survey.id }}">
-                                <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-arrow-repeat me-1"></i> Update Your Selection:</h6>
+                                <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-arrow-repeat me-1"></i> Update
+                                    Your Selection:</h6>
                                 <form action="{% url 'survey_vote' survey.id %}" method="POST">
                                     {% csrf_token %}
                                     <div class="mb-3">
                                         {% for opt in survey.options %}
                                         <label class="option-selectable-card d-flex align-items-center gap-3">
                                             {% if survey.is_multiple_choice %}
-                                            <input type="checkbox" name="options" value="{{ opt.id }}" class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif %}>
+                                            <input type="checkbox" name="options" value="{{ opt.id }}"
+                                                class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif
+                                                %}>
                                             {% else %}
-                                            <input type="radio" name="options" value="{{ opt.id }}" class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif %} required>
+                                            <input type="radio" name="options" value="{{ opt.id }}"
+                                                class="form-check-input mt-0" {% if opt.is_selected %}checked{% endif %}
+                                                required>
                                             {% endif %}
                                             <span class="option-label-text small">{{ opt.text }}</span>
                                         </label>
                                         {% endfor %}
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
+                                        <button type="submit"
+                                            class="btn btn-sm btn-primary-action rounded-pill px-3 py-2 fw-semibold">
                                             Save Updated Vote
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-2" data-bs-toggle="collapse" data-bs-target="#changeVoteForm{{ survey.id }}">
+                                        <button type="button"
+                                            class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-2"
+                                            data-bs-toggle="collapse" data-bs-target="#changeVoteForm{{ survey.id }}">
                                             Cancel
                                         </button>
                                     </div>
@@ -423,16 +494,19 @@
                                 {% for opt in survey.options %}
                                 <label class="option-selectable-card d-flex align-items-center gap-3">
                                     {% if survey.is_multiple_choice %}
-                                    <input type="checkbox" name="options" value="{{ opt.id }}" class="form-check-input mt-0">
+                                    <input type="checkbox" name="options" value="{{ opt.id }}"
+                                        class="form-check-input mt-0">
                                     {% else %}
-                                    <input type="radio" name="options" value="{{ opt.id }}" class="form-check-input mt-0" required>
+                                    <input type="radio" name="options" value="{{ opt.id }}"
+                                        class="form-check-input mt-0" required>
                                     {% endif %}
                                     <span class="option-label-text small">{{ opt.text }}</span>
                                 </label>
                                 {% endfor %}
                             </div>
 
-                            <button type="submit" class="btn btn-primary-action w-100 py-2 rounded-pill fw-semibold shadow-sm">
+                            <button type="submit"
+                                class="btn btn-primary-action w-100 py-2 rounded-pill fw-semibold shadow-sm">
                                 <i class="bi bi-check2-circle me-1"></i> Submit Vote
                             </button>
                         </form>
@@ -440,9 +514,11 @@
                     </div>
 
                     <!-- Card Footer Info -->
-                    <div class="pt-2 border-top border-light d-flex justify-content-between align-items-center text-muted" style="font-size: 0.75rem;">
+                    <div class="pt-2 border-top border-light d-flex justify-content-between align-items-center text-muted"
+                        style="font-size: 0.75rem;">
                         <span>
-                            <i class="bi bi-person-check me-1"></i> Posted by {{ survey.created_by|default:"Organizer" }}
+                            <i class="bi bi-person-check me-1"></i> Posted by {{ survey.created_by|default:"Organizer"
+                            }}
                         </span>
                         <span>
                             <i class="bi bi-clock me-1"></i> {{ survey.created_at|date:"M j, Y" }}
@@ -456,7 +532,8 @@
         {% else %}
         <!-- Empty State -->
         <div class="card card-custom p-5 text-center shadow-sm">
-            <div class="feature-icon-box bg-blue-subtle mx-auto mb-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
+            <div class="feature-icon-box bg-blue-subtle mx-auto mb-3"
+                style="width: 60px; height: 60px; font-size: 1.5rem;">
                 <i class="bi bi-bar-chart text-primary"></i>
             </div>
             <h4 class="fw-bold text-dark mb-1">No Surveys Found</h4>
@@ -464,12 +541,14 @@
                 {% if category_filter or status_filter != 'active' %}
                 There are no surveys matching your selected filter. Try switching tabs or clearing filters.
                 {% else %}
-                There are currently no active surveys. When organizers post questions regarding events, meetups, or community decisions, they will appear here.
+                There are currently no active surveys. When organizers post questions regarding events, meetups, or
+                community decisions, they will appear here.
                 {% endif %}
             </p>
             {% if is_admin %}
             <div>
-                <button type="button" class="btn btn-primary-action px-4 py-2 rounded-pill fw-semibold" data-bs-toggle="modal" data-bs-target="#createSurveyModal">
+                <button type="button" class="btn btn-primary-action px-4 py-2 rounded-pill fw-semibold"
+                    data-bs-toggle="modal" data-bs-target="#createSurveyModal">
                     <i class="bi bi-plus-circle-fill me-1"></i> Create First Survey
                 </button>
             </div>
@@ -481,97 +560,114 @@
 
     <!-- CREATE SURVEY MODAL (Admins Only) -->
     {% if is_admin %}
-    <div class="modal fade" id="createSurveyModal" tabindex="-1" aria-labelledby="createSurveyModalLabel" aria-hidden="true">
+    <div class="modal fade" id="createSurveyModal" tabindex="-1" aria-labelledby="createSurveyModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form action="{% url 'survey_create' %}" method="POST" id="surveyCreateForm"
+                class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                {% csrf_token %}
                 <div class="modal-header bg-dark text-white p-4">
                     <div>
-                        <div class="badge bg-warning text-dark font-monospace mb-1" style="font-size: 0.65rem;">ADMIN ACTION</div>
+                        <div class="badge bg-warning text-dark font-monospace mb-1" style="font-size: 0.65rem;">ADMIN
+                            ACTION</div>
                         <h5 class="modal-title fw-bold" id="createSurveyModalLabel">
                             <i class="bi bi-plus-circle me-2 text-warning"></i> Create New Community Survey
                         </h5>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
                 </div>
-                
-                <form action="{% url 'survey_create' %}" method="POST" id="surveyCreateForm">
-                    {% csrf_token %}
-                    <div class="modal-body p-4">
-                        
-                        <!-- Question / Title -->
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-dark small">Survey Question / Topic <span class="text-danger">*</span></label>
-                            <input type="text" name="title" class="form-control" placeholder="e.g., Where should we host the 2026 Fall Mexican Fiesta & Picnic?" required>
-                        </div>
 
-                        <!-- Category & Mode -->
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark small">Category <span class="text-danger">*</span></label>
-                                <select name="category" class="form-select" required>
-                                    <option value="event" selected>📅 Event & Meetup</option>
-                                    <option value="food">🌮 Food & Culinary</option>
-                                    <option value="community">🤝 Community Initiative</option>
-                                    <option value="general">💡 General Question</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 d-flex align-items-end">
-                                <div class="form-check form-switch p-3 bg-light rounded-3 border w-100">
-                                    <input class="form-check-input" type="checkbox" role="switch" name="is_multiple_choice" id="multiChoiceSwitch">
-                                    <label class="form-check-label fw-semibold text-dark small ms-2" for="multiChoiceSwitch">
-                                        Allow Multiple Choices
-                                    </label>
-                                    <div class="text-muted" style="font-size: 0.72rem;">Members can select more than 1 option</div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="modal-body p-4">
 
-                        <!-- Description -->
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-dark small">Context / Description (Optional)</label>
-                            <textarea name="description" class="form-control" rows="2" placeholder="Provide extra details, proposed dates, park addresses, or context for voters..."></textarea>
-                        </div>
-
-                        <!-- Options Builder -->
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-bold text-dark small mb-0">Voting Options <span class="text-danger">* (At least 2 required)</span></label>
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1" id="addOptionBtn">
-                                    <i class="bi bi-plus me-1"></i> Add Option
-                                </button>
-                            </div>
-
-                            <div id="optionsContainer">
-                                <div class="input-group mb-2 option-row">
-                                    <span class="input-group-text bg-light text-muted small fw-semibold">1</span>
-                                    <input type="text" name="options" class="form-control" placeholder="e.g., Coyote Point Park (San Mateo)" required>
-                                </div>
-                                <div class="input-group mb-2 option-row">
-                                    <span class="input-group-text bg-light text-muted small fw-semibold">2</span>
-                                    <input type="text" name="options" class="form-control" placeholder="e.g., Vasona Lake Park (Los Gatos)" required>
-                                </div>
-                                <div class="input-group mb-2 option-row">
-                                    <span class="input-group-text bg-light text-muted small fw-semibold">3</span>
-                                    <input type="text" name="options" class="form-control" placeholder="e.g., Lake Merritt Pergola (Oakland)">
-                                    <button type="button" class="btn btn-outline-danger remove-option-btn" title="Remove option"><i class="bi bi-x"></i></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border small text-muted mb-0">
-                            <i class="bi bi-shield-check text-success me-1"></i>
-                            Survey results and member votes will automatically synchronize with your Google Spreadsheet's <strong>Surveys</strong> tab.
-                        </div>
-
+                    <!-- Question / Title -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small">Survey Question / Topic <span
+                                class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control"
+                            placeholder="e.g., Where should we host the 2026 Fall Mexican Fiesta & Picnic?" required>
                     </div>
-                    <div class="modal-footer bg-light p-3">
-                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary-action rounded-pill px-4 fw-semibold">
-                            <i class="bi bi-send-fill me-1"></i> Publish Survey
-                        </button>
+
+                    <!-- Category & Mode -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Category <span
+                                    class="text-danger">*</span></label>
+                            <select name="category" class="form-select" required>
+                                <option value="event" selected>📅 Event & Meetup</option>
+                                <option value="food">🌮 Food & Culinary</option>
+                                <option value="community">🤝 Community Initiative</option>
+                                <option value="general">💡 General Question</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="form-check form-switch p-3 bg-light rounded-3 border w-100">
+                                <input class="form-check-input" type="checkbox" role="switch" name="is_multiple_choice"
+                                    id="multiChoiceSwitch">
+                                <label class="form-check-label fw-semibold text-dark small ms-2"
+                                    for="multiChoiceSwitch">
+                                    Allow Multiple Choices
+                                </label>
+                                <div class="text-muted" style="font-size: 0.72rem;">Members can select more than 1
+                                    option</div>
+                            </div>
+                        </div>
                     </div>
-                </form>
-            </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small">Context / Description (Optional)</label>
+                        <textarea name="description" class="form-control" rows="2"
+                            placeholder="Provide extra details, proposed dates, park addresses, or context for voters..."></textarea>
+                    </div>
+
+                    <!-- Options Builder -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-bold text-dark small mb-0">Voting Options <span
+                                    class="text-danger">* (At least 2 required)</span></label>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1"
+                                id="addOptionBtn">
+                                <i class="bi bi-plus me-1"></i> Add Option
+                            </button>
+                        </div>
+
+                        <div id="optionsContainer">
+                            <div class="input-group mb-2 option-row">
+                                <span class="input-group-text bg-light text-muted small fw-semibold">1</span>
+                                <input type="text" name="options" class="form-control"
+                                    placeholder="e.g., Coyote Point Park (San Mateo)" required>
+                            </div>
+                            <div class="input-group mb-2 option-row">
+                                <span class="input-group-text bg-light text-muted small fw-semibold">2</span>
+                                <input type="text" name="options" class="form-control"
+                                    placeholder="e.g., Vasona Lake Park (Los Gatos)" required>
+                            </div>
+                            <div class="input-group mb-2 option-row">
+                                <span class="input-group-text bg-light text-muted small fw-semibold">3</span>
+                                <input type="text" name="options" class="form-control"
+                                    placeholder="e.g., Lake Merritt Pergola (Oakland)">
+                                <button type="button" class="btn btn-outline-danger remove-option-btn"
+                                    title="Remove option"><i class="bi bi-x"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border small text-muted mb-0">
+                        <i class="bi bi-shield-check text-success me-1"></i>
+                        Survey results and member votes will automatically synchronize with your Google Spreadsheet's
+                        <strong>Surveys</strong> tab.
+                    </div>
+
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4"
+                        data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4 fw-semibold">
+                        <i class="bi bi-send-fill me-1"></i> Publish Survey
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
     {% endif %}
@@ -583,12 +679,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Dynamic Survey Options Builder
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const addOptionBtn = document.getElementById('addOptionBtn');
             const optionsContainer = document.getElementById('optionsContainer');
 
             if (addOptionBtn && optionsContainer) {
-                addOptionBtn.addEventListener('click', function() {
+                addOptionBtn.addEventListener('click', function () {
                     const currentRows = optionsContainer.querySelectorAll('.option-row').length;
                     if (currentRows >= 10) {
                         alert('Maximum 10 options per survey.');
@@ -605,7 +701,7 @@
                     optionsContainer.appendChild(rowDiv);
                 });
 
-                optionsContainer.addEventListener('click', function(e) {
+                optionsContainer.addEventListener('click', function (e) {
                     if (e.target.closest('.remove-option-btn')) {
                         const row = e.target.closest('.option-row');
                         if (optionsContainer.querySelectorAll('.option-row').length <= 2) {
@@ -623,4 +719,5 @@
         });
     </script>
 </body>
+
 </html>

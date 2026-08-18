@@ -1345,18 +1345,25 @@ input[type="time"] {
 /* Mobile Modals (Scrollable & Responsive Touch Controls) */
 @media (max-width: 767.98px) {
     .modal-dialog {
-        margin: 0.5rem;
+        margin: 0.5rem auto;
         max-width: calc(100% - 1rem);
     }
+    .modal-dialog.modal-dialog-centered {
+        min-height: calc(100% - 1rem);
+    }
     .modal-content {
-        max-height: calc(100dvh - 1rem);
+        max-height: calc(100dvh - 1.5rem);
         border-radius: var(--radius-lg);
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
     .modal-body {
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-y: contain;
+        flex: 1 1 auto;
+        min-height: 0;
         padding: 1.25rem !important;
     }
     .modal-footer {
