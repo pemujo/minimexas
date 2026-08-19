@@ -19,8 +19,9 @@ def clean_phone_for_whatsapp(phone_number: str) -> str:
 
 def _resolve_base_portal_url(portal_url: str = None, request = None) -> str:
     """
-    Safely resolves the absolute portal base URL.
+    Safely resolves the absolute portal base URL (scheme + host without subpaths or trailing slash).
     Prefers the dynamic request host (works in any environment), then explicit portal_url, then PORTAL_BASE_URL setting.
+    Strips trailing slashes and common subpaths like /login, /join, /organizers if accidentally included.
     """
     if request is not None:
         try:
@@ -30,16 +31,22 @@ def _resolve_base_portal_url(portal_url: str = None, request = None) -> str:
         except Exception:
             pass
 
-    if portal_url and portal_url.strip():
-        url = portal_url.strip().rstrip('/')
+    if portal_url and str(portal_url).strip():
+        url = str(portal_url).strip().rstrip('/')
         if not url.startswith(('http://', 'https://')):
             url = f"https://{url}"
+        for sub in ['/login', '/join', '/organizers', '/events', '/surveys']:
+            if url.endswith(sub):
+                url = url[:-len(sub)].rstrip('/')
         return url
 
     env_base = getattr(settings, 'PORTAL_BASE_URL', '').strip().rstrip('/')
     if env_base:
         if not env_base.startswith(('http://', 'https://')):
             env_base = f"https://{env_base}"
+        for sub in ['/login', '/join', '/organizers', '/events', '/surveys']:
+            if env_base.endswith(sub):
+                env_base = env_base[:-len(sub)].rstrip('/')
         return env_base
 
     return ""
@@ -591,7 +598,7 @@ def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, 
         rsvp_url_going = f"{base_rsvp_endpoint}?token={token_going}"
         rsvp_url_maybe = f"{base_rsvp_endpoint}?token={token_maybe}"
         rsvp_url_declined = f"{base_rsvp_endpoint}?token={token_declined}"
-        portal_events_url = f"{base_url}/events/" if base_url else "/events/"
+        portal_events_url = f"{base_url}/events/{event_id}/" if (base_url and event_id) else (f"{base_url}/events/" if base_url else "/events/")
         portal_profile_url = f"{base_url}/profile/" if base_url else "/profile/"
 
         plain_text_content = f"""¡Hola {member_name}!

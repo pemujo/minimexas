@@ -4,12 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    {% if target_event %}
+    <title>{{ target_event.title }} - MiniMexitas Events</title>
+    <meta name="description" content="📅 {{ target_event.date_formatted }} • 📍 {{ target_event.location }} - {{ target_event.description|truncatewords:20 }}">
+    <!-- Open Graph / WhatsApp Direct Event Sharing -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ target_event.title }} - MiniMexitas Event">
+    <meta property="og:description" content="📅 {{ target_event.date_formatted }} ({{ target_event.time_formatted }}) at {{ target_event.location }}. Join the MiniMexitas community gathering!">
+    <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' target_event.id %}">
+    {% else %}
     <title>Community Events & Calendar - MiniMexitas</title>
     <meta name="description" content="Discover upcoming community events, celebrations, and gatherings organized by MiniMexitas in the Bay Area.">
     <!-- Open Graph / WhatsApp -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="Community Events & Calendar - MiniMexitas">
     <meta property="og:description" content="Discover upcoming community events, celebrations, and meetups in the San Francisco Bay Area.">
+    {% endif %}
     <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:secure_url" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <meta property="og:image:type" content="image/png">
@@ -18,8 +28,8 @@
     <meta property="og:image:alt" content="MiniMexitas Logo">
     <!-- Twitter -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Community Events - MiniMexitas">
-    <meta name="twitter:description" content="Discover upcoming community events and meetups for MiniMexitas members.">
+    <meta name="twitter:title" content="{% if target_event %}{{ target_event.title }} - MiniMexitas{% else %}Community Events - MiniMexitas{% endif %}">
+    <meta name="twitter:description" content="{% if target_event %}{{ target_event.date_formatted }} • {{ target_event.location }}{% else %}Discover upcoming community events and meetups for MiniMexitas members.{% endif %}">
     <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/minimexitas_og.png' %}">
     <!-- Mobile PWA & Theme -->
     <meta name="theme-color" content="#0a0f1d">
@@ -36,6 +46,61 @@
     <!-- Custom Project CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <style>
+        .event-item-card {
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: 16px;
+            background: #ffffff;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            scroll-margin-top: 80px;
+        }
+
+        .event-item-card:hover {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.07), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+        }
+
+        .event-item-card.target-event-highlight {
+            border: 2px solid #2563eb !important;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18), 0 12px 24px rgba(0, 0, 0, 0.07) !important;
+            animation: eventPulseHighlight 2.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes eventPulseHighlight {
+            0% {
+                box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+            }
+        }
+
+        /* Responsive width container for focused direct event view */
+        .focused-event-container {
+            width: 100%;
+            max-width: 880px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (min-width: 1200px) {
+            .focused-event-container {
+                max-width: 960px;
+            }
+        }
+
+        .share-btn {
+            font-size: 0.78rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .share-btn:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
         .rsvp-btn-group {
             display: inline-flex;
             background-color: #f1f5f9;
@@ -44,6 +109,7 @@
             padding: 3px;
             gap: 3px;
         }
+
         .btn-rsvp-pill {
             border: none;
             background: transparent;
@@ -60,33 +126,45 @@
             justify-content: center;
             gap: 4px;
         }
+
         .btn-rsvp-pill:hover {
             color: #0f172a;
             background-color: rgba(255, 255, 255, 0.85);
         }
+
         .btn-rsvp-pill.active-going {
             background-color: #16a34a !important;
             color: #ffffff !important;
             box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35);
         }
+
         .btn-rsvp-pill.active-maybe {
             background-color: #d97706 !important;
             color: #ffffff !important;
             box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35);
         }
+
         .btn-rsvp-pill.active-declined {
             background-color: #64748b !important;
             color: #ffffff !important;
         }
+
+        .attendees-chips-container {
+            max-height: 52px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
         .attendee-pill {
             font-size: 0.72rem;
-            padding: 3px 9px;
+            padding: 2px 8px;
             border-radius: 50px;
             background-color: #ffffff;
             border: 1px solid #cbd5e1;
             color: #1e293b;
             display: inline-block;
         }
+
         .btn-broadcast-cta {
             background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
             color: #ffffff !important;
@@ -98,10 +176,12 @@
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
             transition: all 0.2s ease;
         }
+
         .btn-broadcast-cta:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(2, 132, 199, 0.45);
         }
+
         .rsvp-toast {
             position: fixed;
             bottom: 24px;
@@ -109,6 +189,7 @@
             z-index: 1090;
             min-width: 300px;
         }
+
         @media (max-width: 576px) {
             .rsvp-toast {
                 left: 12px;
@@ -136,7 +217,7 @@
     {% include 'recommendations/navbar.html' with active_page='events' %}
 
     <!-- MAIN CONTAINER -->
-    <div class="container main-container pt-4 mb-5">
+    <div class="container main-container pt-3 pt-md-4 mb-5">
 
         <!-- FLASH NOTIFICATION BANNERS -->
         {% if event_flash_message %}
@@ -170,6 +251,240 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {% endif %}
+
+        <!-- CASE 1: DIRECT FOCUSED EVENT VIEW -->
+        {% if target_event %}
+        <div class="focused-event-container">
+
+            <!-- Top Action & Navigation Bar -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <a href="{% url 'events' %}" class="btn btn-sm btn-light border rounded-pill px-3 py-1 fw-semibold text-secondary shadow-sm">
+                    <i class="bi bi-arrow-left me-1"></i> View All Events
+                </a>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 fw-semibold" style="font-size: 0.75rem;">
+                        <i class="bi bi-box-arrow-in-up-right me-1"></i> Shared Event Direct Link
+                    </span>
+
+                    <!-- Copy Direct Link Button -->
+                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 py-1 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm copy-event-link-btn"
+                        data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' target_event.id %}"
+                        data-event-id="{{ target_event.id }}" title="Copy Direct Link">
+                        <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                        <span class="small copy-label">Copy Link</span>
+                    </button>
+
+                    {% if is_admin %}
+                    <div class="d-flex align-items-center gap-1">
+                        {% if target_event.is_portal_event %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-edit-event"
+                                style="width: 30px; height: 30px; padding: 0; line-height: 1;"
+                                title="Edit portal event"
+                                data-event-id="{{ target_event.portal_event_pk }}"
+                                data-title="{{ target_event.title }}"
+                                data-category="{{ target_event.category }}"
+                                data-start-date="{{ target_event.start_datetime|date:'Y-m-d' }}"
+                                data-start-time="{{ target_event.start_datetime|date:'H:i' }}"
+                                data-end-date="{{ target_event.end_datetime|date:'Y-m-d' }}"
+                                data-end-time="{{ target_event.end_datetime|date:'H:i' }}"
+                                data-location="{{ target_event.location }}"
+                                data-locurl="{{ target_event.location_url }}"
+                                data-desc="{{ target_event.description }}">
+                            <i class="bi bi-pencil" style="font-size: 0.75rem;"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-circle btn-open-delete-event"
+                                style="width: 30px; height: 30px; padding: 0; line-height: 1;"
+                                title="Delete portal event"
+                                data-event-id="{{ target_event.portal_event_pk }}"
+                                data-title="{{ target_event.title }}">
+                            <i class="bi bi-trash3" style="font-size: 0.75rem;"></i>
+                        </button>
+                        {% endif %}
+
+                        {% if target_event.is_broadcasted %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-broadcast" 
+                                style="width: 30px; height: 30px; padding: 0; line-height: 1;"
+                                title="Re-broadcast announcement to all members"
+                                data-event-id="{{ target_event.id }}"
+                                data-title="{{ target_event.title }}"
+                                data-date="{{ target_event.date_formatted }}"
+                                data-time="{{ target_event.time_formatted }}"
+                                data-location="{{ target_event.location }}"
+                                data-locurl="{{ target_event.location_url }}"
+                                data-category="{{ target_event.category }}"
+                                data-desc="{{ target_event.description }}"
+                                data-gcal="{{ target_event.google_calendar_link }}">
+                            <i class="bi bi-arrow-clockwise" style="font-size: 0.75rem;"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-broadcast-cta btn-open-broadcast"
+                                data-event-id="{{ target_event.id }}"
+                                data-title="{{ target_event.title }}"
+                                data-date="{{ target_event.date_formatted }}"
+                                data-time="{{ target_event.time_formatted }}"
+                                data-location="{{ target_event.location }}"
+                                data-locurl="{{ target_event.location_url }}"
+                                data-category="{{ target_event.category }}"
+                                data-desc="{{ target_event.description }}"
+                                data-gcal="{{ target_event.google_calendar_link }}">
+                            <i class="bi bi-megaphone-fill me-1"></i> Broadcast
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Focused Event Card -->
+            <div class="event-item-card target-event-highlight p-3 p-md-4 mb-4 shadow-sm" id="event-card-{{ target_event.id }}">
+                <div>
+                    <!-- Date Box, Category & Badges -->
+                    <div class="d-flex align-items-start justify-content-between mb-3 gap-2">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="event-date-box shadow-sm">
+                                <span class="event-date-month">{{ target_event.start_datetime|date:"M" }}</span>
+                                <span class="event-date-day">{{ target_event.day }}</span>
+                            </div>
+                            <div>
+                                <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
+                                    <span class="badge {% if 'Cultural' in target_event.category %}category-tag cultural{% elif 'Tech' in target_event.category or 'Network' in target_event.category %}category-tag tech{% elif 'Family' in target_event.category or 'Outdoor' in target_event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                        {{ target_event.category }}
+                                    </span>
+                                    {% if target_event.is_portal_event %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Created directly in MiniMexitas portal">
+                                        <i class="bi bi-stars me-1"></i>Portal
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
+                                        <i class="bi bi-google me-1"></i>Google Cal
+                                    </span>
+                                    {% endif %}
+                                    {% if target_event.is_past %}
+                                    <span class="badge bg-light text-secondary border" style="font-size: 0.68rem;">Concluded</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted small">
+                                    <i class="bi bi-clock me-1 text-primary"></i> {{ target_event.time_formatted }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Copy Link Button -->
+                        <button class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary share-btn d-flex align-items-center gap-1 copy-event-link-btn"
+                            type="button" title="Copy Event Link"
+                            data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' target_event.id %}"
+                            data-event-id="{{ target_event.id }}">
+                            <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                            <span class="d-none d-sm-inline small copy-label">Copy Link</span>
+                        </button>
+                    </div>
+
+                    <!-- Event Title -->
+                    <h3 class="fw-bold text-dark mb-2" style="font-size: 1.35rem; line-height: 1.3;">
+                        {{ target_event.title }}
+                    </h3>
+
+                    <!-- Date & Time Full -->
+                    <div class="small mb-2 d-flex align-items-center text-dark">
+                        <i class="bi bi-calendar3 text-primary me-2 flex-shrink-0"></i>
+                        <span class="fw-semibold">{{ target_event.date_formatted }}</span>
+                        <span class="mx-2 text-muted">&bull;</span>
+                        <i class="bi bi-clock text-primary me-1 flex-shrink-0"></i>
+                        <span>{{ target_event.time_formatted }}</span>
+                    </div>
+
+                    <!-- Location -->
+                    <div class="small mb-3 d-flex align-items-start text-secondary">
+                        <i class="bi bi-geo-alt-fill text-danger me-2 mt-1 flex-shrink-0"></i>
+                        <a href="{{ target_event.location_url }}" target="_blank" rel="noopener" class="text-decoration-none text-secondary hover-primary fw-medium">
+                            {{ target_event.location }} <i class="bi bi-box-arrow-up-right ms-1 small text-muted"></i>
+                        </a>
+                    </div>
+
+                    <!-- Organizer -->
+                    <div class="small mb-3 text-muted d-flex align-items-center">
+                        <i class="bi bi-person-circle text-secondary me-2"></i>
+                        <span>Organized by: <strong class="text-dark">{{ target_event.organizer }}</strong></span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="text-secondary small mb-4 p-3 bg-light bg-opacity-50 rounded-3 border" style="line-height: 1.6;">
+                        {{ target_event.description|linebreaksbr }}
+                    </div>
+
+                    <!-- Interactive Member RSVP Widget -->
+                    {% if not target_event.is_past %}
+                    <div class="rsvp-card-container mb-3 p-3 bg-light rounded-3 border">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-muted small fw-semibold" style="font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                                🎟️ Your Attendance:
+                            </span>
+                            <span class="small text-muted" style="font-size: 0.76rem;">
+                                <span class="fw-bold text-success going-count-badge">{{ target_event.going_count }}</span> Confirmed Going
+                            </span>
+                        </div>
+                        
+                        <div class="rsvp-btn-group w-100 justify-content-between mb-3" data-event-id="{{ target_event.id }}" data-event-title="{{ target_event.title }}">
+                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if target_event.my_rsvp == 'going' %}active-going{% endif %}" data-status="going">
+                                <i class="bi bi-check-circle-fill"></i> Going
+                            </button>
+                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if target_event.my_rsvp == 'maybe' %}active-maybe{% endif %}" data-status="maybe">
+                                <i class="bi bi-question-circle-fill"></i> Maybe
+                            </button>
+                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if target_event.my_rsvp == 'declined' %}active-declined{% endif %}" data-status="declined">
+                                <i class="bi bi-x-circle-fill"></i> Can't Go
+                            </button>
+                        </div>
+
+                        <!-- Confirmed Attendees List -->
+                        <div class="pt-2 border-top">
+                            <div class="small fw-semibold text-dark mb-1" style="font-size: 0.74rem;">Confirmed Attendees:</div>
+                            <div class="attendees-chips-container d-flex flex-wrap gap-1">
+                                {% for attendee in target_event.attendees %}
+                                <span class="attendee-pill">{{ attendee }}</span>
+                                {% empty %}
+                                <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-3 bg-light rounded-3 border mb-3 text-center text-muted small">
+                        <i class="bi bi-check2-circle text-success me-1"></i> This event has concluded.
+                    </div>
+                    {% endif %}
+
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="pt-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <a href="{{ target_event.google_calendar_link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-pill" title="Add event to your Google Calendar">
+                        <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
+                    </a>
+
+                    <div>
+                        <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 copy-event-link-btn shadow-sm"
+                            data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' target_event.id %}"
+                            data-event-id="{{ target_event.id }}">
+                            <i class="bi bi-link-45deg me-1"></i> <span class="copy-label">Copy Link</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bottom Hub Link -->
+            <div class="text-center mt-4">
+                <a href="{% url 'events' %}" class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-semibold shadow-sm">
+                    <i class="bi bi-grid me-1"></i> Browse All Community Events ({{ upcoming_events|length }} Upcoming)
+                </a>
+            </div>
+
+        </div>
+
+        <!-- CASE 2: ALL EVENTS DIRECTORY / LIST VIEW -->
+        {% else %}
 
         <!-- HEADER ROW -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -243,18 +558,18 @@
                     </h4>
                 </div>
 
-                <div class="row g-4" id="upcomingEventsCardGrid">
+                <div class="row g-3 g-md-4" id="upcomingEventsCardGrid">
                     {% for event in upcoming_events %}
-                    <div class="col-md-6 col-lg-4 event-card-wrapper" 
+                    <div class="col-12 col-md-6 col-xl-6 event-card-wrapper" 
                          data-title="{{ event.title|lower }}" 
                          data-location="{{ event.location|lower }}" 
                          data-category="{{ event.category }}"
                          data-desc="{{ event.description|lower }}">
                         
-                        <div class="event-item-card h-100 p-4 d-flex flex-column justify-content-between" id="event-card-{{ event.id }}">
+                        <div class="event-item-card h-100 p-3 p-md-4 d-flex flex-column justify-content-between shadow-sm" id="event-card-{{ event.id }}">
                             <div>
                                 
-                                <!-- Date Box, Category & Broadcast Badge -->
+                                <!-- Date Box, Category, Broadcast & Share Header -->
                                 <div class="d-flex align-items-start justify-content-between mb-3 gap-2">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="event-date-box shadow-sm">
@@ -282,9 +597,18 @@
                                         </div>
                                     </div>
 
-                                    <!-- Admin Controls (Broadcast, Edit, Delete) -->
-                                    {% if is_admin %}
+                                    <!-- Controls (Share & Admin) -->
                                     <div class="d-flex align-items-center gap-1">
+                                        <!-- Copy Direct Link Button -->
+                                        <button class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary share-btn d-flex align-items-center gap-1 copy-event-link-btn"
+                                            type="button" title="Copy Event Link"
+                                            data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}"
+                                            data-event-id="{{ event.id }}">
+                                            <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                                            <span class="d-none d-sm-inline small copy-label">Copy Link</span>
+                                        </button>
+
+                                        {% if is_admin %}
                                         {% if event.is_portal_event %}
                                         <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-edit-event"
                                                 style="width: 28px; height: 28px; padding: 0; line-height: 1;"
@@ -312,7 +636,7 @@
 
                                         {% if event.is_broadcasted %}
                                         <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.72rem;" title="Notified {{ event.broadcast_info.recipient_count }} members on {{ event.broadcast_info.broadcast_at|date:'M d, H:i' }}">
-                                            <i class="bi bi-check2-all me-1"></i> Sent ({{ event.broadcast_info.recipient_count }})
+                                            <i class="bi bi-check2-all me-1"></i> Sent
                                         </span>
                                         <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-broadcast" 
                                                 style="width: 28px; height: 28px; padding: 0; line-height: 1;"
@@ -342,8 +666,8 @@
                                             <i class="bi bi-megaphone-fill me-1"></i> Broadcast
                                         </button>
                                         {% endif %}
+                                        {% endif %}
                                     </div>
-                                    {% endif %}
                                 </div>
 
                                 <!-- Event Title -->
@@ -361,7 +685,7 @@
 
                                 <!-- Description -->
                                 <p class="text-muted small mb-3" style="line-height: 1.5;">
-                                    {{ event.description|truncatewords:28 }}
+                                    {{ event.description|truncatewords:24 }}
                                 </p>
 
                                 <!-- Interactive Member RSVP Widget -->
@@ -412,23 +736,33 @@
                             <!-- Footer Actions -->
                             <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
                                 <a href="{{ event.google_calendar_link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-pill" title="Add event to your Google Calendar">
-                                    <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
+                                    <i class="bi bi-calendar-plus text-primary me-1"></i> Calendar
                                 </a>
-                                <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
-                                        data-id="{{ event.id }}"
-                                        data-title="{{ event.title }}"
-                                        data-date="{{ event.date_formatted }}"
-                                        data-time="{{ event.time_formatted }}"
-                                        data-location="{{ event.location }}"
-                                        data-locurl="{{ event.location_url }}"
-                                        data-category="{{ event.category }}"
-                                        data-desc="{{ event.description }}"
-                                        data-organizer="{{ event.organizer }}"
-                                        data-gcal="{{ event.google_calendar_link }}"
-                                        data-my-rsvp="{{ event.my_rsvp|default:'' }}"
-                                        data-going-count="{{ event.going_count }}">
-                                    Details
-                                </button>
+                                
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-muted copy-event-link-btn"
+                                        title="Copy Link"
+                                        data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}"
+                                        data-event-id="{{ event.id }}">
+                                        <i class="bi bi-link-45deg"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
+                                            data-id="{{ event.id }}"
+                                            data-title="{{ event.title }}"
+                                            data-date="{{ event.date_formatted }}"
+                                            data-time="{{ event.time_formatted }}"
+                                            data-location="{{ event.location }}"
+                                            data-locurl="{{ event.location_url }}"
+                                            data-category="{{ event.category }}"
+                                            data-desc="{{ event.description }}"
+                                            data-organizer="{{ event.organizer }}"
+                                            data-gcal="{{ event.google_calendar_link }}"
+                                            data-my-rsvp="{{ event.my_rsvp|default:'' }}"
+                                            data-going-count="{{ event.going_count }}"
+                                            data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}">
+                                        Details
+                                    </button>
+                                </div>
                             </div>
 
                         </div>
@@ -457,15 +791,15 @@
                     </div>
                 </div>
 
-                <div class="row g-4" id="pastEventsCardGrid">
+                <div class="row g-3 g-md-4" id="pastEventsCardGrid">
                     {% for event in past_events %}
-                    <div class="col-md-6 col-lg-4 event-card-wrapper" 
+                    <div class="col-12 col-md-6 col-xl-6 event-card-wrapper" 
                          data-title="{{ event.title|lower }}" 
                          data-location="{{ event.location|lower }}" 
                          data-category="{{ event.category }}"
                          data-desc="{{ event.description|lower }}">
                         
-                        <div class="event-item-card past-event-item-card h-100 p-4 d-flex flex-column justify-content-between">
+                        <div class="event-item-card past-event-item-card h-100 p-3 p-md-4 d-flex flex-column justify-content-between shadow-sm">
                             <div>
                                 
                                 <!-- Date Box & Category Header -->
@@ -497,8 +831,17 @@
                                         </div>
                                     </div>
 
-                                    {% if is_admin and event.is_portal_event %}
                                     <div class="d-flex align-items-center gap-1">
+                                        <!-- Copy Direct Link Button -->
+                                        <button class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary share-btn d-flex align-items-center gap-1 copy-event-link-btn"
+                                            type="button" title="Copy Event Link"
+                                            data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}"
+                                            data-event-id="{{ event.id }}">
+                                            <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                                            <span class="d-none d-sm-inline small copy-label">Copy Link</span>
+                                        </button>
+
+                                        {% if is_admin and event.is_portal_event %}
                                         <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-edit-event"
                                                 style="width: 28px; height: 28px; padding: 0; line-height: 1;"
                                                 title="Edit portal event"
@@ -521,8 +864,8 @@
                                                 data-title="{{ event.title }}">
                                             <i class="bi bi-trash3" style="font-size: 0.72rem;"></i>
                                         </button>
+                                        {% endif %}
                                     </div>
-                                    {% endif %}
                                 </div>
 
                                 <!-- Event Title -->
@@ -540,7 +883,7 @@
 
                                 <!-- Description -->
                                 <p class="text-muted small mb-4" style="line-height: 1.5;">
-                                    {{ event.description|truncatewords:28 }}
+                                    {{ event.description|truncatewords:24 }}
                                 </p>
 
                             </div>
@@ -549,6 +892,7 @@
                             <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
                                 <span class="text-muted small"><i class="bi bi-check2-circle text-success me-1"></i> Concluded</span>
                                 <button type="button" class="btn btn-sm btn-outline-secondary px-3 view-details-btn" 
+                                        data-id="{{ event.id }}"
                                         data-title="{{ event.title }}"
                                         data-date="{{ event.date_formatted }}"
                                         data-time="{{ event.time_formatted }}"
@@ -557,7 +901,8 @@
                                         data-category="{{ event.category }}"
                                         data-desc="{{ event.description }}"
                                         data-organizer="{{ event.organizer }}"
-                                        data-gcal="{{ event.google_calendar_link }}">
+                                        data-gcal="{{ event.google_calendar_link }}"
+                                        data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}">
                                     View Details
                                 </button>
                             </div>
@@ -626,6 +971,8 @@
 
             </div>
         </div>
+
+        {% endif %}
 
     </div>
 
@@ -921,11 +1268,19 @@
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                        <a id="modalEventGcalLink" href="#" target="_blank" rel="noopener" class="btn btn-google py-2 px-3 rounded-pill fw-semibold">
-                            <i class="bi bi-google me-1 text-primary"></i> Add to Calendar
-                        </a>
-                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top gap-2 flex-wrap">
+                        <div class="d-flex align-items-center gap-2">
+                            <a id="modalEventGcalLink" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-google py-2 px-3 rounded-pill fw-semibold">
+                                <i class="bi bi-google me-1 text-primary"></i> Add to Calendar
+                            </a>
+                            <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 py-2 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm copy-event-link-btn" id="modalCopyBtn"
+                                data-event-url=""
+                                data-event-id="" title="Copy Event Link">
+                                <i class="bi bi-link-45deg me-1"></i>
+                                <span class="copy-label small">Copy Link</span>
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary rounded-pill px-4 py-2" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -951,7 +1306,7 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Interactive Calendar Logic, RSVP & Search -->
+    <!-- Interactive Calendar Logic, RSVP, Sharing & Search -->
     <script>
     document.addEventListener("DOMContentLoaded", function() {
         const eventsData = JSON.parse(document.getElementById("eventsJsonData").textContent || "[]");
@@ -965,6 +1320,55 @@
             document.getElementById("rsvpToastText").textContent = msg;
             rsvpToast.show();
         }
+
+        // --- Copy to Clipboard with Visual Feedback ---
+        function copyTextToClipboard(text, btnElement, successLabel = 'Copied!') {
+            function showSuccess() {
+                const originalHtml = btnElement.innerHTML;
+                btnElement.innerHTML = `<i class="bi bi-check2 text-success me-1"></i> <span class="text-success fw-semibold">${successLabel}</span>`;
+                showRsvpToast("Link copied to clipboard!");
+                setTimeout(function () {
+                    btnElement.innerHTML = originalHtml;
+                }, 2200);
+            }
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(showSuccess).catch(function () {
+                    fallbackCopy(text, showSuccess);
+                });
+            } else {
+                fallbackCopy(text, showSuccess);
+            }
+        }
+
+        function fallbackCopy(text, callback) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            tempInput.style.position = 'fixed';
+            tempInput.style.left = '-9999px';
+            document.body.appendChild(tempInput);
+            tempInput.focus();
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                callback();
+            } catch (e) {
+                console.error('Copy fallback failed:', e);
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        document.addEventListener("click", function(e) {
+            const btn = e.target.closest(".copy-event-link-btn");
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = btn.getAttribute("data-event-url");
+                if (url) {
+                    copyTextToClipboard(url, btn);
+                }
+            }
+        });
 
         // --- View Switching (List vs Calendar Grid) ---
         const btnViewList = document.getElementById("btnViewList");
@@ -1217,6 +1621,14 @@
             document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexitas Community";
             document.getElementById("modalEventDescription").textContent = evt.description || evt.desc || "";
             document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal || "#";
+
+            // Set share URLs in modal
+            const shareUrl = evt.share_url || evt.dataset?.shareUrl || `${window.location.origin}/events/${eventId}/`;
+            const modalCopyBtn = document.getElementById("modalCopyBtn");
+            if (modalCopyBtn) {
+                modalCopyBtn.setAttribute("data-event-url", shareUrl);
+                modalCopyBtn.setAttribute("data-event-id", eventId);
+            }
 
             // Configure modal RSVP button group
             const modalRsvpGroup = document.getElementById("modalRsvpBtnGroup");

@@ -240,32 +240,13 @@
                         <i class="bi bi-box-arrow-in-up-right me-1"></i> Shared Survey Direct Link
                     </span>
 
-                    <!-- Share Dropdown -->
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-light border rounded-pill px-3 py-1 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm"
-                            type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Share Survey Link">
-                            <i class="bi bi-share text-secondary"></i>
-                            <span class="small">Share</span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm p-1" style="min-width: 220px;">
-                            <li>
-                                <button type="button" class="dropdown-item rounded-2 small d-flex align-items-center py-2 copy-survey-link-btn"
-                                    data-survey-url="{{ request.scheme }}://{{ request.get_host }}{% url 'survey_detail' target_survey.id %}"
-                                    data-survey-id="{{ target_survey.id }}">
-                                    <i class="bi bi-link-45deg fs-5 text-primary me-2"></i>
-                                    <span class="copy-label">Copy Direct Link</span>
-                                </button>
-                            </li>
-                            <li>
-                                <a href="https://wa.me/?text={{ '🗳️ Participa en la consulta de MiniMexitas: '|urlencode }}{{ target_survey.title|urlencode }}%0A👉%20{{ request.scheme }}://{{ request.get_host }}{% url 'survey_detail' target_survey.id %}"
-                                    target="_blank" rel="noopener noreferrer"
-                                    class="dropdown-item rounded-2 small d-flex align-items-center py-2 text-success">
-                                    <i class="bi bi-whatsapp fs-5 me-2"></i>
-                                    <span>Share on WhatsApp</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
+                    <!-- Copy Direct Link Button -->
+                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 py-1 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm copy-survey-link-btn"
+                        data-survey-url="{{ request.scheme }}://{{ request.get_host }}{% url 'survey_detail' target_survey.id %}"
+                        data-survey-id="{{ target_survey.id }}" title="Copy Direct Link">
+                        <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                        <span class="small copy-label">Copy Link</span>
+                    </button>
 
                     {% if is_admin %}
                     <button type="button" class="btn btn-sm btn-primary-action px-3 py-1 fw-semibold rounded-pill shadow-sm"
@@ -691,32 +672,14 @@
                             </div>
 
                             <div class="d-flex align-items-center gap-1">
-                                <!-- Share Dropdown -->
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary share-btn d-flex align-items-center gap-1"
-                                        type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Share Survey Link">
-                                        <i class="bi bi-share text-secondary"></i>
-                                        <span class="d-none d-sm-inline small">Share</span>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm p-1" style="min-width: 220px;">
-                                        <li>
-                                            <button type="button" class="dropdown-item rounded-2 small d-flex align-items-center py-2 copy-survey-link-btn"
-                                                data-survey-url="{{ request.scheme }}://{{ request.get_host }}{% url 'survey_detail' survey.id %}"
-                                                data-survey-id="{{ survey.id }}">
-                                                <i class="bi bi-link-45deg fs-5 text-primary me-2"></i>
-                                                <span class="copy-label">Copy Direct Link</span>
-                                            </button>
-                                        </li>
-                                        <li>
-                                            <a href="https://wa.me/?text={{ '🗳️ Participa en la consulta de MiniMexitas: '|urlencode }}{{ survey.title|urlencode }}%0A👉%20{{ request.scheme }}://{{ request.get_host }}{% url 'survey_detail' survey.id %}"
-                                                target="_blank" rel="noopener noreferrer"
-                                                class="dropdown-item rounded-2 small d-flex align-items-center py-2 text-success">
-                                                <i class="bi bi-whatsapp fs-5 me-2"></i>
-                                                <span>Share on WhatsApp</span>
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
+                                <!-- Copy Direct Link Button -->
+                                <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary share-btn d-flex align-items-center gap-1 copy-survey-link-btn"
+                                    title="Copy Direct Link"
+                                    data-survey-url="{{ request.scheme }}://{{ request.get_host }}{% url 'survey_detail' survey.id %}"
+                                    data-survey-id="{{ survey.id }}">
+                                    <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                                    <span class="d-none d-sm-inline small copy-label">Copy Link</span>
+                                </button>
 
                                 <!-- Admin Controls Dropdown -->
                                 {% if is_admin %}

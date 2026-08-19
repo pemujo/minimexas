@@ -390,14 +390,8 @@ import json
 import datetime
 
 
-@member_required
-def events_view(request):
-    force_refresh = request.GET.get('refresh') == '1'
+def _get_enriched_events(member_email, force_refresh=False):
     all_events = fetch_community_events(force_refresh=force_refresh)
-
-    member_email = request.session.get('member_email', '').strip().lower()
-    member_name = request.session.get('member_name', 'Member')
-    is_admin = request.session.get('is_admin', False)
 
     # Fetch all RSVPs and Broadcast records from database
     all_rsvps = list(CommunityEventRSVP.objects.all())
@@ -469,6 +463,41 @@ def events_view(request):
             "end_time_input": end_dt.strftime("%H:%M") if hasattr(end_dt, 'strftime') else "",
         })
 
+    return all_events, upcoming_events, past_events, events_payload, total_members_count, subscribed_members_count
+
+
+def _find_target_event(all_events, target_id):
+    if not target_id:
+        return None
+    target_id_str = str(target_id).strip().lower()
+    for e in all_events:
+        eid = str(e.get('id', '')).strip().lower()
+        pk = str(e.get('portal_event_pk', '')).strip().lower() if e.get('portal_event_pk') is not None else ''
+        if eid == target_id_str or (pk and pk == target_id_str):
+            return e
+        if eid.replace('portal_', '') == target_id_str:
+            return e
+        if pk and f"portal_{pk}" == target_id_str:
+            return e
+    return None
+
+
+@member_required
+def events_view(request):
+    force_refresh = request.GET.get('refresh') == '1'
+    member_email = request.session.get('member_email', '').strip().lower()
+    member_name = request.session.get('member_name', 'Member')
+    is_admin = request.session.get('is_admin', False)
+
+    all_events, upcoming_events, past_events, events_payload, total_members_count, subscribed_members_count = _get_enriched_events(
+        member_email=member_email,
+        force_refresh=force_refresh
+    )
+
+    # Check for direct event param ?event=<id>
+    target_event_id = request.GET.get('event')
+    target_event = _find_target_event(all_events, target_event_id) if target_event_id else None
+
     # Flash / status messages
     rsvp_msg = request.session.pop('rsvp_flash_message', None)
     broadcast_msg = request.session.pop('broadcast_flash_message', None)
@@ -491,6 +520,59 @@ def events_view(request):
         'broadcast_flash_message': broadcast_msg,
         'event_flash_message': event_flash_msg,
         'event_error_message': event_error_msg,
+        'target_event': target_event,
+        'target_event_id': target_event_id,
+        'is_direct_detail': target_event is not None,
+    })
+
+
+@member_required
+def event_detail_view(request, event_id):
+    """
+    Direct URL endpoint for an individual event (/events/<str:event_id>/).
+    Renders the events hub focused on the requested event in a responsive,
+    proportioned container with direct sharing (WhatsApp + copy link),
+    live RSVP controls, and back navigation.
+    """
+    force_refresh = request.GET.get('refresh') == '1'
+    member_email = request.session.get('member_email', '').strip().lower()
+    member_name = request.session.get('member_name', 'Member')
+    is_admin = request.session.get('is_admin', False)
+
+    all_events, upcoming_events, past_events, events_payload, total_members_count, subscribed_members_count = _get_enriched_events(
+        member_email=member_email,
+        force_refresh=force_refresh
+    )
+
+    target_event = _find_target_event(all_events, event_id)
+
+    rsvp_msg = request.session.pop('rsvp_flash_message', None)
+    broadcast_msg = request.session.pop('broadcast_flash_message', None)
+    event_flash_msg = request.session.pop('event_flash_message', None)
+    event_error_msg = request.session.pop('event_error_message', None)
+
+    if not target_event:
+        event_error_msg = event_error_msg or f"Event with ID '{event_id}' could not be found or has concluded."
+
+    return render(request, 'recommendations/events.html', {
+        'events': upcoming_events,
+        'upcoming_events': upcoming_events,
+        'past_events': past_events,
+        'all_events': all_events,
+        'events_payload': events_payload,
+        'events_json': json.dumps(events_payload),
+        'member_name': member_name,
+        'member_email': member_email,
+        'is_admin': is_admin,
+        'total_members_count': total_members_count,
+        'subscribed_members_count': subscribed_members_count,
+        'rsvp_flash_message': rsvp_msg,
+        'broadcast_flash_message': broadcast_msg,
+        'event_flash_message': event_flash_msg,
+        'event_error_message': event_error_msg,
+        'target_event': target_event,
+        'target_event_id': event_id,
+        'is_direct_detail': target_event is not None,
     })
 
 
@@ -552,6 +634,8 @@ def event_rsvp_view(request):
         }.get(status, f'Respuesta registrada ({status}).')
 
         request.session['rsvp_flash_message'] = f"🎟️ {status_text} ({event_title or 'Evento'})"
+        if event_id:
+            return redirect('event_detail', event_id=event_id)
         return redirect('events')
 
     # Path 2: In-app Authenticated RSVP POST
@@ -1270,7 +1354,6 @@ def organizer_dashboard_view(request):
 
     # Pending & reviewed membership requests
     pending_requests_qs = MembershipRequest.objects.filter(status=MembershipRequest.STATUS_PENDING).order_by('-created_at')
-    login_url = request.build_absolute_uri(reverse('login_page'))
     pending_requests = []
     for pr in pending_requests_qs:
         pending_requests.append({
@@ -1282,7 +1365,7 @@ def organizer_dashboard_view(request):
             'city': pr.city,
             'referral_source': pr.referral_source,
             'whatsapp_url': get_whatsapp_url(pr.phone_number),
-            'whatsapp_approval_url': build_whatsapp_approval_link(pr.full_name, pr.phone_number, portal_url=login_url),
+            'whatsapp_approval_url': build_whatsapp_approval_link(pr.full_name, pr.phone_number, request=request),
             'created_at': pr.created_at,
         })
     pending_count = len(pending_requests)
@@ -1434,7 +1517,7 @@ def organizer_approve_request_view(request, request_id):
     if req.phone_number:
         request.session['approved_flash_wa_link'] = build_whatsapp_approval_link(
             req.full_name, req.phone_number,
-            portal_url=request.build_absolute_uri(reverse('login_page'))
+            request=request
         )
 
     # Sync to Members tab in Google Sheets
