@@ -98,7 +98,7 @@
                                         community across the Bay Area.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'gmail_login' %}"
+                                        <a href="{% url 'gmail_login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}"
                                             class="btn btn-sm btn-google rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center">
                                             <svg class="me-2" width="16" height="16" viewBox="0 0 18 18">
                                                 <path fill="#4285F4"
@@ -147,7 +147,7 @@
                                         shared by verified group members.
                                     </p>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <a href="{% url 'gmail_login' %}"
+                                        <a href="{% url 'gmail_login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}"
                                             class="btn btn-sm btn-google rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center">
                                             <svg class="me-2" width="16" height="16" viewBox="0 0 18 18">
                                                 <path fill="#4285F4"
@@ -347,7 +347,7 @@
                             </p>
                         </div>
 
-                        <a href="{% url 'gmail_login' %}"
+                        <a href="{% url 'gmail_login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}"
                             class="btn btn-google py-3 w-100 rounded-pill d-flex align-items-center justify-content-center mb-3">
                             <svg class="me-2" width="18" height="18" viewBox="0 0 18 18">
                                 <path fill="#4285F4"

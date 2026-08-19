@@ -1,4 +1,5 @@
 import datetime
+from urllib.parse import quote_plus
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, Client, RequestFactory, override_settings
 from django.urls import reverse
@@ -1483,6 +1484,13 @@ class NotificationsTestCase(TestCase):
         self.assertTrue(link.startswith("https://wa.me/525599998888?text="))
         self.assertIn("Carlos%20Ruiz", link)
         self.assertIn("aprobada", link)
+        self.assertIn("https%3A//minimexitas.org/login/", link)
+        self.assertNotIn("login/login", link)
+
+        # Also verify when portal_url already ends with /login/
+        link_with_login = build_whatsapp_approval_link("Carlos Ruiz", "+52 55 9999 8888", portal_url="https://minimexitas.org/login/")
+        self.assertIn("https%3A//minimexitas.org/login/", link_with_login)
+        self.assertNotIn("login/login", link_with_login)
 
     def test_build_whatsapp_approval_link_empty_phone(self):
         link = build_whatsapp_approval_link("Carlos Ruiz", "")
@@ -2134,6 +2142,22 @@ class SurveysFeatureTestCase(TestCase):
         cache.clear()
         self.client = Client()
 
+        self.voter_profile = MemberProfile.objects.create(
+            email="voter@gmail.com",
+            full_name="Voter Member",
+            is_admin=False
+        )
+        self.admin_profile = MemberProfile.objects.create(
+            email="admin@minimexitas.org",
+            full_name="Super Admin",
+            is_admin=True
+        )
+        self.foodie_profile = MemberProfile.objects.create(
+            email="foodie@gmail.com",
+            full_name="Foodie Member",
+            is_admin=False
+        )
+
         self.survey = CommunitySurvey.objects.create(
             title="Where should we host the 2026 Fall Picnic?",
             description="Cast your vote for our next community gathering.",
@@ -2389,6 +2413,111 @@ class SurveysFeatureTestCase(TestCase):
         res = delete_survey_from_google_sheet(self.survey.id)
         self.assertTrue(res)
         mock_ws.update.assert_called_once()
+
+    def test_survey_detail_view_requires_auth_and_preserves_next(self):
+        response = self.client.get(reverse('survey_detail', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 302)
+        expected_next = f"/surveys/{self.survey.id}/"
+        self.assertIn(f"next={quote_plus(expected_next)}", response.url)
+
+    def test_survey_detail_view_authenticated(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(reverse('survey_detail', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.survey.title)
+        self.assertContains(response, f'id="survey-{self.survey.id}"')
+        self.assertContains(response, "Shared Survey Direct Link")
+        self.assertContains(response, "copy-survey-link-btn")
+        self.assertContains(response, "data-survey-url=")
+        self.assertNotContains(response, "Share on WhatsApp")
+
+    def test_survey_detail_view_closed_survey_visible(self):
+        self.survey.is_active = False
+        self.survey.save()
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(reverse('survey_detail', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.survey.title)
+        self.assertContains(response, "Shared Survey Direct Link")
+
+    def test_surveys_list_view_with_survey_query_param(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(f"{reverse('surveys')}?survey={self.survey.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.survey.title)
+        self.assertContains(response, "Shared Survey Direct Link")
+
+    @patch('recommendations.views.requests.post')
+    @patch('recommendations.views.requests.get')
+    @patch('recommendations.views.is_gmail_allowed')
+    def test_full_oauth_next_redirect_to_survey(self, mock_is_allowed, mock_get, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {'access_token': 'valid_token_123'}
+
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {'email': 'voter@gmail.com', 'name': 'Voter Member', 'verified_email': True}
+
+        mock_is_allowed.return_value = (True, 'Voter Member', False)
+
+        # 1. Unauthenticated hit on survey_detail redirects to login with ?next=
+        target_path = f"/surveys/{self.survey.id}/"
+        unauth_resp = self.client.get(target_path)
+        self.assertEqual(unauth_resp.status_code, 302)
+        self.assertIn(f"next={quote_plus(target_path)}", unauth_resp.url)
+
+        # 2. Login page renders sign-in button carrying next param
+        login_resp = self.client.get(f"/login/?next={quote_plus(target_path)}")
+        self.assertEqual(login_resp.status_code, 200)
+        self.assertContains(login_resp, f"next={target_path}")
+
+        # 3. Initiating Gmail login stores next into session
+        init_login_resp = self.client.get(f"{reverse('gmail_login')}?next={quote_plus(target_path)}")
+        self.assertEqual(init_login_resp.status_code, 302)
+        self.assertEqual(self.client.session.get('oauth_next_url'), target_path)
+
+        # 4. OAuth callback redirects to the stored next survey URL
+        session = self.client.session
+        session['oauth_state'] = 'test_state_123'
+        session['oauth_next_url'] = target_path
+        session.save()
+
+        callback_resp = self.client.get(f"{reverse('google_callback')}?code=test_code&state=test_state_123")
+        self.assertEqual(callback_resp.status_code, 302)
+        self.assertEqual(callback_resp.url, target_path)
+
+    @patch('recommendations.notifications.EmailMultiAlternatives')
+    @patch('recommendations.notifications.get_subscribed_members')
+    def test_survey_broadcast_email_contains_direct_survey_url(self, mock_get_subs, mock_email_class):
+        mock_get_subs.return_value = [{'email': 'voter@gmail.com', 'full_name': 'Voter Member'}]
+
+        from recommendations.notifications import send_survey_broadcast_email
+        request = RequestFactory().get(f'/surveys/{self.survey.id}/')
+        request.get_host = lambda: 'minimexas.pythonanywhere.com'
+        request.is_secure = lambda: True
+
+        sent_count = send_survey_broadcast_email(self.survey, request=request)
+        self.assertEqual(sent_count, 1)
+
+        # Verify email body contains direct link
+        called_args, called_kwargs = mock_email_class.call_args
+        body_text = called_kwargs.get('body', '')
+        self.assertIn(f"/surveys/{self.survey.id}/", body_text)
 
 
 @override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
@@ -3309,6 +3438,177 @@ class OrganizerCreateRecommendationTestCase(TestCase):
         self.assertRedirects(response, reverse('recommendations:notes_list'))
         mock_sync_sheet.assert_called_once()
         self.assertEqual(mock_sync_sheet.call_args[1]['subject'], 'Bilingual Pediatricians')
+
+
+class EventDirectURLAndSharingTestCase(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+        self.member = MemberProfile.objects.create(
+            full_name="Valentina Morales",
+            email="valentina@minimexitas.org",
+            region="san_francisco",
+            is_admin=False
+        )
+
+    def _login_member(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.member.email
+        session['member_name'] = self.member.full_name
+        session['is_admin'] = False
+        session.save()
+
+    def test_unauthenticated_user_redirected_to_login(self):
+        response = self.client.get(reverse('event_detail', kwargs={'event_id': 'evt_tacos_2026'}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        self.assertIn('next=', response.url)
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_event_detail_direct_url_renders_focused_event(self, mock_fetch_events):
+        mock_fetch_events.return_value = [
+            {
+                'id': 'evt_tacos_2026',
+                'title': 'Mexican Food Tour & Taco Picnic',
+                'category': 'Culinary & Social',
+                'start_datetime': datetime.datetime(2026, 8, 25, 12, 0),
+                'year': 2026,
+                'month': 8,
+                'day': '25',
+                'date_formatted': 'Aug 25, 2026',
+                'time_formatted': '12:00 PM',
+                'location': 'Mission Dolores Park, SF',
+                'location_url': 'https://maps.google.com/?q=Mission+Dolores+Park',
+                'description': 'Join us for tacos and cultural chats in the park!',
+                'google_calendar_link': 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Tacos',
+                'organizer': 'Elena Organizer',
+                'is_past': False,
+                'source': 'portal',
+                'is_portal_event': True,
+                'portal_event_pk': 1,
+            }
+        ]
+
+        self._login_member()
+        response = self.client.get(reverse('event_detail', kwargs={'event_id': 'evt_tacos_2026'}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'focused-event-container')
+        self.assertContains(response, 'Mexican Food Tour')
+        self.assertContains(response, 'View All Events')
+        self.assertContains(response, 'copy-event-link-btn')
+        self.assertContains(response, 'data-event-url=')
+        self.assertNotContains(response, 'Share on WhatsApp')
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_event_detail_supports_portal_prefix_and_raw_pk(self, mock_fetch_events):
+        mock_fetch_events.return_value = [
+            {
+                'id': 'portal_5',
+                'title': 'Dia de Muertos Workshop',
+                'category': 'Cultural & Heritage',
+                'start_datetime': datetime.datetime(2026, 11, 1, 14, 0),
+                'year': 2026,
+                'month': 11,
+                'day': '01',
+                'date_formatted': 'Nov 01, 2026',
+                'time_formatted': '2:00 PM',
+                'location': 'Mission Cultural Center, SF',
+                'location_url': 'https://maps.google.com/?q=Mission+Cultural+Center',
+                'description': 'Altar making workshop for families.',
+                'google_calendar_link': 'https://calendar.google.com',
+                'organizer': 'Comunidad MiniMexitas',
+                'is_past': False,
+                'source': 'portal',
+                'is_portal_event': True,
+                'portal_event_pk': 5,
+            }
+        ]
+
+        self._login_member()
+
+        # Test lookup by portal_5
+        res1 = self.client.get('/events/portal_5/')
+        self.assertEqual(res1.status_code, 200)
+        self.assertContains(res1, 'Dia de Muertos Workshop')
+        self.assertContains(res1, 'focused-event-container')
+
+        # Test lookup by raw pk 5
+        res2 = self.client.get('/events/5/')
+        self.assertEqual(res2.status_code, 200)
+        self.assertContains(res2, 'Dia de Muertos Workshop')
+        self.assertContains(res2, 'focused-event-container')
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_events_list_view_with_query_param(self, mock_fetch_events):
+        mock_fetch_events.return_value = [
+            {
+                'id': 'evt_tacos_2026',
+                'title': 'Mexican Food Tour & Taco Picnic',
+                'category': 'Culinary & Social',
+                'start_datetime': datetime.datetime(2026, 8, 25, 12, 0),
+                'year': 2026,
+                'month': 8,
+                'day': '25',
+                'date_formatted': 'Aug 25, 2026',
+                'time_formatted': '12:00 PM',
+                'location': 'Mission Dolores Park, SF',
+                'location_url': 'https://maps.google.com/?q=Mission+Dolores+Park',
+                'description': 'Join us for tacos and cultural chats!',
+                'google_calendar_link': 'https://calendar.google.com',
+                'organizer': 'Elena Organizer',
+                'is_past': False,
+                'source': 'google_calendar',
+                'is_portal_event': False,
+                'portal_event_pk': None,
+            }
+        ]
+
+        self._login_member()
+        response = self.client.get(f"{reverse('events')}?event=evt_tacos_2026")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'focused-event-container')
+        self.assertContains(response, 'Mexican Food Tour')
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_event_detail_nonexistent_event_graceful(self, mock_fetch_events):
+        mock_fetch_events.return_value = [
+            {
+                'id': 'evt_existing',
+                'title': 'Existing Event',
+                'category': 'Cultural & Heritage',
+                'start_datetime': datetime.datetime(2026, 8, 25, 12, 0),
+                'year': 2026,
+                'month': 8,
+                'day': '25',
+                'date_formatted': 'Aug 25, 2026',
+                'time_formatted': '12:00 PM',
+                'location': 'SF',
+                'location_url': '',
+                'description': '',
+                'google_calendar_link': '',
+                'organizer': 'Community',
+                'is_past': False,
+            }
+        ]
+
+        self._login_member()
+        response = self.client.get(reverse('event_detail', kwargs={'event_id': 'evt_missing_999'}))
+        self.assertEqual(response.status_code, 200)
+        # Should render normal events page with alert
+        self.assertContains(response, 'could not be found or has concluded')
+
+    @patch('recommendations.views.sync_event_rsvp_to_google_sheet', return_value=True)
+    def test_event_rsvp_token_redirects_to_event_detail(self, mock_sync_sheet):
+        token = generate_event_rsvp_token(
+            event_id="evt_tacos_2026",
+            email="valentina@minimexitas.org",
+            status="going"
+        )
+        response = self.client.get(f"{reverse('event_rsvp')}?token={token}")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/events/evt_tacos_2026/')
+
 
 
 
