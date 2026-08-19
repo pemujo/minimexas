@@ -792,7 +792,11 @@ def send_survey_broadcast_email(survey_obj, broadcast_by_name: str = None, broad
             options = []
 
     base_url = _resolve_base_portal_url(request=request)
-    portal_surveys_url = f"{base_url}/surveys/" if base_url else "/surveys/"
+    survey_id = getattr(survey_obj, 'id', None)
+    if survey_id:
+        portal_surveys_url = f"{base_url}/surveys/{survey_id}/" if base_url else f"/surveys/{survey_id}/"
+    else:
+        portal_surveys_url = f"{base_url}/surveys/" if base_url else "/surveys/"
     portal_profile_url = f"{base_url}/profile/" if base_url else "/profile/"
     from_email = _get_from_email()
     subject = f"🗳️ Nueva Encuesta MiniMexitas: {survey_title}"

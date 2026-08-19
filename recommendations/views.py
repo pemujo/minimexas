@@ -66,6 +66,9 @@ def member_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         if not is_authenticated_member(request):
+            next_url = request.get_full_path()
+            if next_url and next_url != '/' and next_url != reverse('login_page'):
+                return redirect(f"{reverse('login_page')}?next={quote_plus(next_url)}")
             return redirect('login_page')
         
         # Verify member profile still exists in database (invalidates session if purged by Google Sheet reconciliation)
@@ -84,6 +87,9 @@ def admin_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         if not is_authenticated_member(request):
+            next_url = request.get_full_path()
+            if next_url and next_url != '/' and next_url != reverse('login_page'):
+                return redirect(f"{reverse('login_page')}?next={quote_plus(next_url)}")
             return redirect('login_page')
         if not is_admin_member(request):
             return render(request, 'recommendations/login.html', {
@@ -110,6 +116,12 @@ def gmail_login_view(request):
     """Redirects the user to Google's sign-in page with CSRF state protection."""
     state = secrets.token_urlsafe(32)
     request.session['oauth_state'] = state
+
+    next_url = request.GET.get('next', '').strip()
+    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+        request.session['oauth_next_url'] = next_url
+    else:
+        request.session.pop('oauth_next_url', None)
     
     redirect_uri = get_google_redirect_uri(request)
     google_auth_url = (
@@ -193,6 +205,9 @@ def google_callback_view(request):
     allowed, member_name, is_admin = is_gmail_allowed(user_email)
 
     if allowed:
+        # Check for destination URL to redirect to after successful sign-in
+        next_url = request.session.pop('oauth_next_url', None)
+
         # Prevent session fixation attacks
         request.session.cycle_key()
 
@@ -211,6 +226,9 @@ def google_callback_view(request):
         display_name = profile.full_name or member_name or 'Member'
         request.session['member_name'] = display_name
         request.session.set_expiry(60 * 60 * 24 * 30)  # Logged in for 30 days
+
+        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
         return redirect('home')
     else:
         # Check if there is a pending or rejected request for this email
@@ -240,7 +258,13 @@ def google_callback_view(request):
 
 
 def login_page_view(request):
+    next_url = request.GET.get('next', '').strip()
+    if next_url and (not next_url.startswith('/') or next_url.startswith('//')):
+        next_url = ''
+
     if is_authenticated_member(request):
+        if next_url:
+            return redirect(next_url)
         return redirect('home')
 
     account_deleted = request.session.pop('account_deleted_flash', False)
@@ -249,6 +273,7 @@ def login_page_view(request):
     return render(request, 'recommendations/login.html', {
         'account_deleted': account_deleted,
         'account_deleted_email': account_deleted_email,
+        'next_url': next_url,
     })
 
 
@@ -1605,20 +1630,47 @@ def organizer_sync_sheets_view(request):
         return redirect(reverse('organizer_dashboard') + '?sync_error=1')
 
 
-def surveys_list_view(request):
-    """
-    Renders active and past community surveys.
-    Allows verified members to cast and update votes with live result percentages and transparent voter lists.
-    """
-    if not is_authenticated_member(request):
-        return redirect('login_page')
+def _build_survey_dict(s, user_email):
+    total_votes = s.total_votes
+    unique_voters = s.unique_voters_count
+    user_option_ids = s.user_voted_option_ids(user_email)
+    has_voted = len(user_option_ids) > 0
 
-    user_email = request.session.get('member_email', '').strip().lower()
-    is_admin = request.session.get('is_admin', False)
+    options_data = []
+    for opt in s.options.all():
+        opt_votes = opt.vote_count
+        pct = round((opt_votes / total_votes * 100), 1) if total_votes > 0 else 0
+        is_selected = opt.id in user_option_ids
+        voters = opt.voter_names
 
-    category_filter = request.GET.get('category', '').strip()
-    status_filter = request.GET.get('status', 'active').strip()
+        options_data.append({
+            'id': opt.id,
+            'text': opt.text,
+            'vote_count': opt_votes,
+            'percentage': pct,
+            'is_selected': is_selected,
+            'voters': voters,
+        })
 
+    return {
+        'id': s.id,
+        'title': s.title,
+        'description': s.description,
+        'category': s.category,
+        'category_label': s.get_category_display(),
+        'is_multiple_choice': s.is_multiple_choice,
+        'is_active': s.is_active,
+        'created_by': s.created_by,
+        'created_at': s.created_at,
+        'total_votes': total_votes,
+        'unique_voters': unique_voters,
+        'has_voted': has_voted,
+        'user_option_ids': user_option_ids,
+        'options': options_data,
+    }
+
+
+def _get_surveys_data(user_email, category_filter=None, status_filter='active', target_survey_id=None):
     surveys_qs = CommunitySurvey.objects.all().prefetch_related('options__votes', 'votes')
 
     if category_filter and category_filter in [c[0] for c in CommunitySurvey.CATEGORY_CHOICES]:
@@ -1630,44 +1682,55 @@ def surveys_list_view(request):
         surveys_qs = surveys_qs.filter(is_active=False)
 
     surveys_data = []
+    target_survey_item = None
+
     for s in surveys_qs:
-        total_votes = s.total_votes
-        unique_voters = s.unique_voters_count
-        user_option_ids = s.user_voted_option_ids(user_email)
-        has_voted = len(user_option_ids) > 0
+        item = _build_survey_dict(s, user_email)
+        if target_survey_id and s.id == target_survey_id:
+            target_survey_item = item
+        surveys_data.append(item)
 
-        options_data = []
-        for opt in s.options.all():
-            opt_votes = opt.vote_count
-            pct = round((opt_votes / total_votes * 100), 1) if total_votes > 0 else 0
-            is_selected = opt.id in user_option_ids
-            voters = opt.voter_names
+    # If a specific target survey is requested but was filtered out (or status is active/closed), fetch and prepend it
+    if target_survey_id and not target_survey_item:
+        try:
+            target_obj = CommunitySurvey.objects.prefetch_related('options__votes', 'votes').get(id=target_survey_id)
+            target_survey_item = _build_survey_dict(target_obj, user_email)
+            surveys_data.insert(0, target_survey_item)
+        except CommunitySurvey.DoesNotExist:
+            target_survey_item = None
 
-            options_data.append({
-                'id': opt.id,
-                'text': opt.text,
-                'vote_count': opt_votes,
-                'percentage': pct,
-                'is_selected': is_selected,
-                'voters': voters,
-            })
+    # If target survey exists in list, ensure it's at the top of the list for instant visibility
+    if target_survey_id and target_survey_item:
+        surveys_data = [target_survey_item] + [s for s in surveys_data if s['id'] != target_survey_id]
 
-        surveys_data.append({
-            'id': s.id,
-            'title': s.title,
-            'description': s.description,
-            'category': s.category,
-            'category_label': s.get_category_display(),
-            'is_multiple_choice': s.is_multiple_choice,
-            'is_active': s.is_active,
-            'created_by': s.created_by,
-            'created_at': s.created_at,
-            'total_votes': total_votes,
-            'unique_voters': unique_voters,
-            'has_voted': has_voted,
-            'user_option_ids': user_option_ids,
-            'options': options_data,
-        })
+    return surveys_data, target_survey_item
+
+
+@member_required
+def surveys_list_view(request):
+    """
+    Renders active and past community surveys.
+    Allows verified members to cast and update votes with live result percentages and transparent voter lists.
+    Supports ?survey=<id> query parameter for direct survey sharing.
+    """
+    user_email = request.session.get('member_email', '').strip().lower()
+    is_admin = request.session.get('is_admin', False)
+
+    category_filter = request.GET.get('category', '').strip()
+    status_filter = request.GET.get('status', 'active').strip()
+
+    target_survey_id = None
+    target_survey_param = request.GET.get('survey', '').strip()
+    if target_survey_param and target_survey_param.isdigit():
+        target_survey_id = int(target_survey_param)
+        status_filter = 'all'
+
+    surveys_data, target_survey_item = _get_surveys_data(
+        user_email=user_email,
+        category_filter=category_filter,
+        status_filter=status_filter,
+        target_survey_id=target_survey_id
+    )
 
     active_count = CommunitySurvey.objects.filter(is_active=True).count()
     closed_count = CommunitySurvey.objects.filter(is_active=False).count()
@@ -1685,27 +1748,69 @@ def surveys_list_view(request):
         'active_page': 'surveys',
         'subscribed_members_count': subscribed_members_count,
         'survey_flash_message': survey_flash_message,
+        'target_survey_id': target_survey_id,
+        'target_survey': target_survey_item,
     })
 
 
+@member_required
+def survey_detail_view(request, survey_id):
+    """
+    Direct URL endpoint for an individual survey (/surveys/<int:survey_id>/).
+    Renders the survey hub focused on the requested survey, ensuring it is visible
+    even if active/closed status differs, and smoothly scrolls to it.
+    """
+    target_survey_obj = get_object_or_404(CommunitySurvey, id=survey_id)
+    user_email = request.session.get('member_email', '').strip().lower()
+    is_admin = request.session.get('is_admin', False)
+
+    status_filter = 'all' if not target_survey_obj.is_active else 'active'
+
+    surveys_data, target_survey_item = _get_surveys_data(
+        user_email=user_email,
+        category_filter=None,
+        status_filter=status_filter,
+        target_survey_id=survey_id
+    )
+
+    active_count = CommunitySurvey.objects.filter(is_active=True).count()
+    closed_count = CommunitySurvey.objects.filter(is_active=False).count()
+    subscribed_members_count = MemberProfile.objects.exclude(email__isnull=True).exclude(email='').filter(email_notifications=True).count()
+    survey_flash_message = request.session.pop('survey_flash_message', None)
+
+    return render(request, 'recommendations/surveys.html', {
+        'surveys': surveys_data,
+        'category_filter': '',
+        'status_filter': status_filter,
+        'category_choices': CommunitySurvey.CATEGORY_CHOICES,
+        'active_count': active_count,
+        'closed_count': closed_count,
+        'is_admin': is_admin,
+        'active_page': 'surveys',
+        'subscribed_members_count': subscribed_members_count,
+        'survey_flash_message': survey_flash_message,
+        'target_survey_id': survey_id,
+        'target_survey': target_survey_item,
+        'is_direct_detail': True,
+    })
+
+
+@member_required
 def survey_vote_view(request, survey_id):
     """
     Processes a member's vote for a survey.
     Supports single-choice and multiple-choice voting, vote updates, and Google Sheets synchronization.
     """
-    if not is_authenticated_member(request):
-        return redirect('login_page')
-
     if request.method != 'POST':
-        return redirect('surveys')
+        return redirect('survey_detail', survey_id=survey_id)
 
     survey = get_object_or_404(CommunitySurvey, id=survey_id)
     if not survey.is_active:
-        return redirect(reverse('surveys') + '?error=survey_closed')
+        return redirect(reverse('survey_detail', kwargs={'survey_id': survey.id}) + '?error=survey_closed')
 
     selected_option_ids = request.POST.getlist('options')
     if not selected_option_ids:
-        return redirect(reverse('surveys') + '?error=no_selection')
+        return redirect(reverse('survey_detail', kwargs={'survey_id': survey.id}) + '?error=no_selection')
 
     user_email = request.session.get('member_email', '').strip().lower()
     user_name = request.session.get('member_name', 'Member')
@@ -1717,7 +1822,7 @@ def survey_vote_view(request, survey_id):
     # Validate option IDs belong to this survey
     valid_options = survey.options.filter(id__in=selected_option_ids)
     if not valid_options.exists():
-        return redirect(reverse('surveys') + '?error=invalid_option')
+        return redirect(reverse('survey_detail', kwargs={'survey_id': survey.id}) + '?error=invalid_option')
 
     # Clear previous votes for this user on this survey
     SurveyVote.objects.filter(survey=survey, voter_email__iexact=user_email).delete()
@@ -1737,7 +1842,7 @@ def survey_vote_view(request, survey_id):
     except Exception as e:
         logger.warning(f"Failed to sync survey #{survey.id} to Google Sheet: {e}")
 
-    return redirect(reverse('surveys') + '?voted=1')
+    return redirect(reverse('survey_detail', kwargs={'survey_id': survey.id}) + '?voted=1')
 
 
 @admin_required

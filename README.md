@@ -87,10 +87,12 @@ flowchart TD
   - Role-based permissions (`Member` vs `Admin` / `Organizer`).
   - Protection against CSRF, expired states, and session fixation.
 
-- **🗳️ Surveys & Community Decision Center (`/surveys/`)**:
+- **🗳️ Surveys & Community Decision Center (`/surveys/` & `/surveys/<id>/`)**:
   - Interactive community polling with categorized topics (*Community, Event Planning, Meetup, General*).
   - Single-choice and multiple-choice voting modes with live percentage distribution bars.
-  - Instant and re-broadcast email announcements sent to subscribed members.
+  - **Direct Survey URLs & Deep Linking**: Direct routes (`/surveys/<id>/`) with auto-scroll, visual pulse highlight, and share modal (WhatsApp and 1-click clipboard copy).
+  - **Seamless Authentication Preservation**: Opening a direct survey link while logged out automatically preserves the destination (`?next=`) across Google OAuth sign-in.
+  - Instant and re-broadcast email announcements with direct voting CTA buttons sent to subscribed members.
   - Organizer controls to create, close/re-open, broadcast, and delete surveys.
 
 - **📅 Community Events & 1-Click Signed RSVPs (`/events/`)**:

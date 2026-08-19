@@ -1,4 +1,5 @@
 import datetime
+from urllib.parse import quote_plus
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, Client, RequestFactory, override_settings
 from django.urls import reverse
@@ -2134,6 +2135,22 @@ class SurveysFeatureTestCase(TestCase):
         cache.clear()
         self.client = Client()
 
+        self.voter_profile = MemberProfile.objects.create(
+            email="voter@gmail.com",
+            full_name="Voter Member",
+            is_admin=False
+        )
+        self.admin_profile = MemberProfile.objects.create(
+            email="admin@minimexitas.org",
+            full_name="Super Admin",
+            is_admin=True
+        )
+        self.foodie_profile = MemberProfile.objects.create(
+            email="foodie@gmail.com",
+            full_name="Foodie Member",
+            is_admin=False
+        )
+
         self.survey = CommunitySurvey.objects.create(
             title="Where should we host the 2026 Fall Picnic?",
             description="Cast your vote for our next community gathering.",
@@ -2389,6 +2406,110 @@ class SurveysFeatureTestCase(TestCase):
         res = delete_survey_from_google_sheet(self.survey.id)
         self.assertTrue(res)
         mock_ws.update.assert_called_once()
+
+    def test_survey_detail_view_requires_auth_and_preserves_next(self):
+        response = self.client.get(reverse('survey_detail', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 302)
+        expected_next = f"/surveys/{self.survey.id}/"
+        self.assertIn(f"next={quote_plus(expected_next)}", response.url)
+
+    def test_survey_detail_view_authenticated(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(reverse('survey_detail', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.survey.title)
+        self.assertContains(response, f'id="survey-{self.survey.id}"')
+        self.assertContains(response, "Shared Survey Direct Link")
+        self.assertContains(response, "Copy Direct Link")
+        self.assertContains(response, "Share on WhatsApp")
+
+    def test_survey_detail_view_closed_survey_visible(self):
+        self.survey.is_active = False
+        self.survey.save()
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(reverse('survey_detail', args=[self.survey.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.survey.title)
+        self.assertContains(response, "Shared Survey Direct Link")
+
+    def test_surveys_list_view_with_survey_query_param(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "voter@gmail.com"
+        session['member_name'] = "Voter Member"
+        session.save()
+
+        response = self.client.get(f"{reverse('surveys')}?survey={self.survey.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.survey.title)
+        self.assertContains(response, "Shared Survey Direct Link")
+
+    @patch('recommendations.views.requests.post')
+    @patch('recommendations.views.requests.get')
+    @patch('recommendations.views.is_gmail_allowed')
+    def test_full_oauth_next_redirect_to_survey(self, mock_is_allowed, mock_get, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {'access_token': 'valid_token_123'}
+
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {'email': 'voter@gmail.com', 'name': 'Voter Member', 'verified_email': True}
+
+        mock_is_allowed.return_value = (True, 'Voter Member', False)
+
+        # 1. Unauthenticated hit on survey_detail redirects to login with ?next=
+        target_path = f"/surveys/{self.survey.id}/"
+        unauth_resp = self.client.get(target_path)
+        self.assertEqual(unauth_resp.status_code, 302)
+        self.assertIn(f"next={quote_plus(target_path)}", unauth_resp.url)
+
+        # 2. Login page renders sign-in button carrying next param
+        login_resp = self.client.get(f"/login/?next={quote_plus(target_path)}")
+        self.assertEqual(login_resp.status_code, 200)
+        self.assertContains(login_resp, f"next={target_path}")
+
+        # 3. Initiating Gmail login stores next into session
+        init_login_resp = self.client.get(f"{reverse('gmail_login')}?next={quote_plus(target_path)}")
+        self.assertEqual(init_login_resp.status_code, 302)
+        self.assertEqual(self.client.session.get('oauth_next_url'), target_path)
+
+        # 4. OAuth callback redirects to the stored next survey URL
+        session = self.client.session
+        session['oauth_state'] = 'test_state_123'
+        session['oauth_next_url'] = target_path
+        session.save()
+
+        callback_resp = self.client.get(f"{reverse('google_callback')}?code=test_code&state=test_state_123")
+        self.assertEqual(callback_resp.status_code, 302)
+        self.assertEqual(callback_resp.url, target_path)
+
+    @patch('recommendations.notifications.EmailMultiAlternatives')
+    @patch('recommendations.notifications.get_subscribed_members')
+    def test_survey_broadcast_email_contains_direct_survey_url(self, mock_get_subs, mock_email_class):
+        mock_get_subs.return_value = [{'email': 'voter@gmail.com', 'full_name': 'Voter Member'}]
+
+        from recommendations.notifications import send_survey_broadcast_email
+        request = RequestFactory().get(f'/surveys/{self.survey.id}/')
+        request.get_host = lambda: 'minimexas.pythonanywhere.com'
+        request.is_secure = lambda: True
+
+        sent_count = send_survey_broadcast_email(self.survey, request=request)
+        self.assertEqual(sent_count, 1)
+
+        # Verify email body contains direct link
+        called_args, called_kwargs = mock_email_class.call_args
+        body_text = called_kwargs.get('body', '')
+        self.assertIn(f"/surveys/{self.survey.id}/", body_text)
 
 
 @override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
