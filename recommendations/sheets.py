@@ -1,4 +1,8 @@
 import os
+import re
+import urllib.parse
+import urllib.request
+import functools
 import logging
 from django.conf import settings
 import gspread
@@ -6,26 +10,251 @@ import gspread
 logger = logging.getLogger(__name__)
 
 
+# Known Bay Area locations & landmarks for instant coordinate mapping
+BAY_AREA_GEOLOCATIONS = {
+    "san francisco": (37.7749, -122.4194),
+    "sf": (37.7749, -122.4194),
+    "mission": (37.7599, -122.4148),
+    "mission district": (37.7599, -122.4148),
+    "mission dolores": (37.7596, -122.4269),
+    "dolores park": (37.7596, -122.4269),
+    "castro": (37.7609, -122.4350),
+    "soma": (37.7785, -122.4056),
+    "financial district": (37.7946, -122.4000),
+    "richmond district": (37.7797, -122.4842),
+    "sunset district": (37.7535, -122.4842),
+    "north beach": (37.8000, -122.4100),
+    "marina": (37.8037, -122.4368),
+    "haight": (37.7692, -122.4481),
+    "oakland": (37.8044, -122.2712),
+    "berkeley": (37.8715, -122.2730),
+    "san jose": (37.3382, -121.8863),
+    "palo alto": (37.4419, -122.1430),
+    "mountain view": (37.3861, -122.0839),
+    "sunnyvale": (37.3688, -122.0363),
+    "santa clara": (37.3541, -121.9552),
+    "redwood city": (37.4852, -122.2364),
+    "san mateo": (37.5630, -122.3255),
+    "fremont": (37.5483, -121.9886),
+    "hayward": (37.6688, -122.0808),
+    "san rafael": (37.9735, -122.5311),
+    "marin": (37.9838, -122.5449),
+    "walnut creek": (37.9101, -122.0652),
+    "concord": (37.9780, -122.0311),
+    "pleasanton": (37.6604, -121.8758),
+    "dublin": (37.7022, -121.9358),
+    "livermore": (37.6819, -121.7680),
+    "richmond": (37.9358, -122.3477),
+    "daly city": (37.7058, -122.4619),
+    "south san francisco": (37.6547, -122.4077),
+    "burlingame": (37.5841, -122.3661),
+    "cupertino": (37.3230, -122.0322),
+    "milpitas": (37.4323, -121.8996),
+    "san leandro": (37.7249, -122.1561),
+    "alameda": (37.7652, -122.2416),
+    "foster city": (37.5585, -122.2711),
+    "belmont": (37.5202, -122.2758),
+    "san carlos": (37.5072, -122.2605),
+    "los altos": (37.3852, -122.1141),
+    "santa cruz": (36.9741, -122.0308),
+    "vallejo": (38.1041, -122.2566),
+    "napa": (38.2975, -122.2869),
+    "sonoma": (38.2919, -122.4580),
+    "petaluma": (38.2324, -122.6367),
+    "union city": (37.5934, -122.0438),
+    "campbell": (37.2872, -121.9499),
+    "los gatos": (37.2358, -121.9624),
+    "morgan hill": (37.1305, -121.6544),
+    "gilroy": (37.0058, -121.5683),
+    "menlo park": (37.4530, -122.1817),
+    "millbrae": (37.5985, -122.3872),
+    "pacifica": (37.6138, -122.4869),
+    "half moon bay": (37.4636, -122.4286),
+    "east bay": (37.8044, -122.2712),
+    "south bay": (37.3382, -121.8863),
+    "north bay": (37.9735, -122.5311),
+    "peninsula": (37.5630, -122.3255),
+}
+
+
+@functools.lru_cache(maxsize=512)
+def resolve_google_maps_url(url):
+    """
+    Follows HTTP redirects for Google Maps short links (e.g. maps.app.goo.gl or goo.gl/maps)
+    with a short timeout and caches the resulting full URL.
+    """
+    if not url or not isinstance(url, str):
+        return url
+    url_clean = url.strip()
+    if not any(domain in url_clean for domain in ('maps.app.goo.gl', 'goo.gl/maps', 'bit.ly', 'tinyurl.com')):
+        return url_clean
+    try:
+        req = urllib.request.Request(
+            url_clean,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        )
+        with urllib.request.urlopen(req, timeout=2.5) as response:
+            final_url = response.geturl()
+            if final_url and final_url != url_clean:
+                return final_url
+    except Exception as e:
+        logger.debug(f"Could not resolve short maps URL {url_clean}: {e}")
+    return url_clean
+
+
+def _extract_coords_from_string(text):
+    """
+    Extracts latitude and longitude from URLs, query parameters, or raw coordinate strings.
+    """
+    if not text:
+        return None, None
+
+    match = (
+        re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', text)
+        or re.search(r'[?&/](?:q|ll|loc:|destination|query|center|daddr)=(-?\d+\.\d+),(-?\d+\.\d+)', text)
+        or re.search(r'/search/(-?\d+\.\d+),(-?\d+\.\d+)', text)
+        or re.search(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)', text)
+        or re.search(r'!8m2!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)', text)
+        or re.search(r'!1d(-?\d+\.\d+)!2d(-?\d+\.\d+)', text)
+        or re.search(r'^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$', text)
+        or re.search(r'(?<!\d)(-?\d{1,2}\.\d{3,7})\s*,\s*(-?\d{1,3}\.\d{3,7})(?!\d)', text)
+    )
+    if match:
+        try:
+            return float(match.group(1)), float(match.group(2))
+        except (ValueError, TypeError):
+            pass
+    return None, None
+
+
+def parse_location_and_coords(location_val, recommendation_text=""):
+    """
+    Parses a raw location string (or extracts a Google Maps link from recommendation text).
+    Resolves short URLs, extracts place titles, and extracts exact or fallback Bay Area coordinates.
+    Returns a dict with location, location_url, location_display, lat, lng, and has_location.
+    """
+    raw_loc = str(location_val or '').strip()
+    rec_text = str(recommendation_text or '').strip()
+
+    # If no explicit location, search for a Google Maps URL embedded inside recommendation text
+    if not raw_loc and rec_text:
+        match_url = re.search(r'https?://(?:maps\.google\.[a-z.]+|goo\.gl/maps|maps\.app\.goo\.gl|www\.google\.[a-z.]+/maps)[^\s<>"\']*', rec_text, re.IGNORECASE)
+        if match_url:
+            raw_loc = match_url.group(0).rstrip('.,;:)')
+
+    if not raw_loc:
+        return {
+            'location': '',
+            'location_url': '',
+            'location_display': '',
+            'lat': None,
+            'lng': None,
+            'has_location': False,
+        }
+
+    # Resolve short URLs if needed
+    expanded_url = raw_loc
+    if raw_loc.startswith(('http://', 'https://')):
+        expanded_url = resolve_google_maps_url(raw_loc)
+
+    is_url = raw_loc.startswith(('http://', 'https://')) or expanded_url.startswith(('http://', 'https://'))
+    location_url = raw_loc if is_url else f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(raw_loc)}"
+
+    # Clean display title
+    location_display = ""
+    if is_url:
+        # Check place path in expanded or raw URL
+        for u in (expanded_url, raw_loc):
+            place_match = re.search(r'/place/([^/@?]+)', u)
+            if place_match:
+                extracted = urllib.parse.unquote_plus(place_match.group(1)).replace('+', ' ').strip()
+                if extracted and not extracted.startswith('data='):
+                    location_display = extracted
+                    break
+            q_match = re.search(r'[?&](?:query|q|destination|daddr)=([^&]+)', u)
+            if q_match:
+                extracted = urllib.parse.unquote_plus(q_match.group(1)).replace('+', ' ').strip()
+                if extracted:
+                    location_display = extracted
+                    break
+            s_match = re.search(r'/search/([^/@?]+)', u)
+            if s_match:
+                extracted = urllib.parse.unquote_plus(s_match.group(1)).replace('+', ' ').strip()
+                if extracted:
+                    location_display = extracted
+                    break
+
+        if not location_display or location_display.startswith('data='):
+            location_display = "Google Maps Location"
+    else:
+        location_display = raw_loc
+
+    # Extract coordinates
+    lat, lng = _extract_coords_from_string(expanded_url)
+    if lat is None or lng is None:
+        lat, lng = _extract_coords_from_string(raw_loc)
+
+    # Lookup known Bay Area cities/landmarks if coordinates not explicitly found
+    if lat is None or lng is None:
+        search_blob = f"{location_display} {raw_loc} {expanded_url} {rec_text}".lower()
+        for place_name, coords in BAY_AREA_GEOLOCATIONS.items():
+            pattern = r'\b' + re.escape(place_name) + r'\b'
+            if re.search(pattern, search_blob):
+                lat, lng = coords
+                break
+
+    # Fallback to Bay Area center coordinates if location exists but couldn't be geocoded
+    if lat is None or lng is None:
+        lat, lng = (37.7749, -122.4194)
+
+    return {
+        'location': raw_loc,
+        'location_url': location_url,
+        'location_display': location_display,
+        'lat': lat,
+        'lng': lng,
+        'has_location': True,
+    }
+
+
 def _normalize_record_keys(record):
     """
     Normalizes dictionary keys from Google Sheets so Django templates
     can access fields reliably using dot notation (e.g. row.Shared_By).
+    Also parses and enriches location information and map coordinates.
     """
     normalized = {}
+    location_raw = ''
+
     for key, value in record.items():
         clean_key = str(key).strip().replace(" ", "_")
         normalized[clean_key] = value
         
         # Also ensure canonical field names match expected template properties
         lower_key = clean_key.lower()
-        if lower_key in ('shared_by', 'sharedby', 'author', 'member'):
+        if lower_key in ('shared_by', 'sharedby', 'author', 'member', 'compartido_por', 'compartidopor'):
             normalized['Shared_By'] = value
-        elif lower_key in ('date', 'timestamp', 'time'):
+        elif lower_key in ('date', 'timestamp', 'time', 'fecha'):
             normalized['Date'] = value
-        elif lower_key in ('subject', 'topic', 'category', 'title'):
+        elif lower_key in ('subject', 'topic', 'category', 'title', 'tema', 'categoria', 'categoría'):
             normalized['Subject'] = value
-        elif lower_key in ('recommendation', 'notes', 'message', 'content', 'recommendations'):
+        elif lower_key in ('recommendation', 'notes', 'message', 'content', 'recommendations', 'recomendacion', 'recomendación', 'notas'):
             normalized['Recommendation'] = value
+        elif lower_key in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'google_maps', 'maps_url', 'location_url', 'address', 'direccion', 'dirección', 'lugar', 'place'):
+            normalized['Location'] = value
+            location_raw = value
+
+    # Parse and enrich location metadata & coordinates
+    loc_info = parse_location_and_coords(
+        location_raw or normalized.get('Location', ''),
+        recommendation_text=normalized.get('Recommendation', '')
+    )
+    normalized['Location'] = loc_info['location']
+    normalized['location_url'] = loc_info['location_url']
+    normalized['location_display'] = loc_info['location_display']
+    normalized['lat'] = loc_info['lat']
+    normalized['lng'] = loc_info['lng']
+    normalized['has_location'] = loc_info['has_location']
 
     return normalized
 
@@ -60,9 +289,12 @@ def open_google_spreadsheet(gc):
 
 def _get_worksheet_case_insensitive(sh, target_name):
     """
-    Finds a worksheet in spreadsheet `sh` matching target_name.
-    Tries exact title first, then searches all worksheets case-insensitively.
+    Safely retrieves a worksheet by case-insensitive and whitespace-stripped name,
+    supporting common bilingual aliases.
     """
+    if not sh or not target_name:
+        return None
+
     try:
         ws = sh.worksheet(target_name)
         if ws:
@@ -103,6 +335,7 @@ def fetch_recommendations():
     """
     Fetches rows from the Google Sheet and returns normalized dictionaries.
     Prioritizes 'Recomendaciones', 'Recommendations', or 'Notes' tab before fallback.
+    Resilient to missing headers, varied column orders, and missing Location column definitions.
     """
     gc = get_gspread_client()
     sh = open_google_spreadsheet(gc)
@@ -112,12 +345,53 @@ def fetch_recommendations():
         or _get_worksheet_case_insensitive(sh, "Notes")
         or getattr(sh, 'sheet1', None)
     )
-    
-    raw_records = worksheet.get_all_records() if worksheet else []
-    return [_normalize_record_keys(row) for row in raw_records]
+    if not worksheet:
+        return []
+
+    # First attempt to read via get_all_values() for full column resilience
+    try:
+        all_values = worksheet.get_all_values()
+        if all_values and isinstance(all_values, list) and len(all_values) > 0 and isinstance(all_values[0], (list, tuple)):
+            headers = [str(h).strip() for h in all_values[0]]
+            canonical_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location']
+            if not headers or all(not h for h in headers):
+                headers = canonical_headers
+
+            records = []
+            for row in all_values[1:]:
+                if not isinstance(row, (list, tuple)) or all(not str(c).strip() for c in row):
+                    continue
+                record = {}
+                for col_idx, cell in enumerate(row):
+                    if col_idx < len(headers) and headers[col_idx]:
+                        record[headers[col_idx]] = cell
+                    elif col_idx == 4:
+                        record['Location'] = cell
+                    else:
+                        record[f'col_{col_idx}'] = cell
+
+                has_loc_in_rec = any(str(k).strip().lower() in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'address', 'direccion') for k in record)
+                if not has_loc_in_rec and len(row) >= 5:
+                    record['Location'] = row[4]
+
+                records.append(_normalize_record_keys(record))
+            if records:
+                return records
+    except Exception as e:
+        logger.debug(f"get_all_values() not usable or failed: {e}")
+
+    # Fallback / standard get_all_records()
+    try:
+        raw_records = worksheet.get_all_records() if worksheet else []
+        if raw_records and isinstance(raw_records, list):
+            return [_normalize_record_keys(row) for row in raw_records if isinstance(row, dict)]
+    except Exception as e:
+        logger.warning(f"Failed to fetch recommendations: {e}")
+
+    return []
 
 
-def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date_str=None):
+def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date_str=None, location=None):
     """
     Appends a new community recommendation to the 'Recomendaciones' (or 'Recommendations') tab.
     Matches column headers dynamically, initializes default headers if missing, and appends the row.
@@ -142,19 +416,19 @@ def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date
                 worksheet = None
 
         if not worksheet:
-            worksheet = sh.add_worksheet(title="Recomendaciones", rows=100, cols=4)
+            worksheet = sh.add_worksheet(title="Recomendaciones", rows=100, cols=5)
 
         all_values = worksheet.get_all_values()
-        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation']
+        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location']
 
         if not all_values:
-            worksheet.update(values=[expected_headers], range_name='A1:D1')
+            worksheet.update(values=[expected_headers], range_name='A1:E1')
             all_values = [expected_headers]
 
         headers = all_values[0]
         if not headers or all(not str(h).strip() for h in headers):
             headers = expected_headers
-            worksheet.update(values=[headers], range_name='A1:D1')
+            worksheet.update(values=[headers], range_name='A1:E1')
 
         if not date_str:
             date_str = datetime.now().strftime("%Y-%m-%d")
@@ -184,20 +458,188 @@ def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date
             'notas': str(recommendation).strip(),
             'message': str(recommendation).strip(),
             'content': str(recommendation).strip(),
+            'location': str(location or '').strip(),
+            'ubicacion': str(location or '').strip(),
+            'ubicación': str(location or '').strip(),
+            'map': str(location or '').strip(),
+            'maps': str(location or '').strip(),
+            'google_maps': str(location or '').strip(),
+            'maps_url': str(location or '').strip(),
+            'location_url': str(location or '').strip(),
+            'address': str(location or '').strip(),
+            'direccion': str(location or '').strip(),
+            'dirección': str(location or '').strip(),
+            'place': str(location or '').strip(),
+            'lugar': str(location or '').strip(),
         }
+
+        # Check if headers include a location column; if not and location provided, add header
+        has_location_header = any(str(h).strip().lower() in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'address', 'direccion') for h in headers)
+        if not has_location_header and location and str(location).strip():
+            headers.append('Location')
+            try:
+                worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
+            except Exception:
+                pass
 
         if headers:
             row_data = [field_map.get(str(h).strip().lower(), '') for h in headers]
             if all(not str(val).strip() for val in row_data):
-                row_data = [date_str, subject, shared_by, recommendation]
+                row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip()]
         else:
-            row_data = [date_str, subject, shared_by, recommendation]
+            row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip()]
 
         worksheet.append_row(row_data)
-        logger.info(f"Successfully synced new recommendation in '{subject}' shared by '{shared_by}' to Google Sheet.")
+        logger.info(f"Successfully synced new recommendation in '{subject}' shared by '{shared_by}' with location '{location or ''}' to Google Sheet.")
         return True
     except Exception as e:
         logger.warning(f"Failed to sync recommendation to Google Sheet: {e}")
+        return False
+
+
+def update_recommendation_in_google_sheet(
+    row_index,
+    shared_by,
+    subject,
+    recommendation,
+    date_str=None,
+    location=None,
+    original_subject=None,
+    original_shared_by=None,
+    original_recommendation=None
+):
+    """
+    Updates an existing community recommendation row in the 'Recomendaciones' (or 'Recommendations') tab.
+    Identifies target row using row_index (1-indexed, header is row 1) with fallback value matching.
+    """
+    if not shared_by or not recommendation:
+        return False
+
+    try:
+        from datetime import datetime
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = (
+            _get_worksheet_case_insensitive(sh, "Recomendaciones")
+            or _get_worksheet_case_insensitive(sh, "Recommendations")
+            or _get_worksheet_case_insensitive(sh, "Notes")
+        )
+        if not worksheet:
+            try:
+                worksheet = getattr(sh, 'sheet1', None)
+            except Exception:
+                worksheet = None
+
+        if not worksheet:
+            return False
+
+        all_values = worksheet.get_all_values()
+        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location']
+
+        if not all_values:
+            worksheet.update(values=[expected_headers], range_name='A1:E1')
+            all_values = [expected_headers]
+
+        headers = [str(h).strip() for h in all_values[0]]
+        if not headers or all(not h for h in headers):
+            headers = expected_headers
+            worksheet.update(values=[headers], range_name='A1:E1')
+
+        # Check if headers include a location column; if not and location provided, add header
+        has_location_header = any(str(h).strip().lower() in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'address', 'direccion') for h in headers)
+        if not has_location_header and location and str(location).strip():
+            headers.append('Location')
+            try:
+                worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
+            except Exception:
+                pass
+
+        if not date_str:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+
+        field_map = {
+            'date': str(date_str).strip(),
+            'fecha': str(date_str).strip(),
+            'timestamp': str(date_str).strip(),
+            'time': str(date_str).strip(),
+            'subject': str(subject).strip(),
+            'tema': str(subject).strip(),
+            'categoria': str(subject).strip(),
+            'categoría': str(subject).strip(),
+            'topic': str(subject).strip(),
+            'shared by': str(shared_by).strip(),
+            'shared_by': str(shared_by).strip(),
+            'sharedby': str(shared_by).strip(),
+            'compartido por': str(shared_by).strip(),
+            'compartidopor': str(shared_by).strip(),
+            'autor': str(shared_by).strip(),
+            'author': str(shared_by).strip(),
+            'member': str(shared_by).strip(),
+            'recommendation': str(recommendation).strip(),
+            'recommendations': str(recommendation).strip(),
+            'recomendacion': str(recommendation).strip(),
+            'recomendación': str(recommendation).strip(),
+            'notas': str(recommendation).strip(),
+            'notes': str(recommendation).strip(),
+            'message': str(recommendation).strip(),
+            'content': str(recommendation).strip(),
+            'location': str(location or '').strip(),
+            'ubicacion': str(location or '').strip(),
+            'ubicación': str(location or '').strip(),
+            'map': str(location or '').strip(),
+            'maps': str(location or '').strip(),
+            'google_maps': str(location or '').strip(),
+            'maps_url': str(location or '').strip(),
+            'location_url': str(location or '').strip(),
+            'address': str(location or '').strip(),
+            'direccion': str(location or '').strip(),
+            'dirección': str(location or '').strip(),
+            'place': str(location or '').strip(),
+            'lugar': str(location or '').strip(),
+        }
+
+        row_data = [field_map.get(str(h).strip().lower(), '') for h in headers]
+        if all(not str(val).strip() for val in row_data):
+            row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip()]
+
+        target_row_idx = None
+        try:
+            r_idx = int(row_index)
+            if 1 < r_idx <= len(all_values):
+                target_row_idx = r_idx
+        except (ValueError, TypeError):
+            target_row_idx = None
+
+        # Fallback search if row_index was not exact or rows shifted
+        if not target_row_idx and (original_recommendation or original_subject):
+            orig_rec_clean = str(original_recommendation or '').strip().lower()
+            orig_sub_clean = str(original_subject or '').strip().lower()
+            orig_author_clean = str(original_shared_by or '').strip().lower()
+
+            for idx, existing_row in enumerate(all_values[1:], start=2):
+                row_str = " ".join([str(c).lower() for c in existing_row])
+                if orig_rec_clean and orig_rec_clean in row_str:
+                    target_row_idx = idx
+                    break
+                if orig_sub_clean and orig_author_clean and orig_sub_clean in row_str and orig_author_clean in row_str:
+                    target_row_idx = idx
+                    break
+
+        if target_row_idx:
+            while len(row_data) < len(headers):
+                row_data.append('')
+            end_col = chr(ord('A') + len(row_data) - 1) if len(row_data) <= 26 else 'Z'
+            range_name = f"A{target_row_idx}:{end_col}{target_row_idx}"
+            worksheet.update(values=[row_data], range_name=range_name)
+            logger.info(f"Successfully updated recommendation at row {target_row_idx} in Google Sheet.")
+            return True
+        else:
+            worksheet.append_row(row_data)
+            logger.info("Target row not found for edit; appended as new row in Google Sheet.")
+            return True
+    except Exception as e:
+        logger.warning(f"Failed to update recommendation in Google Sheet: {e}")
         return False
 
 

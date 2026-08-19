@@ -13,6 +13,7 @@ from django.utils import timezone
 from .sheets import (
     fetch_recommendations,
     sync_recommendation_to_google_sheet,
+    update_recommendation_in_google_sheet,
     sync_profile_to_google_sheet,
     sync_pending_request_to_google_sheet,
     update_pending_request_status_in_google_sheet,
@@ -315,8 +316,22 @@ def notes_list_view(request):
 
     is_admin = request.session.get('is_admin', False)
 
+    enriched_notes = []
+    mapped_count = 0
+    for idx, row in enumerate(notes or []):
+        item = dict(row)
+        item['index'] = idx
+        item['row_num'] = idx + 2
+        if item.get('has_location'):
+            mapped_count += 1
+        enriched_notes.append(item)
+
+    notes_json = json.dumps(enriched_notes, default=str)
+
     return render(request, 'recommendations/notes.html', {
-        'notes': notes,
+        'notes': enriched_notes,
+        'notes_json': notes_json,
+        'mapped_count': mapped_count,
         'error': error,
         'success_message': success_message,
         'is_admin': is_admin,
@@ -341,6 +356,7 @@ def organizer_create_recommendation_view(request):
 
     shared_by = request.POST.get('shared_by', '').strip() or request.session.get('member_name', 'Organizer')
     recommendation_text = request.POST.get('recommendation', '').strip()
+    location = request.POST.get('location', '').strip()
     date_str = request.POST.get('date', '').strip()
     if not date_str:
         import datetime
@@ -358,7 +374,8 @@ def organizer_create_recommendation_view(request):
         shared_by=shared_by,
         subject=subject,
         recommendation=recommendation_text,
-        date_str=date_str
+        date_str=date_str,
+        location=location
     )
 
     # Invalidate cache so recommendation appears immediately
@@ -366,21 +383,94 @@ def organizer_create_recommendation_view(request):
 
     # Audit log
     try:
+        notes_audit = f"Published recommendation in '{subject}' shared by {shared_by}"
+        if location:
+            notes_audit += f" (Location: {location})"
         MembershipAuditLog.objects.create(
             action=MembershipAuditLog.ACTION_RECOMMENDATION_CREATED,
             target_name=subject,
             target_email='',
             actor_name=admin_name,
             actor_email=admin_email,
-            notes=f"Published recommendation in '{subject}' shared by {shared_by}"
+            notes=notes_audit
         )
     except Exception as e:
         logger.warning(f"Failed to record recommendation creation in audit log: {e}")
 
     if synced:
-        request.session['recommendation_success_message'] = f"Recommendation in '{subject}' was added and synced to Google Sheets!"
+        request.session['recommendation_success_message'] = f"Recommendation '{subject}' published successfully!"
     else:
-        request.session['recommendation_success_message'] = f"Recommendation in '{subject}' was added successfully!"
+        request.session['recommendation_error_message'] = "Could not sync recommendation to Google Sheet, but your request was processed."
+
+    return redirect('recommendations:notes_list')
+
+
+@admin_required
+def organizer_edit_recommendation_view(request):
+    """
+    Allows organizers/admins to edit an existing community recommendation.
+    Synchronizes the edits directly into Google Sheets,
+    invalidates the cache, and records an entry in the MembershipAuditLog.
+    """
+    if request.method != 'POST':
+        return redirect('recommendations:notes_list')
+
+    row_index = request.POST.get('row_index', '').strip()
+    category = request.POST.get('category', '').strip()
+    custom_category = request.POST.get('custom_category', '').strip()
+    subject = custom_category if (category.lower() in ('other', 'otro', '') and custom_category) else (category or 'General')
+
+    shared_by = request.POST.get('shared_by', '').strip() or request.session.get('member_name', 'Organizer')
+    recommendation_text = request.POST.get('recommendation', '').strip()
+    location = request.POST.get('location', '').strip()
+    date_str = request.POST.get('date', '').strip()
+    original_subject = request.POST.get('original_subject', '').strip()
+    original_shared_by = request.POST.get('original_shared_by', '').strip()
+    original_recommendation = request.POST.get('original_recommendation', '').strip()
+
+    if not recommendation_text:
+        request.session['recommendation_error_message'] = "Please provide recommendation details."
+        return redirect('recommendations:notes_list')
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    # Synchronize update to Google Sheet
+    synced = update_recommendation_in_google_sheet(
+        row_index=row_index,
+        shared_by=shared_by,
+        subject=subject,
+        recommendation=recommendation_text,
+        date_str=date_str,
+        location=location,
+        original_subject=original_subject,
+        original_shared_by=original_shared_by,
+        original_recommendation=original_recommendation
+    )
+
+    # Invalidate cache so updated recommendation appears immediately
+    cache.delete('whatsapp_recommendations_cache')
+
+    # Audit log
+    try:
+        notes_audit = f"Edited recommendation '{subject}' shared by {shared_by}"
+        if location:
+            notes_audit += f" (Location: {location})"
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_RECOMMENDATION_UPDATED,
+            target_name=subject,
+            target_email='',
+            actor_name=admin_name,
+            actor_email=admin_email,
+            notes=notes_audit
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record recommendation update in audit log: {e}")
+
+    if synced:
+        request.session['recommendation_success_message'] = f"Recommendation '{subject}' updated successfully!"
+    else:
+        request.session['recommendation_error_message'] = "Could not sync recommendation update to Google Sheet, but your request was processed."
 
     return redirect('recommendations:notes_list')
 
