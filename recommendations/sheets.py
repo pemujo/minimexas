@@ -117,6 +117,90 @@ def fetch_recommendations():
     return [_normalize_record_keys(row) for row in raw_records]
 
 
+def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date_str=None):
+    """
+    Appends a new community recommendation to the 'Recomendaciones' (or 'Recommendations') tab.
+    Matches column headers dynamically, initializes default headers if missing, and appends the row.
+    """
+    if not shared_by or not recommendation:
+        return False
+
+    try:
+        from datetime import datetime
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = (
+            _get_worksheet_case_insensitive(sh, "Recomendaciones")
+            or _get_worksheet_case_insensitive(sh, "Recommendations")
+            or _get_worksheet_case_insensitive(sh, "Notes")
+        )
+        if not worksheet:
+            try:
+                worksheet = getattr(sh, 'sheet1', None)
+            except Exception:
+                worksheet = None
+
+        if not worksheet:
+            worksheet = sh.add_worksheet(title="Recomendaciones", rows=100, cols=4)
+
+        all_values = worksheet.get_all_values()
+        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation']
+
+        if not all_values:
+            worksheet.update(values=[expected_headers], range_name='A1:D1')
+            all_values = [expected_headers]
+
+        headers = all_values[0]
+        if not headers or all(not str(h).strip() for h in headers):
+            headers = expected_headers
+            worksheet.update(values=[headers], range_name='A1:D1')
+
+        if not date_str:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+
+        field_map = {
+            'date': str(date_str).strip(),
+            'fecha': str(date_str).strip(),
+            'timestamp': str(date_str).strip(),
+            'time': str(date_str).strip(),
+            'subject': str(subject).strip(),
+            'tema': str(subject).strip(),
+            'categoria': str(subject).strip(),
+            'categoría': str(subject).strip(),
+            'topic': str(subject).strip(),
+            'shared by': str(shared_by).strip(),
+            'shared_by': str(shared_by).strip(),
+            'sharedby': str(shared_by).strip(),
+            'compartido por': str(shared_by).strip(),
+            'compartidopor': str(shared_by).strip(),
+            'autor': str(shared_by).strip(),
+            'author': str(shared_by).strip(),
+            'member': str(shared_by).strip(),
+            'recommendation': str(recommendation).strip(),
+            'recomendacion': str(recommendation).strip(),
+            'recomendación': str(recommendation).strip(),
+            'notes': str(recommendation).strip(),
+            'notas': str(recommendation).strip(),
+            'message': str(recommendation).strip(),
+            'content': str(recommendation).strip(),
+        }
+
+        if headers:
+            row_data = [field_map.get(str(h).strip().lower(), '') for h in headers]
+            if all(not str(val).strip() for val in row_data):
+                row_data = [date_str, subject, shared_by, recommendation]
+        else:
+            row_data = [date_str, subject, shared_by, recommendation]
+
+        worksheet.append_row(row_data)
+        logger.info(f"Successfully synced new recommendation in '{subject}' shared by '{shared_by}' to Google Sheet.")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to sync recommendation to Google Sheet: {e}")
+        return False
+
+
 def sync_profile_to_google_sheet(profile):
     """
     Securely synchronizes a MemberProfile record to the 'Members' tab in the Google Spreadsheet.

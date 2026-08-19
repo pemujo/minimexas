@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from .sheets import (
     fetch_recommendations,
+    sync_recommendation_to_google_sheet,
     sync_profile_to_google_sheet,
     sync_pending_request_to_google_sheet,
     update_pending_request_status_in_google_sheet,
@@ -282,11 +283,81 @@ def notes_list_view(request):
             notes = []
             error = "Unable to load recommendations at this time."
 
+    success_message = request.session.pop('recommendation_success_message', None)
+    error_message = request.session.pop('recommendation_error_message', None)
+    if error_message:
+        error = error_message
+
+    is_admin = request.session.get('is_admin', False)
+
     return render(request, 'recommendations/notes.html', {
         'notes': notes,
         'error': error,
-        'member_name': request.session.get('member_name', 'Member')
+        'success_message': success_message,
+        'is_admin': is_admin,
+        'member_name': request.session.get('member_name', 'Member'),
+        'member_email': request.session.get('member_email', ''),
     })
+
+
+@admin_required
+def organizer_create_recommendation_view(request):
+    """
+    Allows organizers/admins to create and publish a new community recommendation.
+    Synchronizes the new recommendation directly into Google Sheets,
+    invalidates the cache, and records an entry in the MembershipAuditLog.
+    """
+    if request.method != 'POST':
+        return redirect('recommendations:notes_list')
+
+    category = request.POST.get('category', '').strip()
+    custom_category = request.POST.get('custom_category', '').strip()
+    subject = custom_category if (category.lower() in ('other', 'otro', '') and custom_category) else (category or 'General')
+
+    shared_by = request.POST.get('shared_by', '').strip() or request.session.get('member_name', 'Organizer')
+    recommendation_text = request.POST.get('recommendation', '').strip()
+    date_str = request.POST.get('date', '').strip()
+    if not date_str:
+        import datetime
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    if not recommendation_text:
+        request.session['recommendation_error_message'] = "Please provide recommendation details."
+        return redirect('recommendations:notes_list')
+
+    admin_name = request.session.get('member_name', 'Organizer')
+    admin_email = request.session.get('member_email', '').strip().lower()
+
+    # Synchronize to Google Sheet
+    synced = sync_recommendation_to_google_sheet(
+        shared_by=shared_by,
+        subject=subject,
+        recommendation=recommendation_text,
+        date_str=date_str
+    )
+
+    # Invalidate cache so recommendation appears immediately
+    cache.delete('whatsapp_recommendations_cache')
+
+    # Audit log
+    try:
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_RECOMMENDATION_CREATED,
+            target_name=subject,
+            target_email='',
+            actor_name=admin_name,
+            actor_email=admin_email,
+            notes=f"Published recommendation in '{subject}' shared by {shared_by}"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record recommendation creation in audit log: {e}")
+
+    if synced:
+        request.session['recommendation_success_message'] = f"Recommendation in '{subject}' was added and synced to Google Sheets!"
+    else:
+        request.session['recommendation_success_message'] = f"Recommendation in '{subject}' was added successfully!"
+
+    return redirect('recommendations:notes_list')
 
 
 from .calendar_sync import fetch_community_events

@@ -132,6 +132,7 @@ class MembershipAuditLog(models.Model):
     ACTION_EVENT_CREATED = 'event_created'
     ACTION_EVENT_UPDATED = 'event_updated'
     ACTION_EVENT_DELETED = 'event_deleted'
+    ACTION_RECOMMENDATION_CREATED = 'recommendation_created'
 
     ACTION_CHOICES = [
         (ACTION_SUBMITTED, 'Request Submitted'),
@@ -146,6 +147,7 @@ class MembershipAuditLog(models.Model):
         (ACTION_EVENT_CREATED, 'Event Created'),
         (ACTION_EVENT_UPDATED, 'Event Updated'),
         (ACTION_EVENT_DELETED, 'Event Deleted'),
+        (ACTION_RECOMMENDATION_CREATED, 'Recommendation Created'),
     ]
 
     action = models.CharField(max_length=30, choices=ACTION_CHOICES, db_index=True, verbose_name="Action")

@@ -55,7 +55,12 @@
                 </p>
             </div>
             
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                {% if is_admin %}
+                <button type="button" class="btn btn-sm btn-primary-gradient d-inline-flex align-items-center rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#createRecommendationModal" style="font-size: 0.85rem; font-weight: 600;">
+                    <i class="bi bi-plus-circle-fill me-1"></i> Add Recommendation
+                </button>
+                {% endif %}
                 <a href="?refresh=1" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center rounded-pill px-3 shadow-sm" title="Refresh recommendations" style="border-color: rgba(255,255,255,0.15); font-size: 0.85rem;">
                     <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                 </a>
@@ -66,9 +71,16 @@
             </div>
         </div>
 
+        {% if success_message %}
+            <div class="alert alert-success alert-custom shadow-sm mb-4 d-flex align-items-center" role="alert">
+                <i class="bi bi-check-circle-fill me-2 fs-5 flex-shrink-0 text-success"></i>
+                <div>{{ success_message }}</div>
+            </div>
+        {% endif %}
+
         {% if error %}
             <div class="alert alert-danger alert-custom shadow-sm mb-4 d-flex align-items-center" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
+                <i class="bi bi-exclamation-triangle-fill me-2 fs-5 flex-shrink-0"></i>
                 <div>{{ error }}</div>
             </div>
         {% endif %}
@@ -160,6 +172,82 @@
         </div>
     </div>
 
+    {% if is_admin %}
+    <!-- CREATE RECOMMENDATION MODAL (ORGANIZERS ONLY) -->
+    <div class="modal fade" id="createRecommendationModal" tabindex="-1" aria-labelledby="createRecommendationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <form action="{% url 'recommendations:recommendation_create' %}" method="POST" id="createRecommendationForm" class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                {% csrf_token %}
+                <div class="modal-header bg-dark text-white p-4">
+                    <div>
+                        <div class="badge bg-warning text-dark font-monospace mb-1" style="font-size: 0.65rem;">ORGANIZER ACTION</div>
+                        <h5 class="modal-title fw-bold" id="createRecommendationModalLabel">
+                            <i class="bi bi-plus-circle-fill me-2 text-warning"></i> Add Community Recommendation
+                        </h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <!-- Category Selection -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Category / Topic <span class="text-danger">*</span></label>
+                            <select name="category" id="modalRecCategory" class="form-select" required>
+                                <option value="Doctors & Health">🩺 Doctors & Health (Médicos & Salud)</option>
+                                <option value="Food & Dining">🍽️ Food, Dining & Markets (Comida & Restaurantes)</option>
+                                <option value="Home & Services">🛠️ Home & Services (Hogar & Servicios)</option>
+                                <option value="Kids & Activities">👶 Kids & Activities (Niños & Actividades)</option>
+                                <option value="Professional & Legal">💼 Professional & Legal (Servicios Profesionales)</option>
+                                <option value="Beauty & Wellness">💇 Beauty & Wellness (Belleza & Bienestar)</option>
+                                <option value="Travel & Leisure">✈️ Travel & Leisure (Viajes & Vacaciones)</option>
+                                <option value="Community & Social">🤝 Community & Social (Comunidad)</option>
+                                <option value="Other">💡 Other / Custom (Otro)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="modalCustomCategoryWrapper" style="display: none;">
+                            <label class="form-label fw-bold text-dark small">Custom Category Name <span class="text-danger">*</span></label>
+                            <input type="text" name="custom_category" id="modalCustomCategory" class="form-control" placeholder="e.g., Real Estate, Car Mechanics, Language Tutors">
+                        </div>
+                    </div>
+
+                    <!-- Author and Date -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Shared By (Member Name) <span class="text-danger">*</span></label>
+                            <input type="text" name="shared_by" class="form-control" value="{{ member_name }}" placeholder="e.g. Maria Gonzalez" required>
+                            <div class="text-muted" style="font-size: 0.75rem;">Name of the community member or source making the recommendation.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Date</label>
+                            <input type="date" name="date" id="modalRecDate" class="form-control">
+                            <div class="text-muted" style="font-size: 0.75rem;">Defaults to today if left blank.</div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation Content -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small">Recommendation Details & Contact <span class="text-danger">*</span></label>
+                        <textarea name="recommendation" class="form-control" rows="5" placeholder="Provide name of business/doctor, phone number, address, website link, pricing info, and personal tips or endorsement..." required></textarea>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-2 text-muted" style="font-size: 0.8rem;">
+                        <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-5"></i>
+                        <span>This recommendation will be automatically synced to the <strong>Google Sheets</strong> recommendations tab and visible to all members immediately.</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-gradient rounded-pill px-4 shadow-sm" style="font-weight: 600;">
+                        <i class="bi bi-check-circle-fill me-1"></i> Publish Recommendation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- FOOTER COMPONENT -->
     {% include 'recommendations/footer.html' %}
 
@@ -249,6 +337,28 @@
             }
             if (clearSearchBtn) {
                 clearSearchBtn.addEventListener('click', resetFilters);
+            }
+
+            // Modal custom category toggle & default date
+            const modalCategory = document.getElementById('modalRecCategory');
+            const customCategoryWrapper = document.getElementById('modalCustomCategoryWrapper');
+            const customCategoryInput = document.getElementById('modalCustomCategory');
+            const modalDateInput = document.getElementById('modalRecDate');
+
+            if (modalDateInput && !modalDateInput.value) {
+                const today = new Date().toISOString().split('T')[0];
+                modalDateInput.value = today;
+            }
+
+            if (modalCategory && customCategoryWrapper) {
+                modalCategory.addEventListener('change', function () {
+                    if (this.value === 'Other') {
+                        customCategoryWrapper.style.display = 'block';
+                        if (customCategoryInput) customCategoryInput.focus();
+                    } else {
+                        customCategoryWrapper.style.display = 'none';
+                    }
+                });
             }
         });
     </script>
