@@ -123,8 +123,10 @@ flowchart TD
   - Regional member distribution analytics for event planning.
   - Direct WhatsApp links with prefilled greetings.
 
-- **🌮 Curated Community Recommendations (`/`)**:
-  - Categorized directory of authentic Mexican businesses, restaurants, doctors, schools, and cultural artisans.
+- **🌮 Curated Community Recommendations (`/recommendations/`)**:
+  - Searchable and categorized directory of authentic businesses, restaurants, doctors, schools, services, and community tips.
+  - **Organizer Direct Creation**: Organizers can publish new recommendations directly from the page with preset or custom categories and instant Google Sheets dual-sync.
+  - **1-Click Force Sync & Cache Refresh**: Dedicated refresh control to bust cache and fetch the latest spreadsheet updates on demand.
 
 - **📱 Mobile-First Responsive Design**:
   - Optimized for smartphones (iOS Safari and Android Chrome) with momentum scrolling, touch-friendly inputs, and responsive modal viewports.

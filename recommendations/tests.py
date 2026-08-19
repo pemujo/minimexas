@@ -34,6 +34,7 @@ from recommendations.sheets import (
     sync_event_rsvp_to_google_sheet,
     sync_community_event_to_google_sheet,
     delete_community_event_from_google_sheet,
+    sync_recommendation_to_google_sheet,
 )
 from recommendations.calendar_sync import (
     get_google_calendar_add_url,
@@ -3168,6 +3169,147 @@ class CommunityEventSheetSyncTestCase(TestCase):
         success = delete_community_event_from_google_sheet("portal_42")
         self.assertTrue(success)
         mock_worksheet.update_cell.assert_called_once_with(2, 3, "Deleted (Inactive)")
+
+
+@override_settings(GOOGLE_SHEET_KEY="mock_test_sheet_key_123")
+class OrganizerCreateRecommendationTestCase(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+        self.admin_profile = MemberProfile.objects.create(
+            email="admin.rec@minimexitas.org",
+            full_name="Admin Organizer",
+            is_admin=True,
+        )
+        self.regular_profile = MemberProfile.objects.create(
+            email="member.rec@minimexitas.org",
+            full_name="Regular Member",
+            is_admin=False,
+        )
+
+    def test_sync_recommendation_to_google_sheet_missing_inputs(self):
+        self.assertFalse(sync_recommendation_to_google_sheet("", "Doctors", "Great clinic"))
+        self.assertFalse(sync_recommendation_to_google_sheet("Maria", "Doctors", ""))
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_sync_recommendation_to_google_sheet_success(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.title = "Recomendaciones"
+        mock_ws.get_all_values.return_value = [
+            ['Date', 'Subject', 'Shared By', 'Recommendation']
+        ]
+
+        mock_sh = MagicMock()
+        mock_sh.worksheets.return_value = [mock_ws]
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        success = sync_recommendation_to_google_sheet(
+            shared_by="Dr. Laura",
+            subject="Pediatricians",
+            recommendation="Bilingual clinic in Mission SF: (415) 555-0199",
+            date_str="2026-08-18"
+        )
+        self.assertTrue(success)
+        mock_ws.append_row.assert_called_once()
+        row_arg = mock_ws.append_row.call_args[0][0]
+        self.assertEqual(row_arg, ["2026-08-18", "Pediatricians", "Dr. Laura", "Bilingual clinic in Mission SF: (415) 555-0199"])
+
+    def test_notes_list_view_shows_add_button_for_admin_only(self):
+        # Non-admin member
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        with patch('recommendations.views.fetch_recommendations', return_value=[]):
+            response = self.client.get(reverse('recommendations:notes_list'))
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, 'data-bs-target="#createRecommendationModal"')
+
+        # Admin member
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.admin_profile.email
+        session['member_name'] = self.admin_profile.full_name
+        session['is_admin'] = True
+        session.save()
+
+        with patch('recommendations.views.fetch_recommendations', return_value=[]):
+            response = self.client.get(reverse('recommendations:notes_list'))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'data-bs-target="#createRecommendationModal"')
+            self.assertContains(response, 'Add Recommendation')
+
+    def test_organizer_create_recommendation_forbidden_for_non_admin(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_create'), {
+            'category': 'Food & Dining',
+            'shared_by': 'Carlos',
+            'recommendation': 'Best Birria tacos in San Jose: Birrieria Jalisco',
+        })
+        # admin_required redirects unauthorized users
+        self.assertIn(response.status_code, [302, 403])
+        self.assertEqual(MembershipAuditLog.objects.count(), 0)
+
+    @patch('recommendations.views.sync_recommendation_to_google_sheet', return_value=True)
+    def test_organizer_create_recommendation_success(self, mock_sync_sheet):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.admin_profile.email
+        session['member_name'] = self.admin_profile.full_name
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_create'), {
+            'category': 'Food & Dining',
+            'shared_by': 'Chef Mateo',
+            'recommendation': 'Autentica Taqueria en Palo Alto: Tacos El Grullo',
+            'date': '2026-08-18'
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_sync_sheet.assert_called_once_with(
+            shared_by='Chef Mateo',
+            subject='Food & Dining',
+            recommendation='Autentica Taqueria en Palo Alto: Tacos El Grullo',
+            date_str='2026-08-18'
+        )
+
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_CREATED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.actor_email, self.admin_profile.email)
+        self.assertEqual(audit.target_name, 'Food & Dining')
+        self.assertIn('Chef Mateo', audit.notes)
+
+    @patch('recommendations.views.sync_recommendation_to_google_sheet', return_value=True)
+    def test_organizer_create_recommendation_custom_category(self, mock_sync_sheet):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.admin_profile.email
+        session['member_name'] = self.admin_profile.full_name
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_create'), {
+            'category': 'Other',
+            'custom_category': 'Bilingual Pediatricians',
+            'shared_by': 'Lucia R.',
+            'recommendation': 'Dr. Sandra Gomez in Redwood City',
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_sync_sheet.assert_called_once()
+        self.assertEqual(mock_sync_sheet.call_args[1]['subject'], 'Bilingual Pediatricians')
+
 
 
 
