@@ -1515,3 +1515,31 @@ input[type="time"] {
     }
 }
 
+/* ==========================================================================
+   Leaflet Maps Component Overrides & Button Text Color Fixes
+   ========================================================================== */
+.leaflet-container a.btn {
+    text-decoration: none !important;
+}
+
+.leaflet-container a.btn-primary,
+.leaflet-popup-content a.btn-primary {
+    color: #ffffff !important;
+    background-color: var(--brand-primary, #1e40af) !important;
+    border-color: var(--brand-primary, #1e40af) !important;
+}
+
+.leaflet-container a.btn-primary:hover,
+.leaflet-popup-content a.btn-primary:hover {
+    color: #ffffff !important;
+    background-color: var(--brand-primary-hover, #1d4ed8) !important;
+    border-color: var(--brand-primary-hover, #1d4ed8) !important;
+}
+
+.leaflet-container a.btn-primary i,
+.leaflet-container a.btn-primary span,
+.leaflet-popup-content a.btn-primary i,
+.leaflet-popup-content a.btn-primary span {
+    color: #ffffff !important;
+}
+

@@ -119,6 +119,30 @@
             align-items: center;
             gap: 6px;
         }
+        /* Leaflet container a-tag override fix for action buttons */
+        .leaflet-container a.btn-primary,
+        .leaflet-popup-content a.btn-primary,
+        .rec-popup-actions a.btn-primary,
+        .rec-popup-card a.btn-primary {
+            color: #ffffff !important;
+            background-color: var(--brand-primary, #1e40af) !important;
+            border-color: var(--brand-primary, #1e40af) !important;
+            text-decoration: none !important;
+        }
+        .leaflet-container a.btn-primary:hover,
+        .leaflet-popup-content a.btn-primary:hover,
+        .rec-popup-actions a.btn-primary:hover,
+        .rec-popup-card a.btn-primary:hover {
+            color: #ffffff !important;
+            background-color: var(--brand-primary-hover, #1d4ed8) !important;
+            border-color: var(--brand-primary-hover, #1d4ed8) !important;
+        }
+        .rec-popup-actions a.btn-primary i,
+        .rec-popup-actions a.btn-primary span,
+        .rec-popup-card a.btn-primary i,
+        .rec-popup-card a.btn-primary span {
+            color: #ffffff !important;
+        }
         /* Interactive Row Highlighting */
         .recommendation-row.highlighted-row {
             background-color: #fef3c7 !important;
@@ -783,8 +807,8 @@
                         <div class="rec-popup-text">${snippet}</div>
                         <div class="rec-popup-actions mt-2 pt-2 border-top d-flex flex-wrap gap-1 align-items-center justify-content-between">
                             <div class="d-flex gap-1">
-                                <a href="${locUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary d-inline-flex align-items-center rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.74rem; font-weight: 600;">
-                                    <i class="bi bi-box-arrow-up-right me-1"></i> Maps
+                                <a href="${locUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary text-white d-inline-flex align-items-center rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.74rem; font-weight: 600; color: #ffffff !important; background-color: #1e40af !important; border-color: #1e40af !important;">
+                                    <i class="bi bi-box-arrow-up-right me-1 text-white" style="color: #ffffff !important;"></i> <span class="text-white" style="color: #ffffff !important;">Maps</span>
                                 </a>
                                 <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1 highlight-list-row-btn" data-index="${item.index}" style="font-size: 0.74rem;">
                                     <i class="bi bi-arrow-down-left-square me-1"></i> List
