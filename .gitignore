@@ -14,6 +14,7 @@ db.sqlite3-journal
 *.pem
 *.key
 sheets_sa.json
+.gemini.json
 
 # Virtual Environments
 .venv/

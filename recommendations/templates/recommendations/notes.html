@@ -33,8 +33,401 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Leaflet CSS for Interactive OpenStreetMap -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <!-- Project-Wide Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <style>
+        /* Modern Leaflet Map & Card Wrapper */
+        .map-card-wrapper {
+            border-radius: 16px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+            background: #ffffff;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+
+        #recommendationsMap {
+            border-radius: 0 0 16px 16px;
+            z-index: 1;
+            width: 100%;
+            background: #f8fafc;
+        }
+
+        /* Laptops & Wide Desktops (>= 992px): Map stays sticky & fully visible in frame while scrolling list */
+        @media (min-width: 992px) {
+            #rightMapColumn {
+                position: sticky;
+                top: 80px;
+                align-self: flex-start;
+                z-index: 10;
+            }
+            .map-card-wrapper {
+                position: sticky;
+                top: 80px;
+                display: flex;
+                flex-direction: column;
+                max-height: calc(100vh - 96px);
+            }
+            #recommendationsMap {
+                height: calc(100vh - 200px) !important;
+                min-height: 420px;
+                max-height: 640px;
+                flex: 1 1 auto;
+            }
+        }
+
+        /* Tablets & Cell Phones (< 992px): Map appears at top above list */
+        @media (max-width: 991.98px) {
+            #rightMapColumn {
+                position: static;
+                margin-bottom: 1.5rem;
+            }
+            .map-card-wrapper {
+                position: static;
+                box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.07);
+            }
+            #recommendationsMap {
+                height: 340px !important;
+            }
+        }
+
+        @media (max-width: 576px) {
+            #rightMapColumn {
+                margin-bottom: 1.25rem;
+            }
+            #recommendationsMap {
+                height: 290px !important;
+            }
+        }
+        /* Custom Leaflet Marker Pin */
+        .custom-rec-pin {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 50% 50% 50% 0;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 10px rgba(220, 38, 38, 0.4);
+            border: 2px solid #ffffff;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+        }
+        .custom-rec-pin:hover, .custom-rec-pin.pin-active {
+            transform: rotate(-45deg) scale(1.22);
+            box-shadow: 0 6px 16px rgba(220, 38, 38, 0.55);
+            background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+            z-index: 1000 !important;
+        }
+        .custom-rec-pin i {
+            transform: rotate(45deg);
+            color: #ffffff;
+            font-size: 14px;
+        }
+        /* Leaflet Popup Styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 14px;
+            padding: 4px;
+            box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.18);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .leaflet-popup-content {
+            margin: 10px 14px;
+            line-height: 1.4;
+            font-family: inherit;
+        }
+        .rec-popup-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .rec-popup-subject {
+            font-size: 0.72rem;
+            font-weight: 600;
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            margin-bottom: 6px;
+        }
+        .rec-popup-text {
+            font-size: 0.8rem;
+            color: #475569;
+            margin-bottom: 10px;
+            max-height: 90px;
+            overflow-y: auto;
+        }
+        .rec-popup-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        /* Leaflet container a-tag override fix for action buttons */
+        .leaflet-container a.btn-primary,
+        .leaflet-popup-content a.btn-primary,
+        .rec-popup-actions a.btn-primary,
+        .rec-popup-card a.btn-primary {
+            color: #ffffff !important;
+            background-color: var(--brand-primary, #1e40af) !important;
+            border-color: var(--brand-primary, #1e40af) !important;
+            text-decoration: none !important;
+        }
+        .leaflet-container a.btn-primary:hover,
+        .leaflet-popup-content a.btn-primary:hover,
+        .rec-popup-actions a.btn-primary:hover,
+        .rec-popup-card a.btn-primary:hover {
+            color: #ffffff !important;
+            background-color: var(--brand-primary-hover, #1d4ed8) !important;
+            border-color: var(--brand-primary-hover, #1d4ed8) !important;
+        }
+        .rec-popup-actions a.btn-primary i,
+        .rec-popup-actions a.btn-primary span,
+        .rec-popup-card a.btn-primary i,
+        .rec-popup-card a.btn-primary span {
+            color: #ffffff !important;
+        }
+        /* Interactive Row Highlighting - Light Blue */
+        @keyframes highlightGlow {
+            0% {
+                background-color: #dbeafe !important;
+                box-shadow: inset 0 0 0 1px #93c5fd;
+            }
+            70% {
+                background-color: #eff6ff !important;
+                box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3);
+            }
+            100% {
+                background-color: #eff6ff !important;
+                box-shadow: none;
+            }
+        }
+        .recommendation-row.highlighted-row {
+            animation: highlightGlow 1.2s ease-out;
+            background-color: #eff6ff !important;
+            border-color: #93c5fd !important;
+            border-left: 5px solid #2563eb !important;
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12) !important;
+            --bs-table-bg: #eff6ff !important;
+            --bs-table-accent-bg: #eff6ff !important;
+            transition: background-color 0.4s ease, border-color 0.4s ease;
+        }
+        .recommendation-row.highlighted-row > td,
+        .recommendation-row.highlighted-row > th {
+            animation: highlightGlow 1.2s ease-out;
+            background-color: #eff6ff !important;
+            --bs-table-bg: #eff6ff !important;
+            --bs-table-accent-bg: #eff6ff !important;
+            transition: background-color 0.4s ease;
+        }
+        .recommendation-row.highlighted-row > td:first-child {
+            border-left: 4px solid #2563eb !important;
+        }
+        /* Mobile Switcher */
+        .view-switcher-pill {
+            background: #f1f5f9;
+            border-radius: 9999px;
+            padding: 3px;
+            display: inline-flex;
+            border: 1px solid #e2e8f0;
+        }
+        .view-switcher-btn {
+            border: none;
+            background: transparent;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #64748b;
+            padding: 5px 14px;
+            border-radius: 9999px;
+            transition: all 0.2s ease;
+        }
+        .view-switcher-btn.active {
+            background: #ffffff;
+            color: #1e40af;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        /* Location Badges */
+        .loc-pill-btn {
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 9999px;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            background: #fff5f5;
+            color: #dc2626;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.18s ease;
+            cursor: pointer;
+        }
+        .loc-pill-btn:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+            border-color: #f87171;
+            transform: translateY(-1px);
+        }
+        .gmaps-ext-btn {
+            font-size: 0.74rem;
+            font-weight: 500;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            color: #475569;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.18s ease;
+        }
+        .gmaps-ext-btn:hover {
+            background: #f8fafc;
+            color: #1e40af;
+            border-color: #cbd5e1;
+        }
+
+        /* =========================================================
+           Responsive Mobile Card Feed Layout (< 768px)
+           Eliminates horizontal/lateral scrolling and formats rows as clean cards
+           ========================================================= */
+        @media (max-width: 767.98px) {
+            #leftListColumn .card.card-custom {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+
+            .table-responsive {
+                overflow-x: visible !important;
+                border: none !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            #recommendationsTable {
+                display: block !important;
+                width: 100% !important;
+                border-collapse: separate !important;
+                border-spacing: 0 !important;
+                border: none !important;
+            }
+
+            #recommendationsTable thead {
+                display: none !important;
+            }
+
+            #recommendationsTable tbody {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.85rem !important;
+                width: 100% !important;
+            }
+
+            .recommendation-row {
+                display: grid !important;
+                grid-template-columns: 1fr auto !important;
+                grid-template-areas:
+                    "subject action"
+                    "date    date"
+                    "content content"
+                    "author  author" !important;
+                row-gap: 0.35rem !important;
+                column-gap: 0.5rem !important;
+                align-items: center !important;
+                background: #ffffff !important;
+                border-radius: 16px !important;
+                border: 1px solid rgba(226, 232, 240, 0.95) !important;
+                box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
+                padding: 1.1rem !important;
+                margin-bottom: 0 !important;
+                position: relative !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .recommendation-row > td {
+                display: block !important;
+                padding: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                width: 100% !important;
+            }
+
+            .recommendation-row .rec-cell-subject {
+                grid-area: subject !important;
+                justify-self: start !important;
+            }
+
+            .recommendation-row .rec-cell-date {
+                grid-area: date !important;
+                margin-top: -0.05rem !important;
+                margin-bottom: 0.2rem !important;
+            }
+
+            .recommendation-row .rec-cell-action {
+                grid-area: action !important;
+                justify-self: end !important;
+                text-align: right !important;
+            }
+
+            .recommendation-row .rec-cell-content {
+                grid-area: content !important;
+                margin-top: 0.35rem !important;
+                padding-top: 0.65rem !important;
+                border-top: 1px solid rgba(241, 245, 249, 0.95) !important;
+            }
+
+            .recommendation-row .rec-cell-author {
+                grid-area: author !important;
+                margin-top: 0.2rem !important;
+                padding-top: 0.6rem !important;
+                border-top: 1px solid rgba(241, 245, 249, 0.95) !important;
+            }
+
+            .recommendation-row .recommendation-text {
+                font-size: 0.92rem !important;
+                line-height: 1.6 !important;
+                color: #1e293b !important;
+                word-break: break-word !important;
+                overflow-wrap: anywhere !important;
+                white-space: normal !important;
+            }
+
+            .recommendation-row .date-badge {
+                font-size: 0.78rem !important;
+                color: #64748b !important;
+            }
+
+            .recommendation-row .badge-subject {
+                font-size: 0.78rem !important;
+                padding: 4px 10px !important;
+            }
+
+            .loc-pill-btn {
+                max-width: 100% !important;
+                white-space: normal !important;
+                word-break: break-word !important;
+            }
+
+            #serverEmptyRow {
+                display: block !important;
+                width: 100% !important;
+            }
+            #serverEmptyRow > td {
+                display: block !important;
+                width: 100% !important;
+                border: none !important;
+                background: #ffffff !important;
+                border-radius: 16px !important;
+                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            }
+        }
+    </style>
 </head>
 <body>
 
@@ -42,7 +435,7 @@
     {% include 'recommendations/navbar.html' with active_page='recommendations' %}
 
     <!-- Main Content Container -->
-    <div class="container main-container pt-4 mb-5">
+    <div class="container-fluid px-lg-4 px-xl-5 pt-4 mb-5">
         
         <!-- Header Row -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
@@ -51,11 +444,24 @@
                     <h2 class="fw-bold mb-0">Shared Recommendations</h2>
                 </div>
                 <p class="text-muted mb-0 small">
-                    Curated community recommendations & directory
+                    Curated community recommendations & interactive map directory
                 </p>
             </div>
             
             <div class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Mobile / Tablet View Switcher -->
+                <div class="d-lg-none view-switcher-pill me-2">
+                    <button type="button" class="view-switcher-btn active" id="btnShowBoth">
+                        <i class="bi bi-layout-split me-1"></i> Both
+                    </button>
+                    <button type="button" class="view-switcher-btn" id="btnShowMap">
+                        <i class="bi bi-map-fill me-1"></i> Map
+                    </button>
+                    <button type="button" class="view-switcher-btn" id="btnShowList">
+                        <i class="bi bi-list-ul me-1"></i> List
+                    </button>
+                </div>
+
                 {% if is_admin %}
                 <button type="button" class="btn btn-sm btn-primary-gradient d-inline-flex align-items-center rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#createRecommendationModal" style="font-size: 0.85rem; font-weight: 600;">
                     <i class="bi bi-plus-circle-fill me-1"></i> Add Recommendation
@@ -67,6 +473,10 @@
                 <span id="total-count-badge" class="count-badge">
                     <i class="bi bi-bookmark-check-fill me-1" style="color: #60a5fa;"></i>
                     <span id="visible-count">{{ notes|length }}</span>&nbsp;Items
+                </span>
+                <span id="mapped-count-badge" class="count-badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);">
+                    <i class="bi bi-geo-alt-fill me-1"></i>
+                    <span id="mapped-count">{{ mapped_count }}</span>&nbsp;Mapped
                 </span>
             </div>
         </div>
@@ -87,13 +497,13 @@
 
         <!-- Filter & Search Toolbar -->
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-3 mb-3">
-            <div class="search-input-wrapper">
+            <div class="search-input-wrapper flex-grow-1" style="max-width: 480px;">
                 <i class="bi bi-search"></i>
-                <input type="text" id="recommendationSearch" class="form-control" placeholder="Search by keyword, author, or category..." autocomplete="off">
+                <input type="text" id="recommendationSearch" class="form-control" placeholder="Search keyword, author, place, or category..." autocomplete="off">
             </div>
 
-            <div class="d-flex align-items-center gap-2">
-                <select id="subjectFilter" class="form-select form-select-sm rounded-pill" style="max-width: 200px; font-size: 0.86rem; padding: 7px 14px; border-color: var(--border-subtle);">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <select id="subjectFilter" class="form-select form-select-sm rounded-pill" style="max-width: 220px; font-size: 0.86rem; padding: 7px 14px; border-color: var(--border-subtle);">
                     <option value="">All Categories</option>
                 </select>
                 <button id="resetFilters" class="btn btn-sm btn-outline-pill px-3 py-1 d-none" title="Clear filters">
@@ -102,73 +512,149 @@
             </div>
         </div>
 
-        <!-- Clean Card Wrapper -->
-        <div class="card card-custom">
-            <div class="table-responsive">
-                <table id="recommendationsTable" class="table table-hover table-custom align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 14%;">Date</th>
-                            <th style="width: 22%;">Subject</th>
-                            <th style="width: 20%;">Shared By</th>
-                            <th style="width: 44%;">Recommendation</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        {% for row in notes %}
-                            <tr class="recommendation-row" data-subject="{{ row.Subject|default:''|lower }}" data-author="{{ row.Shared_By|default:''|lower }}" data-content="{{ row.Recommendation|default:''|lower }}">
-                                <td>
-                                    <span class="date-badge">
-                                        <i class="bi bi-calendar3 me-1 opacity-75"></i> {{ row.Date|default:"—" }}
-                                    </span>
-                                </td>
-                                <td>
-                                    {% if row.Subject %}
-                                        <span class="badge-subject">
-                                            {{ row.Subject }}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted small">—</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="author-avatar">
-                                            {{ row.Shared_By|slice:":1"|upper|default:"?" }}
-                                        </div>
-                                        <span class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ row.Shared_By|default:"Group Member" }}</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="recommendation-text">{{ row.Recommendation|urlize|linebreaksbr }}</div>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr id="serverEmptyRow">
-                                <td colspan="4" class="text-center py-5">
-                                    <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
-                                        <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
-                                        <h6 class="fw-bold text-dark">No recommendations found</h6>
-                                        <p class="small text-muted mb-0">No community recommendations have been published yet.</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <!-- 2-Column Responsive Layout: Map above List on Mobile, Map Sticky on Right on Laptop/Desktop -->
+        <div class="row g-4 align-items-start">
+            
+            <!-- Map Column: order-1 on mobile/tablets (<992px) to render above the list, order-lg-2 on laptops/desktops (>=992px) to render on right -->
+            <div class="col-12 col-lg-5 col-xl-5 order-1 order-lg-2" id="rightMapColumn">
+                <div class="map-card-wrapper">
+                    <!-- Map Header Bar -->
+                    <div class="p-3 bg-white border-bottom d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                                <i class="bi bi-geo-alt-fill" style="font-size: 1rem;"></i>
+                            </span>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.92rem;">Community Map</h6>
+                                <span class="text-muted" style="font-size: 0.74rem;">
+                                    <span id="activeMapPinCount">0</span> recommendations located
+                                </span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button type="button" id="resetMapZoomBtn" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1" style="font-size: 0.74rem; font-weight: 600;" title="Fit all visible pins in view">
+                                <i class="bi bi-arrows-fullscreen me-1"></i> Fit Pins
+                            </button>
+                        </div>
+                    </div>
 
-            <!-- Branded Empty Search State -->
-            <div id="noMatchState" class="text-center py-5 d-none">
-                <div class="branded-empty-state mx-auto" style="max-width: 440px;">
-                    <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
-                    <h6 class="fw-bold text-dark mb-1">No matching recommendations found</h6>
-                    <p class="small text-muted mb-3">Try adjusting your search terms or category filter.</p>
-                    <button id="clearSearchBtn" class="btn btn-sm btn-outline-pill px-3 py-1">
-                        <i class="bi bi-x-circle me-1"></i> Clear Search
-                    </button>
+                    <!-- Map Container -->
+                    <div id="recommendationsMap"></div>
+
+                    <!-- Map Footer Bar -->
+                    <div class="p-2 px-3 bg-light border-top d-flex align-items-center justify-content-between text-muted" style="font-size: 0.75rem;">
+                        <span><i class="bi bi-info-circle me-1 text-primary"></i> Click any pin to open directions</span>
+                        <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="text-muted text-decoration-none fw-semibold">
+                            Google Maps <i class="bi bi-box-arrow-up-right" style="font-size: 0.65rem;"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
+
+            <!-- List Column: order-2 on mobile/tablets (<992px) to render below map, order-lg-1 on laptops/desktops (>=992px) to render on left -->
+            <div class="col-12 col-lg-7 col-xl-7 order-2 order-lg-1" id="leftListColumn">
+                <div class="card card-custom">
+                    <div class="table-responsive">
+                        <table id="recommendationsTable" class="table table-hover table-custom align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 13%;">Date</th>
+                                    <th style="width: 21%;">Subject</th>
+                                    <th style="width: 18%;">Shared By</th>
+                                    <th style="width: {% if is_admin %}38%{% else %}48%{% endif %};">Recommendation</th>
+                                    {% if is_admin %}
+                                    <th style="width: 10%; text-align: center;">Action</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                {% for row in notes %}
+                                    <tr class="recommendation-row" id="rec-row-{{ row.index }}" data-index="{{ row.index }}" data-subject="{{ row.Subject|default:''|lower }}" data-author="{{ row.Shared_By|default:''|lower }}" data-content="{{ row.Recommendation|default:''|lower }}" data-location="{{ row.Location|default:''|lower }}" data-has-loc="{% if row.has_location %}1{% else %}0{% endif %}">
+                                        <td class="rec-cell-date">
+                                            <span class="date-badge">
+                                                <i class="bi bi-calendar3 me-1 opacity-75"></i> {{ row.Date|default:"—" }}
+                                            </span>
+                                        </td>
+                                        <td class="rec-cell-subject">
+                                            {% if row.Subject %}
+                                                <span class="badge-subject">
+                                                    {{ row.Subject }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted small">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="rec-cell-author">
+                                            <div class="d-flex align-items-center">
+                                                <div class="author-avatar">
+                                                    {{ row.Shared_By|slice:":1"|upper|default:"?" }}
+                                                </div>
+                                                <span class="fw-semibold text-dark" style="font-size: 0.88rem;">{{ row.Shared_By|default:"Group Member" }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="rec-cell-content">
+                                            <div class="recommendation-text">{{ row.Recommendation|urlize|linebreaksbr }}</div>
+                                            
+                                            {% if row.has_location %}
+                                             <div class="mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2" style="border-color: rgba(226, 232, 240, 0.6) !important;">
+                                                <button type="button" class="loc-pill-btn focus-on-map-btn" data-index="{{ row.index }}" title="Show on Community Map">
+                                                    <i class="bi bi-geo-alt-fill me-1"></i>
+                                                    <span>{{ row.location_display|default:row.Location|truncatechars:32 }}</span>
+                                                </button>
+                                                {% if row.location_url %}
+                                                <a href="{{ row.location_url }}" target="_blank" rel="noopener noreferrer" class="gmaps-ext-btn" title="Open in Google Maps">
+                                                    <i class="bi bi-box-arrow-up-right me-1"></i> Maps
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </td>
+                                        {% if is_admin %}
+                                        <td class="rec-cell-action text-center align-middle">
+                                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 edit-rec-btn shadow-sm"
+                                                data-index="{{ row.index }}"
+                                                data-row-num="{{ row.row_num|default:'' }}"
+                                                data-subject="{{ row.Subject|default:'' }}"
+                                                data-shared-by="{{ row.Shared_By|default:'' }}"
+                                                data-date="{{ row.Date|default:'' }}"
+                                                data-location="{{ row.Location|default:'' }}"
+                                                data-recommendation="{{ row.Recommendation|default:'' }}"
+                                                title="Edit Recommendation"
+                                                style="font-size: 0.78rem; font-weight: 600;">
+                                                <i class="bi bi-pencil-square me-1"></i> Edit
+                                            </button>
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                {% empty %}
+                                    <tr id="serverEmptyRow">
+                                        <td colspan="{% if is_admin %}5{% else %}4{% endif %}" class="text-center py-5">
+                                            <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
+                                                <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
+                                                <h6 class="fw-bold text-dark">No recommendations found</h6>
+                                                <p class="small text-muted mb-0">No community recommendations have been published yet.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Branded Empty Search State -->
+                    <div id="noMatchState" class="text-center py-5 d-none">
+                        <div class="branded-empty-state mx-auto" style="max-width: 440px;">
+                            <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
+                            <h6 class="fw-bold text-dark mb-1">No matching recommendations found</h6>
+                            <p class="small text-muted mb-3">Try adjusting your search terms or category filter.</p>
+                            <button id="clearSearchBtn" class="btn btn-sm btn-outline-pill px-3 py-1">
+                                <i class="bi bi-x-circle me-1"></i> Clear Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -225,15 +711,29 @@
                         </div>
                     </div>
 
+                    <!-- Location / Google Maps Link (NEW FIELD) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small">
+                            <i class="bi bi-geo-alt-fill text-danger me-1"></i> Location / Google Maps Link <span class="text-muted fw-normal">(Optional)</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-geo-alt"></i></span>
+                            <input type="text" name="location" id="modalRecLocation" class="form-control border-start-0" placeholder="e.g. Taqueria Cancun, 2288 Mission St, San Francisco or https://maps.app.goo.gl/...">
+                        </div>
+                        <div class="text-muted mt-1" style="font-size: 0.75rem;">
+                            Add a Google Maps URL, street address, or venue name to display this recommendation on the community map.
+                        </div>
+                    </div>
+
                     <!-- Recommendation Content -->
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark small">Recommendation Details & Contact <span class="text-danger">*</span></label>
-                        <textarea name="recommendation" class="form-control" rows="5" placeholder="Provide name of business/doctor, phone number, address, website link, pricing info, and personal tips or endorsement..." required></textarea>
+                        <textarea name="recommendation" class="form-control" rows="4" placeholder="Provide name of business/doctor, phone number, address, website link, pricing info, and personal tips or endorsement..." required></textarea>
                     </div>
 
                     <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-2 text-muted" style="font-size: 0.8rem;">
                         <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-5"></i>
-                        <span>This recommendation will be automatically synced to the <strong>Google Sheets</strong> recommendations tab and visible to all members immediately.</span>
+                        <span>This recommendation will be automatically synced to the <strong>Google Sheets</strong> recommendations tab and visible on the map immediately.</span>
                     </div>
                 </div>
 
@@ -246,6 +746,99 @@
             </form>
         </div>
     </div>
+
+    <!-- EDIT RECOMMENDATION MODAL (ORGANIZERS ONLY) -->
+    <div class="modal fade" id="editRecommendationModal" tabindex="-1" aria-labelledby="editRecommendationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <form action="{% url 'recommendations:recommendation_edit' %}" method="POST" id="editRecommendationForm" class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                {% csrf_token %}
+                <input type="hidden" name="row_index" id="editModalRowIndex">
+                <input type="hidden" name="original_subject" id="editModalOriginalSubject">
+                <input type="hidden" name="original_shared_by" id="editModalOriginalSharedBy">
+                <input type="hidden" name="original_recommendation" id="editModalOriginalRecommendation">
+
+                <div class="modal-header bg-dark text-white p-4">
+                    <div>
+                        <div class="badge bg-warning text-dark font-monospace mb-1" style="font-size: 0.65rem;">ORGANIZER ACTION</div>
+                        <h5 class="modal-title fw-bold" id="editRecommendationModalLabel">
+                            <i class="bi bi-pencil-square me-2 text-warning"></i> Edit Community Recommendation
+                        </h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <!-- Category Selection -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Category / Topic <span class="text-danger">*</span></label>
+                            <select name="category" id="editModalRecCategory" class="form-select" required>
+                                <option value="Doctors & Health">🩺 Doctors & Health (Médicos & Salud)</option>
+                                <option value="Food & Dining">🍽️ Food, Dining & Markets (Comida & Restaurantes)</option>
+                                <option value="Home & Services">🛠️ Home & Services (Hogar & Servicios)</option>
+                                <option value="Kids & Activities">👶 Kids & Activities (Niños & Actividades)</option>
+                                <option value="Professional & Legal">💼 Professional & Legal (Servicios Profesionales)</option>
+                                <option value="Beauty & Wellness">💇 Beauty & Wellness (Belleza & Bienestar)</option>
+                                <option value="Travel & Leisure">✈️ Travel & Leisure (Viajes & Vacaciones)</option>
+                                <option value="Community & Social">🤝 Community & Social (Comunidad)</option>
+                                <option value="Other">💡 Other / Custom (Otro)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="editModalCustomCategoryWrapper" style="display: none;">
+                            <label class="form-label fw-bold text-dark small">Custom Category Name <span class="text-danger">*</span></label>
+                            <input type="text" name="custom_category" id="editModalCustomCategory" class="form-control" placeholder="e.g., Real Estate, Car Mechanics, Language Tutors">
+                        </div>
+                    </div>
+
+                    <!-- Author and Date -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Shared By (Member Name) <span class="text-danger">*</span></label>
+                            <input type="text" name="shared_by" id="editModalRecSharedBy" class="form-control" placeholder="e.g. Maria Gonzalez" required>
+                            <div class="text-muted" style="font-size: 0.75rem;">Name of the community member or source making the recommendation.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small">Date</label>
+                            <input type="date" name="date" id="editModalRecDate" class="form-control">
+                            <div class="text-muted" style="font-size: 0.75rem;">Original date or updated date.</div>
+                        </div>
+                    </div>
+
+                    <!-- Location / Google Maps Link -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small">
+                            <i class="bi bi-geo-alt-fill text-danger me-1"></i> Location / Google Maps Link <span class="text-muted fw-normal">(Optional)</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-geo-alt"></i></span>
+                            <input type="text" name="location" id="editModalRecLocation" class="form-control border-start-0" placeholder="e.g. Taqueria Cancun, 2288 Mission St, San Francisco or https://maps.app.goo.gl/...">
+                        </div>
+                        <div class="text-muted mt-1" style="font-size: 0.75rem;">
+                            Add a Google Maps URL, street address, or venue name to display this recommendation on the community map.
+                        </div>
+                    </div>
+
+                    <!-- Recommendation Content -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small">Recommendation Details & Contact <span class="text-danger">*</span></label>
+                        <textarea name="recommendation" id="editModalRecDetails" class="form-control" rows="4" placeholder="Provide name of business/doctor, phone number, address, website link, pricing info, and personal tips or endorsement..." required></textarea>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-2 text-muted" style="font-size: 0.8rem;">
+                        <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-5"></i>
+                        <span>Changes will be saved directly into <strong>Google Sheets</strong> and updated on the Community Map immediately.</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-gradient rounded-pill px-4 shadow-sm" style="font-weight: 600;">
+                        <i class="bi bi-check-circle-fill me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     {% endif %}
 
     <!-- FOOTER COMPONENT -->
@@ -253,18 +846,61 @@
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Leaflet JS for OpenStreetMap & Google Maps Linking -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- Interactive Client-side Search & Filtering Script -->
+    <!-- Interactive Client-side Search, Filtering & Leaflet Map Synchronization -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Raw JSON items from backend
+            const notesData = {{ notes_json|safe }};
+            
             const searchInput = document.getElementById('recommendationSearch');
             const subjectFilter = document.getElementById('subjectFilter');
             const resetFiltersBtn = document.getElementById('resetFilters');
             const clearSearchBtn = document.getElementById('clearSearchBtn');
             const rows = Array.from(document.querySelectorAll('.recommendation-row'));
             const visibleCountElem = document.getElementById('visible-count');
+            const activePinCountElem = document.getElementById('activeMapPinCount');
             const noMatchState = document.getElementById('noMatchState');
-            const tableBody = document.getElementById('tableBody');
+            const resetMapZoomBtn = document.getElementById('resetMapZoomBtn');
+
+            // Responsive Mobile View Switcher
+            const btnShowList = document.getElementById('btnShowList');
+            const btnShowMap = document.getElementById('btnShowMap');
+            const btnShowBoth = document.getElementById('btnShowBoth');
+            const leftListCol = document.getElementById('leftListColumn');
+            const rightMapCol = document.getElementById('rightMapColumn');
+
+            if (btnShowList && btnShowMap && btnShowBoth) {
+                btnShowList.addEventListener('click', function() {
+                    btnShowList.classList.add('active');
+                    btnShowMap.classList.remove('active');
+                    btnShowBoth.classList.remove('active');
+                    leftListCol.classList.remove('d-none');
+                    rightMapCol.classList.add('d-none');
+                });
+                btnShowMap.addEventListener('click', function() {
+                    btnShowMap.classList.add('active');
+                    btnShowList.classList.remove('active');
+                    btnShowBoth.classList.remove('active');
+                    leftListCol.classList.add('d-none');
+                    rightMapCol.classList.remove('d-none');
+                    if (window.recMap) {
+                        setTimeout(() => { window.recMap.invalidateSize(); fitVisiblePins(); }, 150);
+                    }
+                });
+                btnShowBoth.addEventListener('click', function() {
+                    btnShowBoth.classList.add('active');
+                    btnShowList.classList.remove('active');
+                    btnShowMap.classList.remove('active');
+                    leftListCol.classList.remove('d-none');
+                    rightMapCol.classList.remove('d-none');
+                    if (window.recMap) {
+                        setTimeout(() => { window.recMap.invalidateSize(); fitVisiblePins(); }, 150);
+                    }
+                });
+            }
 
             // Populate unique categories into select filter
             const categories = new Set();
@@ -282,16 +918,319 @@
                 subjectFilter.appendChild(opt);
             });
 
+            // -------------------------------------------------------------
+            // Leaflet Map Initialization
+            // -------------------------------------------------------------
+            const defaultCenter = [37.7749, -122.4194]; // San Francisco center
+            const map = L.map('recommendationsMap', {
+                center: defaultCenter,
+                zoom: 10,
+                scrollWheelZoom: true,
+                zoomControl: true
+            });
+            window.recMap = map;
+
+            // Clean OpenStreetMap Tile Layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Marker Storage & Map References
+            const markersByIndex = {};
+            const markerClusterGroup = L.featureGroup().addTo(map);
+
+            // Icon Creator
+            function createPinIcon(iconClass = 'bi-geo-alt-fill') {
+                return L.divIcon({
+                    className: 'custom-pin-container',
+                    html: `<div class="custom-rec-pin"><i class="bi ${iconClass}"></i></div>`,
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 34],
+                    popupAnchor: [0, -32]
+                });
+            }
+
+            // Client-side Geocoding Cache for addresses without direct coords
+            const geocodeCache = JSON.parse(localStorage.getItem('mm_geocode_cache') || '{}');
+
+            function saveGeocodeCache() {
+                try {
+                    localStorage.setItem('mm_geocode_cache', JSON.stringify(geocodeCache));
+                } catch(e) {}
+            }
+
+            // Client-side regex coordinate extractor helper
+            function extractCoordsFromUrlOrText(str) {
+                if (!str) return null;
+                const m = str.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+                    || str.match(/[?&/](?:q|ll|loc:|destination|query|center|daddr)=(-?\d+\.\d+),(-?\d+\.\d+)/)
+                    || str.match(/\/search\/(-?\d+\.\d+),(-?\d+\.\d+)/)
+                    || str.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)
+                    || str.match(/!8m2!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)
+                    || str.match(/!1d(-?\d+\.\d+)!2d(-?\d+\.\d+)/)
+                    || str.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+                if (m) {
+                    const lat = parseFloat(m[1]);
+                    const lng = parseFloat(m[2]);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        return [lat, lng];
+                    }
+                }
+                return null;
+            }
+
+            // Escape HTML for popup safety
+            function escapeHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // Build Popup HTML Content
+            function buildPopupContent(item) {
+                const subject = escapeHtml(item.Subject || 'Recommendation');
+                const author = escapeHtml(item.Shared_By || 'Community Member');
+                const rawRec = item.Recommendation || '';
+                const snippet = escapeHtml(rawRec.length > 140 ? rawRec.substring(0, 140) + '...' : rawRec);
+                const locDisplay = escapeHtml(item.location_display || item.Location || 'Location');
+                const locUrl = item.location_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.Location || '')}`;
+
+                {% if is_admin %}
+                const editBtnHtml = `
+                    <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 edit-rec-btn shadow-sm"
+                        data-index="${item.index}"
+                        data-row-num="${item.row_num || (item.index + 2)}"
+                        data-subject="${subject}"
+                        data-shared-by="${author}"
+                        data-date="${escapeHtml(item.Date || '')}"
+                        data-location="${escapeHtml(item.Location || '')}"
+                        data-recommendation="${escapeHtml(item.Recommendation || '')}"
+                        style="font-size: 0.74rem; font-weight: 600;">
+                        <i class="bi bi-pencil-square me-1"></i> Edit
+                    </button>
+                `;
+                {% else %}
+                const editBtnHtml = '';
+                {% endif %}
+
+                return `
+                    <div class="rec-popup-card">
+                        <span class="rec-popup-subject">${subject}</span>
+                        <div class="rec-popup-title">${locDisplay}</div>
+                        <div class="small text-muted mb-2"><i class="bi bi-person-fill text-primary me-1"></i>Shared by <strong>${author}</strong></div>
+                        <div class="rec-popup-text">${snippet}</div>
+                        <div class="rec-popup-actions mt-2 pt-2 border-top d-flex flex-wrap gap-1 align-items-center justify-content-between">
+                            <div class="d-flex gap-1">
+                                <a href="${locUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary text-white d-inline-flex align-items-center rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.74rem; font-weight: 600; color: #ffffff !important; background-color: #1e40af !important; border-color: #1e40af !important;">
+                                    <i class="bi bi-box-arrow-up-right me-1 text-white" style="color: #ffffff !important;"></i> <span class="text-white" style="color: #ffffff !important;">Maps</span>
+                                </a>
+                                <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1 highlight-list-row-btn" data-index="${item.index}" style="font-size: 0.74rem;">
+                                    <i class="bi bi-arrow-down-left-square me-1"></i> List
+                                </button>
+                            </div>
+                            ${editBtnHtml}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function addMarkerForNote(item, coords) {
+                if (markersByIndex[item.index]) return;
+
+                // Pick icon based on subject
+                let iconClass = 'bi-geo-alt-fill';
+                const sub = (item.Subject || '').toLowerCase();
+                if (sub.includes('food') || sub.includes('restaurant') || sub.includes('comida') || sub.includes('taqueria')) iconClass = 'bi-cup-hot-fill';
+                else if (sub.includes('doctor') || sub.includes('health') || sub.includes('salud') || sub.includes('clinic')) iconClass = 'bi-heart-pulse-fill';
+                else if (sub.includes('kid') || sub.includes('niño') || sub.includes('school')) iconClass = 'bi-balloon-fill';
+                else if (sub.includes('home') || sub.includes('hogar') || sub.includes('service')) iconClass = 'bi-house-door-fill';
+                else if (sub.includes('travel') || sub.includes('viaje')) iconClass = 'bi-airplane-fill';
+                else if (sub.includes('beauty') || sub.includes('belleza')) iconClass = 'bi-stars';
+
+                const marker = L.marker(coords, {
+                    icon: createPinIcon(iconClass),
+                    title: item.Subject || 'Recommendation'
+                });
+
+                marker.bindPopup(buildPopupContent(item), {
+                    maxWidth: 290,
+                    minWidth: 240
+                });
+
+                marker.on('click', function() {
+                    highlightTableRow(item.index);
+                });
+                marker.on('popupopen', function() {
+                    highlightTableRow(item.index);
+                });
+
+                markersByIndex[item.index] = {
+                    marker: marker,
+                    item: item,
+                    coords: coords
+                };
+
+                markerClusterGroup.addLayer(marker);
+            }
+
+            // Plot all items with locations
+            notesData.forEach(item => {
+                if (!item.has_location && !item.Location) return;
+
+                let coords = null;
+                const hasLat = item.lat !== null && item.lat !== undefined && !isNaN(item.lat);
+                const hasLng = item.lng !== null && item.lng !== undefined && !isNaN(item.lng);
+
+                if (hasLat && hasLng) {
+                    coords = [parseFloat(item.lat), parseFloat(item.lng)];
+                } else {
+                    coords = extractCoordsFromUrlOrText(item.Location) || extractCoordsFromUrlOrText(item.location_url);
+                }
+
+                if (coords) {
+                    // Slight deterministic jitter if pins share exact same coordinates
+                    const jitterLat = coords[0] + (((item.index || 0) % 5 - 2) * 0.0004);
+                    const jitterLng = coords[1] + (((item.index || 0) % 7 - 3) * 0.0004);
+                    addMarkerForNote(item, [jitterLat, jitterLng]);
+                } else {
+                    // Try geocode for place names or addresses
+                    let query = (item.location_display && item.location_display !== 'Google Maps Location') 
+                        ? item.location_display 
+                        : (item.Location && !item.Location.startsWith('http') ? item.Location : '');
+
+                    if (!query && item.Recommendation) {
+                        query = item.Recommendation.substring(0, 50).replace(/[^\w\s]/g, ' ').trim();
+                    }
+
+                    if (query && geocodeCache[query]) {
+                        addMarkerForNote(item, geocodeCache[query]);
+                    } else if (query) {
+                        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', California')}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data && data.length > 0) {
+                                    const c = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                                    geocodeCache[query] = c;
+                                    saveGeocodeCache();
+                                    addMarkerForNote(item, c);
+                                    filterRows();
+                                } else {
+                                    const fallback = [37.7749 + (((item.index || 0) % 5 - 2) * 0.008), -122.4194 + (((item.index || 0) % 7 - 3) * 0.008)];
+                                    addMarkerForNote(item, fallback);
+                                    filterRows();
+                                }
+                            })
+                            .catch(err => {
+                                const fallback = [37.7749 + (((item.index || 0) % 5 - 2) * 0.008), -122.4194 + (((item.index || 0) % 7 - 3) * 0.008)];
+                                addMarkerForNote(item, fallback);
+                                filterRows();
+                            });
+                    } else {
+                        const fallback = [37.7749 + (((item.index || 0) % 5 - 2) * 0.008), -122.4194 + (((item.index || 0) % 7 - 3) * 0.008)];
+                        addMarkerForNote(item, fallback);
+                    }
+                }
+            });
+
+            function highlightTableRow(index) {
+                // If on mobile and list is hidden, switch back to 'Both' view
+                if (window.innerWidth < 992 && leftListCol && leftListCol.classList.contains('d-none')) {
+                    if (btnShowBoth) btnShowBoth.click();
+                }
+                rows.forEach(r => {
+                    r.classList.remove('highlighted-row');
+                    if (r._highlightTimer) {
+                        clearTimeout(r._highlightTimer);
+                    }
+                });
+                const targetRow = document.getElementById(`rec-row-${index}`);
+                if (targetRow) {
+                    targetRow.classList.add('highlighted-row');
+                    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetRow._highlightTimer = setTimeout(() => {
+                        targetRow.classList.remove('highlighted-row');
+                    }, 4000);
+                }
+            }
+
+            function fitVisiblePins() {
+                const visibleMarkers = [];
+                Object.values(markersByIndex).forEach(obj => {
+                    if (markerClusterGroup.hasLayer(obj.marker)) {
+                        visibleMarkers.push(obj.marker);
+                    }
+                });
+
+                if (visibleMarkers.length > 0) {
+                    const group = L.featureGroup(visibleMarkers);
+                    map.fitBounds(group.getBounds().pad(0.18), { maxZoom: 15, animate: true });
+                } else {
+                    map.setView(defaultCenter, 10, { animate: true });
+                }
+            }
+
+            if (resetMapZoomBtn) {
+                resetMapZoomBtn.addEventListener('click', fitVisiblePins);
+            }
+
+            // Global delegation for "Show in List" inside Leaflet popups
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.highlight-list-row-btn');
+                if (btn) {
+                    const idx = btn.getAttribute('data-index');
+                    if (idx !== null) {
+                        highlightTableRow(idx);
+                    }
+                }
+            });
+
+            // Focus on Map button click from table row
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.focus-on-map-btn');
+                if (btn) {
+                    const idx = btn.getAttribute('data-index');
+                    if (idx !== null) {
+                        // If mobile and map is hidden, make it visible
+                        if (window.innerWidth < 992 && rightMapCol && rightMapCol.classList.contains('d-none')) {
+                            if (btnShowBoth) btnShowBoth.click();
+                        }
+                        const mObj = markersByIndex[idx];
+                        if (mObj) {
+                            if (!markerClusterGroup.hasLayer(mObj.marker)) {
+                                markerClusterGroup.addLayer(mObj.marker);
+                            }
+                            map.setView(mObj.coords, 14, { animate: true });
+                            setTimeout(() => {
+                                mObj.marker.openPopup();
+                            }, 180);
+                        }
+                        // If mobile, smooth scroll up to map
+                        if (window.innerWidth < 992 && rightMapCol) {
+                            rightMapCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }
+                }
+            });
+
+            // -------------------------------------------------------------
+            // Filter Rows & Sync Map Markers
+            // -------------------------------------------------------------
             function filterRows() {
                 const query = searchInput.value.trim().toLowerCase();
                 const selectedCategory = subjectFilter.value.trim().toLowerCase();
                 let visibleCount = 0;
+                let activePins = 0;
 
                 rows.forEach(row => {
                     const subject = row.getAttribute('data-subject') || '';
                     const author = row.getAttribute('data-author') || '';
                     const content = row.getAttribute('data-content') || '';
-                    const textCombined = (subject + ' ' + author + ' ' + content + ' ' + row.textContent).toLowerCase();
+                    const locationStr = row.getAttribute('data-location') || '';
+                    const idx = row.getAttribute('data-index');
+                    const textCombined = (subject + ' ' + author + ' ' + content + ' ' + locationStr + ' ' + row.textContent).toLowerCase();
 
                     const matchesQuery = !query || textCombined.includes(query);
                     const matchesCategory = !selectedCategory || subject.includes(selectedCategory);
@@ -299,17 +1238,35 @@
                     if (matchesQuery && matchesCategory) {
                         row.style.display = '';
                         visibleCount++;
+
+                        // Sync marker visibility
+                        if (markersByIndex[idx]) {
+                            if (!markerClusterGroup.hasLayer(markersByIndex[idx].marker)) {
+                                markerClusterGroup.addLayer(markersByIndex[idx].marker);
+                            }
+                            activePins++;
+                        }
                     } else {
                         row.style.display = 'none';
+                        if (markersByIndex[idx] && markerClusterGroup.hasLayer(markersByIndex[idx].marker)) {
+                            markerClusterGroup.removeLayer(markersByIndex[idx].marker);
+                        }
                     }
                 });
 
-                visibleCountElem.textContent = visibleCount;
+                if (visibleCountElem) {
+                    visibleCountElem.textContent = visibleCount;
+                }
+                if (activePinCountElem) {
+                    activePinCountElem.textContent = activePins;
+                }
 
-                if (visibleCount === 0 && rows.length > 0) {
-                    noMatchState.classList.remove('d-none');
-                } else {
-                    noMatchState.classList.add('d-none');
+                if (noMatchState) {
+                    if (visibleCount === 0 && rows.length > 0) {
+                        noMatchState.classList.remove('d-none');
+                    } else {
+                        noMatchState.classList.add('d-none');
+                    }
                 }
 
                 if (query || selectedCategory) {
@@ -323,14 +1280,15 @@
                 searchInput.value = '';
                 subjectFilter.value = '';
                 filterRows();
+                fitVisiblePins();
                 searchInput.focus();
             }
 
             if (searchInput) {
-                searchInput.addEventListener('input', filterRows);
+                searchInput.addEventListener('input', () => { filterRows(); });
             }
             if (subjectFilter) {
-                subjectFilter.addEventListener('change', filterRows);
+                subjectFilter.addEventListener('change', () => { filterRows(); fitVisiblePins(); });
             }
             if (resetFiltersBtn) {
                 resetFiltersBtn.addEventListener('click', resetFilters);
@@ -338,6 +1296,10 @@
             if (clearSearchBtn) {
                 clearSearchBtn.addEventListener('click', resetFilters);
             }
+
+            // Initial filtering & pins fit
+            filterRows();
+            setTimeout(fitVisiblePins, 300);
 
             // Modal custom category toggle & default date
             const modalCategory = document.getElementById('modalRecCategory');
@@ -360,6 +1322,102 @@
                     }
                 });
             }
+
+            {% if is_admin %}
+            // Edit Recommendation click delegation
+            document.addEventListener('click', function(e) {
+                const editBtn = e.target.closest('.edit-rec-btn');
+                if (!editBtn) return;
+
+                const idx = editBtn.getAttribute('data-index');
+                let item = (idx !== null && notesData && notesData[idx]) ? notesData[idx] : null;
+
+                const modal = document.getElementById('editRecommendationModal');
+                if (!modal) return;
+
+                const rowNumInput = document.getElementById('editModalRowIndex');
+                const origSubInput = document.getElementById('editModalOriginalSubject');
+                const origAuthorInput = document.getElementById('editModalOriginalSharedBy');
+                const origRecInput = document.getElementById('editModalOriginalRecommendation');
+
+                const catSelect = document.getElementById('editModalRecCategory');
+                const customCatWrapper = document.getElementById('editModalCustomCategoryWrapper');
+                const customCatInput = document.getElementById('editModalCustomCategory');
+                const sharedByInput = document.getElementById('editModalRecSharedBy');
+                const dateInput = document.getElementById('editModalRecDate');
+                const locInput = document.getElementById('editModalRecLocation');
+                const recInput = document.getElementById('editModalRecDetails');
+
+                const rowNum = editBtn.getAttribute('data-row-num') || (item ? item.row_num : '') || (idx !== null ? (parseInt(idx) + 2) : '');
+                const subject = editBtn.getAttribute('data-subject') || (item ? item.Subject : '') || '';
+                const sharedBy = editBtn.getAttribute('data-shared-by') || (item ? item.Shared_By : '') || '';
+                const date = editBtn.getAttribute('data-date') || (item ? item.Date : '') || '';
+                const location = editBtn.getAttribute('data-location') || (item ? item.Location : '') || '';
+                const recommendation = editBtn.getAttribute('data-recommendation') || (item ? item.Recommendation : '') || '';
+
+                if (rowNumInput) rowNumInput.value = rowNum;
+                if (origSubInput) origSubInput.value = subject;
+                if (origAuthorInput) origAuthorInput.value = sharedBy;
+                if (origRecInput) origRecInput.value = recommendation;
+
+                if (sharedByInput) sharedByInput.value = sharedBy;
+                if (dateInput) {
+                    const dateMatch = date.match(/^\d{4}-\d{2}-\d{2}$/);
+                    dateInput.value = dateMatch ? dateMatch[0] : (date || '');
+                }
+                if (locInput) locInput.value = location;
+                if (recInput) recInput.value = recommendation;
+
+                // Determine category match
+                if (catSelect) {
+                    let matched = false;
+                    for (let i = 0; i < catSelect.options.length; i++) {
+                        const optVal = catSelect.options[i].value;
+                        if (optVal !== 'Other' && subject.toLowerCase().includes(optVal.toLowerCase())) {
+                            catSelect.selectedIndex = i;
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched && subject) {
+                        for (let i = 0; i < catSelect.options.length; i++) {
+                            if (catSelect.options[i].value.toLowerCase() === subject.toLowerCase()) {
+                                catSelect.selectedIndex = i;
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matched) {
+                        if (customCatWrapper) customCatWrapper.style.display = 'none';
+                        if (customCatInput) customCatInput.value = '';
+                    } else {
+                        catSelect.value = 'Other';
+                        if (customCatWrapper) customCatWrapper.style.display = 'block';
+                        if (customCatInput) customCatInput.value = subject;
+                    }
+                }
+
+                const bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+                bsModal.show();
+            });
+
+            // Edit modal custom category toggle
+            const editModalCategory = document.getElementById('editModalRecCategory');
+            const editCustomCategoryWrapper = document.getElementById('editModalCustomCategoryWrapper');
+            const editCustomCategoryInput = document.getElementById('editModalCustomCategory');
+            if (editModalCategory && editCustomCategoryWrapper) {
+                editModalCategory.addEventListener('change', function () {
+                    if (this.value === 'Other') {
+                        editCustomCategoryWrapper.style.display = 'block';
+                        if (editCustomCategoryInput) editCustomCategoryInput.focus();
+                    } else {
+                        editCustomCategoryWrapper.style.display = 'none';
+                    }
+                });
+            }
+            {% endif %}
         });
     </script>
 </body>
