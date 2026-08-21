@@ -3954,6 +3954,253 @@ class EditRecommendationTestCase(TestCase):
         self.assertContains(res_admin, 'data-row-num="2"')
 
 
+class GeminiWeatherTestCase(TestCase):
+    """
+    Unit tests for Google Gemini Flash 3.7 Weather Forecast & Outfit Advisor
+    with Google Search Grounding and 6-hour caching.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.profile = MemberProfile.objects.create(
+            email='member.weather@example.com',
+            full_name='Weather Tester',
+            is_admin=False
+        )
+
+    def _login(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.profile.email
+        session['member_name'] = self.profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+    def test_weather_endpoint_requires_authentication(self):
+        response = self.client.get(reverse('event_weather'), {'location': 'San Francisco'})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_weather_missing_location_returns_error(self):
+        self._login()
+        response = self.client.get(reverse('event_weather'))
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['available'])
+    @patch('google.genai.Client')
+    def test_weather_past_event_prevents_api_call(self, mock_client_cls):
+        self._login()
+        from recommendations.weather import get_event_weather_forecast, is_date_in_past
+        
+        # Test past dates detection
+        self.assertTrue(is_date_in_past('2020-01-01'))
+        self.assertTrue(is_date_in_past('2020-01-01 10:00'))
+        self.assertTrue(is_date_in_past('Wed, Jan 01, 2020 10:00 AM'))
+        self.assertFalse(is_date_in_past('2099-12-31 18:00'))
+
+        # Query for past event: should return past_event status and never call Gemini
+        result = get_event_weather_forecast(location='Mission Dolores Park, SF', datetime_str='2020-01-01 14:00')
+        self.assertFalse(result['available'])
+        self.assertEqual(result['status'], 'past_event')
+        self.assertIn('past events', result['message'])
+        mock_client_cls.assert_not_called()
+
+    @override_settings(GEMINI_MODEL='gemini-3.7-flash')
+    @patch('google.genai.Client')
+    def test_weather_success_and_caching(self, mock_client_cls):
+        self._login()
+        from recommendations.weather import get_event_weather_forecast
+
+        # Mock Gemini SDK client response
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        mock_candidate = MagicMock()
+        mock_candidate.grounding_metadata.web_search_queries = ['weather Mission Dolores SF 2026-08-22']
+        
+        mock_chunk = MagicMock()
+        mock_chunk.web.title = 'National Weather Service'
+        mock_chunk.web.uri = 'https://forecast.weather.gov'
+        mock_candidate.grounding_metadata.grounding_chunks = [mock_chunk]
+
+        mock_response = MagicMock()
+        mock_response.text = (
+            "### Expected Weather\n"
+            "* Temperature: 68°F - 72°F, Sunny with mild coastal breeze.\n"
+            "### What to Wear\n"
+            "* **Adults**: Light layers, comfortable sneakers, sunglasses.\n"
+            "* **Kids**: T-shirt + light hoodie, sun hat, and bring a windbreaker."
+        )
+        mock_response.candidates = [mock_candidate]
+        mock_client.models.generate_content.return_value = mock_response
+
+        # 1. First Call: Cache miss -> calls Gemini API
+        res1 = get_event_weather_forecast(
+            location='Mission Dolores Park, SF',
+            datetime_str='2026-08-22 14:00',
+            force_refresh=False,
+            provider='gemini'
+        )
+        self.assertTrue(res1['available'])
+        self.assertFalse(res1['cached'])
+        self.assertEqual(res1['model'], 'gemini-3.7-flash')
+        self.assertIn('Expected Weather', res1['recommendation'])
+        self.assertEqual(len(res1['sources']), 1)
+        self.assertEqual(res1['sources'][0]['title'], 'National Weather Service')
+        mock_client.models.generate_content.assert_called_once()
+
+        # Verify Google Search tool was configured
+        call_kwargs = mock_client.models.generate_content.call_args[1]
+        self.assertEqual(call_kwargs['model'], 'gemini-3.7-flash')
+        self.assertTrue(hasattr(call_kwargs['config'], 'tools'))
+
+        # 2. Second Call: Cache hit -> returns cached data, 0 new API calls (token saving)
+        mock_client.models.generate_content.reset_mock()
+        res2 = get_event_weather_forecast(
+            location='Mission Dolores Park, SF',
+            datetime_str='2026-08-22 14:00',
+            force_refresh=False,
+            provider='gemini'
+        )
+        self.assertTrue(res2['available'])
+        self.assertTrue(res2['cached'])
+        mock_client.models.generate_content.assert_not_called()
+
+        # 3. Third Call with force_refresh=True -> bypasses cache and calls Gemini again
+        res3 = get_event_weather_forecast(
+            location='Mission Dolores Park, SF',
+            datetime_str='2026-08-22 14:00',
+            force_refresh=True,
+            provider='gemini'
+        )
+        self.assertTrue(res3['available'])
+        self.assertFalse(res3['cached'])
+        mock_client.models.generate_content.assert_called_once()
+
+    @patch('recommendations.weather.requests.get')
+    def test_standard_openmeteo_weather(self, mock_requests_get):
+        self._login()
+        from recommendations.weather import get_openmeteo_weather_forecast
+
+        # Mock Nominatim geocoding & Open-Meteo forecast responses
+        def side_effect(url, **kwargs):
+            mock_resp = MagicMock()
+            if 'nominatim' in url:
+                mock_resp.json.return_value = [{
+                    'lat': '37.7596',
+                    'lon': '-122.4260',
+                    'display_name': 'Mission Dolores Park, San Francisco, CA'
+                }]
+            elif 'open-meteo' in url:
+                mock_resp.json.return_value = {
+                    'current_weather': {
+                        'temperature': 65.2,
+                        'weathercode': 2,
+                        'windspeed': 10.5,
+                    },
+                    'daily': {
+                        'time': ['2026-08-22'],
+                        'temperature_2m_max': [68.0],
+                        'temperature_2m_min': [54.0],
+                        'weathercode': [2],
+                        'precipitation_probability_max': [5],
+                        'windspeed_10m_max': [12.0],
+                    }
+                }
+            return mock_resp
+
+        mock_requests_get.side_effect = side_effect
+
+        # 1. Fetch Open-Meteo forecast
+        res = get_openmeteo_weather_forecast('Mission Dolores Park, SF', '2026-08-22 10:00', force_refresh=True)
+        self.assertTrue(res['available'])
+        self.assertEqual(res['provider'], 'standard')
+        self.assertEqual(res['temp_current'], 65.2)
+        self.assertEqual(res['temp_max'], 68.0)
+        self.assertEqual(res['temp_min'], 54.0)
+        self.assertEqual(res['condition'], 'Partly Cloudy')
+        self.assertEqual(res['rain_chance'], 5)
+        self.assertIn('Adults', res['recommendation'])
+        self.assertIn('Kids', res['recommendation'])
+
+    @override_settings(GEMINI_API_KEY='test-key')
+    @patch('recommendations.views.get_event_weather_forecast')
+    def test_weather_view_endpoint_integration(self, mock_get_weather):
+        self._login()
+        mock_get_weather.return_value = {
+            'available': True,
+            'status': 'success',
+            'location': 'Golden Gate Park, SF',
+            'datetime_str': 'Sunday 11:00 AM',
+            'recommendation': 'Partly cloudy, 64°F. Wear light jacket.',
+            'cached': False,
+            'sources': [],
+        }
+
+        response = self.client.get(reverse('event_weather'), {
+            'location': 'Golden Gate Park, SF',
+            'datetime': 'Sunday 11:00 AM'
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['available'])
+        mock_get_weather.assert_called_once_with(
+            location='Golden Gate Park, SF',
+            datetime_str='Sunday 11:00 AM',
+            force_refresh=False,
+            provider='standard'
+        )
+
+        # 1. Non-admin request with refresh=1 -> force_refresh is False
+        mock_get_weather.reset_mock()
+        response = self.client.get(reverse('event_weather'), {
+            'location': 'Golden Gate Park, SF',
+            'datetime': 'Sunday 11:00 AM',
+            'refresh': '1'
+        })
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with(
+            location='Golden Gate Park, SF',
+            datetime_str='Sunday 11:00 AM',
+            force_refresh=False,
+            provider='standard'
+        )
+
+        # 2. Admin request with refresh=1 -> force_refresh is True
+        session = self.client.session
+        session['is_admin'] = True
+        session.save()
+
+        mock_get_weather.reset_mock()
+        response = self.client.get(reverse('event_weather'), {
+            'location': 'Golden Gate Park, SF',
+            'datetime': 'Sunday 11:00 AM',
+            'refresh': '1'
+        })
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with(
+            location='Golden Gate Park, SF',
+            datetime_str='Sunday 11:00 AM',
+            force_refresh=True,
+            provider='standard'
+        )
+
+        # 3. Explicit provider request
+        mock_get_weather.reset_mock()
+        response = self.client.get(reverse('event_weather'), {
+            'location': 'Golden Gate Park, SF',
+            'datetime': 'Sunday 11:00 AM',
+            'provider': 'both'
+        })
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with(
+            location='Golden Gate Park, SF',
+            datetime_str='Sunday 11:00 AM',
+            force_refresh=False,
+            provider='both'
+        )
+
+
 
 
 

@@ -1190,7 +1190,7 @@ a:hover {
 
 /* Global Mobile Viewport & Touch Defaults */
 html, body {
-    overflow-x: hidden;
+    overflow-x: clip;
     max-width: 100vw;
     width: 100%;
     -webkit-tap-highlight-color: rgba(30, 64, 175, 0.1);

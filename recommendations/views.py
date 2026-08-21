@@ -50,6 +50,7 @@ from .notifications import (
     build_whatsapp_approval_link,
     build_whatsapp_decline_link,
 )
+from .weather import get_event_weather_forecast
 
 logger = logging.getLogger(__name__)
 
@@ -664,6 +665,45 @@ def event_detail_view(request, event_id):
         'target_event_id': event_id,
         'is_direct_detail': target_event is not None,
     })
+
+
+@member_required
+def event_weather_api_view(request):
+    """
+    AJAX API endpoint returning real-time weather and outfit recommendations.
+    Cached for 6 hours by default to minimize token reprompting.
+    """
+    location = request.GET.get('location', '').strip()
+    datetime_str = request.GET.get('datetime', '').strip()
+    is_admin = bool(request.session.get('is_admin', False))
+    force_refresh = is_admin and (request.GET.get('refresh') == '1' or request.GET.get('force') == '1')
+
+    if not location:
+        event_id = request.GET.get('event_id', '').strip()
+        if event_id:
+            member_email = request.session.get('member_email', '').strip().lower()
+            all_events, _, _, _, _, _ = _get_enriched_events(member_email=member_email)
+            target_event = _find_target_event(all_events, event_id)
+            if target_event:
+                location = target_event.get('location', '')
+                if not datetime_str:
+                    datetime_str = f"{target_event.get('date_formatted', '')} {target_event.get('time_formatted', '')}".strip()
+
+    if not location:
+        return JsonResponse({
+            'available': False,
+            'status': 'missing_location',
+            'message': 'Location parameter is required.'
+        }, status=400)
+
+    provider = request.GET.get('provider', 'standard').strip().lower()
+    result = get_event_weather_forecast(
+        location=location,
+        datetime_str=datetime_str,
+        force_refresh=force_refresh,
+        provider=provider
+    )
+    return JsonResponse(result)
 
 
 def event_rsvp_view(request):

@@ -245,6 +245,10 @@ else:
 
 PORTAL_BASE_URL = os.environ.get("PORTAL_BASE_URL", "").rstrip("/")
 
+# Google Gemini AI Studio API Configuration (Grounding with Google Search)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", os.environ.get("GOOGLE_API_KEY", "")).strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash").strip()
+
 if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True

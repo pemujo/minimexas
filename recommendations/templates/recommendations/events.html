@@ -413,6 +413,35 @@
                         {{ target_event.description|linebreaksbr }}
                     </div>
 
+                    <!-- Weather Forecast & Outfit Advisor -->
+                    <div class="weather-card-container mb-4 p-3 rounded-3 border shadow-xs" style="background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%); border-color: #bfdbfe !important;">
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom" style="border-color: rgba(191, 219, 254, 0.6) !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary rounded-pill px-2 py-1 shadow-xs" style="font-size: 0.72rem; background: linear-gradient(135deg, #1e40af, #2563eb) !important;">
+                                    <i class="bi bi-cloud-sun-fill me-1"></i> Weather
+                                </span>
+                                <span class="fw-bold text-dark small" style="font-size: 0.85rem;">
+                                    Forecast & Outfit Advisor
+                                </span>
+                            </div>
+                            {% if is_admin and not target_event.is_past %}
+                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 refresh-weather-btn" 
+                                data-location="{{ target_event.location }}" 
+                                data-datetime="{{ target_event.date_formatted }} {{ target_event.time_formatted }}" 
+                                data-target="#focusedWeatherContent" 
+                                style="font-size: 0.72rem;">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                            </button>
+                            {% endif %}
+                        </div>
+                        <div id="focusedWeatherContent" class="weather-content-area" data-location="{{ target_event.location }}" data-datetime="{{ target_event.date_formatted }} {{ target_event.time_formatted }}">
+                            <div class="d-flex align-items-center gap-2 text-muted small py-2">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <span>Checking live weather forecast...</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Interactive Member RSVP Widget -->
                     {% if not target_event.is_past %}
                     <div class="rsvp-card-container mb-3 p-3 bg-light rounded-3 border">
@@ -1250,7 +1279,32 @@
                     </div>
 
                     <h6 class="fw-bold text-dark mb-2">About This Event</h6>
-                    <p class="text-muted small mb-4" id="modalEventDescription" style="line-height: 1.6;"></p>
+                    <p class="text-muted small mb-3" id="modalEventDescription" style="line-height: 1.6;"></p>
+
+                    <!-- Modal Weather Forecast & Outfit Advisor -->
+                    <div class="weather-card-container mb-4 p-3 rounded-3 border shadow-xs" style="background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%); border-color: #bfdbfe !important;">
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom" style="border-color: rgba(191, 219, 254, 0.6) !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary rounded-pill px-2 py-1 shadow-xs" style="font-size: 0.72rem; background: linear-gradient(135deg, #1e40af, #2563eb) !important;">
+                                    <i class="bi bi-cloud-sun-fill me-1"></i> Weather
+                                </span>
+                                <span class="fw-bold text-dark small" style="font-size: 0.85rem;">
+                                    Forecast & Outfit Advisor
+                                </span>
+                            </div>
+                            {% if is_admin %}
+                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1" id="modalWeatherRefreshBtn" style="font-size: 0.72rem;">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                            </button>
+                            {% endif %}
+                        </div>
+                        <div id="modalWeatherContent" class="weather-content-area">
+                            <div class="d-flex align-items-center gap-2 text-muted small py-2">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <span>Loading weather forecast & outfit recommendations...</span>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Modal RSVP Box -->
                     <div class="p-3 bg-light rounded-3 border mb-4" id="modalRsvpContainer">
@@ -1603,11 +1657,247 @@
             }
         });
 
+        // --- Gemini AI Weather Forecast & Outfit Advisor ---
+        let activeModalEvent = null;
+
+        function formatInlineMarkdown(str) {
+            return str
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="text-dark">$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        }
+
+        function formatMarkdownWeather(mdText) {
+            if (!mdText) return '';
+            
+            // Escape HTML entities to prevent XSS
+            let safeText = mdText
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            let lines = safeText.split('\n');
+            let formattedLines = [];
+            let inList = false;
+
+            for (let line of lines) {
+                let trimmed = line.trim();
+                if (!trimmed) {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    continue;
+                }
+
+                if (trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+                    if (!inList) {
+                        formattedLines.push('<ul class="mb-2 ps-3" style="font-size: 0.84rem; line-height: 1.5;">');
+                        inList = true;
+                    }
+                    let itemContent = formatInlineMarkdown(trimmed.substring(2).trim());
+                    formattedLines.push(`<li class="mb-1 text-secondary">${itemContent}</li>`);
+                } else if (/^\d+\.\s/.test(trimmed)) {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    let itemContent = formatInlineMarkdown(trimmed.replace(/^\d+\.\s/, '').trim());
+                    formattedLines.push(`<div class="mb-1 text-secondary small fw-medium">${itemContent}</div>`);
+                } else if (trimmed.startsWith('### ')) {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    formattedLines.push(`<div class="fw-bold text-dark mt-2 mb-1" style="font-size: 0.88rem;">${formatInlineMarkdown(trimmed.substring(4))}</div>`);
+                } else if (trimmed.startsWith('## ')) {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    formattedLines.push(`<div class="fw-bold text-dark mt-2 mb-1" style="font-size: 0.92rem;">${formatInlineMarkdown(trimmed.substring(3))}</div>`);
+                } else if (trimmed.startsWith('# ')) {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    formattedLines.push(`<div class="fw-bold text-dark mt-2 mb-1" style="font-size: 0.95rem;">${formatInlineMarkdown(trimmed.substring(2))}</div>`);
+                } else {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    formattedLines.push(`<p class="mb-2 text-secondary small" style="line-height: 1.5;">${formatInlineMarkdown(trimmed)}</p>`);
+                }
+            }
+
+            if (inList) {
+                formattedLines.push('</ul>');
+            }
+
+            return formattedLines.join('');
+        }
+
+        function buildGeminiHtml(gemini, location) {
+            if (!gemini || !gemini.available) {
+                return `
+                    <div class="p-3 bg-white bg-opacity-75 rounded-3 border border-dashed text-center small text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        ${gemini?.message || 'AI forecast is unavailable for this location.'}
+                    </div>
+                `;
+            }
+            const formattedHtml = formatMarkdownWeather(gemini.recommendation);
+            const cacheBadge = gemini.cached 
+                ? `<span class="badge bg-light text-muted border rounded-pill" style="font-size: 0.65rem;" title="Updated recently"><i class="bi bi-clock-history me-1"></i>Cached</span>`
+                : `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.65rem;"><i class="bi bi-stars me-1"></i>Live AI</span>`;
+
+            let sourcesHtml = '';
+            if (gemini.sources && gemini.sources.length > 0) {
+                const links = gemini.sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted hover-primary" style="font-size: 0.7rem;">${s.title || 'Source'}</a>`).join(' &bull; ');
+                sourcesHtml = `<div class="mt-2 pt-1 border-top small text-muted" style="font-size: 0.7rem; border-color: rgba(191,219,254,0.5)!important;"><i class="bi bi-globe me-1"></i>Sources: ${links}</div>`;
+            }
+
+            return `
+                <div class="p-3 rounded-3 bg-white bg-opacity-90 border shadow-xs h-100" style="border-color: #bfdbfe !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color: rgba(191,219,254,0.6)!important;">
+                        <span class="badge bg-primary rounded-pill px-2 py-1 shadow-xs" style="font-size: 0.72rem; background: linear-gradient(135deg, #1e40af, #2563eb) !important;">
+                            <i class="bi bi-stars me-1"></i> AI Smart Advisor (Gemini 3.7)
+                        </span>
+                        ${cacheBadge}
+                    </div>
+                    <div class="weather-text mb-2">${formattedHtml}</div>
+                    ${sourcesHtml}
+                </div>
+            `;
+        }
+
+        function buildStandardHtml(std, location) {
+            if (!std || !std.available) {
+                return `
+                    <div class="p-3 bg-white bg-opacity-75 rounded-3 border border-dashed text-center small text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        ${std?.message || 'Weather forecast is unavailable for this location.'}
+                    </div>
+                `;
+            }
+
+            const cacheBadge = std.cached 
+                ? `<span class="badge bg-light text-muted border rounded-pill" style="font-size: 0.65rem;" title="Updated recently"><i class="bi bi-clock-history me-1"></i>Cached</span>`
+                : `<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill" style="font-size: 0.65rem;"><i class="bi bi-check2-circle me-1"></i>Live Forecast</span>`;
+
+            let adultsTipsHtml = (std.outfit_adults || []).map(t => `<li class="mb-1 text-secondary">${formatInlineMarkdown(t)}</li>`).join('');
+            let kidsTipsHtml = (std.outfit_kids || []).map(t => `<li class="mb-1 text-secondary">${formatInlineMarkdown(t)}</li>`).join('');
+
+            return `
+                <div class="p-3 rounded-3 bg-white bg-opacity-90 border shadow-xs h-100" style="border-color: #bfdbfe !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color: rgba(191,219,254,0.6)!important;">
+                        <span class="badge bg-primary rounded-pill px-2 py-1 shadow-xs" style="font-size: 0.72rem; background: linear-gradient(135deg, #1e40af, #2563eb) !important;">
+                            <i class="bi bi-cloud-sun me-1"></i> Event Weather & Outfit Guide
+                        </span>
+                        ${cacheBadge}
+                    </div>
+                    
+                    <!-- Weather Conditions Bar -->
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-3 p-2 rounded-2 bg-light border">
+                        <div class="d-flex align-items-center gap-1 fw-bold text-dark" style="font-size: 1.05rem;">
+                            <span>${std.emoji || '☀️'}</span>
+                            <span>${std.temp_current !== undefined ? std.temp_current + '°F' : ''}</span>
+                        </div>
+                        <span class="badge bg-white text-dark border px-2 py-1" style="font-size: 0.75rem;">
+                            <i class="bi ${std.icon || 'bi-sun'} me-1"></i> ${std.condition || 'Clear'}
+                        </span>
+                        <span class="badge bg-white text-secondary border px-2 py-1" style="font-size: 0.72rem;">
+                            High: <strong>${std.temp_max}°F</strong> / Low: <strong>${std.temp_min}°F</strong>
+                        </span>
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1" style="font-size: 0.72rem;">
+                            <i class="bi bi-droplet-half me-1"></i> Rain: ${std.rain_chance}%
+                        </span>
+                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1" style="font-size: 0.72rem;">
+                            <i class="bi bi-wind me-1"></i> ${std.wind_speed} mph
+                        </span>
+                    </div>
+
+                    <!-- Clothing & Tips -->
+                    <div class="mb-2">
+                        <div class="fw-bold text-dark small mb-1" style="font-size: 0.84rem;">
+                            <i class="bi bi-person-fill text-primary me-1"></i> For Adults:
+                        </div>
+                        <ul class="mb-2 ps-3" style="font-size: 0.83rem; line-height: 1.4;">
+                            ${adultsTipsHtml || '<li class="text-muted">Standard comfortable layers.</li>'}
+                        </ul>
+                    </div>
+                    <div class="mb-2">
+                        <div class="fw-bold text-dark small mb-1" style="font-size: 0.84rem;">
+                            <i class="bi bi-emoji-smile-fill text-warning me-1"></i> For Kids:
+                        </div>
+                        <ul class="mb-2 ps-3" style="font-size: 0.83rem; line-height: 1.4;">
+                            ${kidsTipsHtml || '<li class="text-muted">Comfortable clothing and light layer.</li>'}
+                        </ul>
+                    </div>
+
+                    <div class="mt-2 pt-1 border-top small text-muted" style="font-size: 0.7rem; border-color: rgba(226,232,240,0.8)!important;">
+                        <i class="bi bi-globe me-1"></i>Forecast: <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted hover-primary">Open-Meteo & NOAA</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function fetchEventWeather(location, datetimeStr, containerEl, forceRefresh = false) {
+            if (!containerEl || !location) return;
+            
+            containerEl.innerHTML = `
+                <div class="d-flex align-items-center gap-2 text-muted small py-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <span>Checking live weather forecast...</span>
+                </div>
+            `;
+
+            try {
+                const params = new URLSearchParams({
+                    location: location,
+                    datetime: datetimeStr || '',
+                    provider: 'standard'
+                });
+                if (forceRefresh) params.append('refresh', '1');
+
+                const resp = await fetch(`/events/weather/?${params.toString()}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await resp.json();
+
+                if (data.available) {
+                    const standardData = data.standard || data;
+                    const standardHtml = buildStandardHtml(standardData, location);
+
+                    containerEl.innerHTML = `
+                        <div class="weather-recommendation-wrapper">
+                            ${standardHtml}
+                        </div>
+                    `;
+                } else {
+                    containerEl.innerHTML = `
+                        <div class="small text-muted py-1">
+                            <i class="bi bi-info-circle me-1 text-secondary"></i>
+                            ${data.message || 'Weather forecast is currently unavailable for this event location.'}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                containerEl.innerHTML = `
+                    <div class="small text-muted py-1">
+                        <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+                        Unable to load weather forecast right now.
+                    </div>
+                `;
+            }
+        }
+
         // --- Modal Event Details ---
         const detailModal = new bootstrap.Modal(document.getElementById("eventDetailModal"));
         const detailButtons = document.querySelectorAll(".view-details-btn");
 
         function openModalForEvent(evt) {
+            activeModalEvent = evt;
             const eventId = evt.id || evt.dataset?.id || "";
             const eventTitle = evt.title || "";
             const myRsvp = evt.my_rsvp || evt.myRsvp || evt.dataset?.myRsvp || "";
@@ -1621,6 +1911,17 @@
             document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexitas Community";
             document.getElementById("modalEventDescription").textContent = evt.description || evt.desc || "";
             document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal || "#";
+
+            // Load Weather & Outfit Forecast for this event
+            const modalWeatherEl = document.getElementById("modalWeatherContent");
+            const modalRefreshBtn = document.getElementById("modalWeatherRefreshBtn");
+            if (modalRefreshBtn) {
+                modalRefreshBtn.style.display = evt.is_past ? 'none' : '';
+            }
+            if (modalWeatherEl && evt.location) {
+                const dtStr = `${evt.date_formatted || evt.date || ''} ${evt.time_formatted || evt.time || ''}`.trim();
+                fetchEventWeather(evt.location, dtStr, modalWeatherEl, false);
+            }
 
             // Set share URLs in modal
             const shareUrl = evt.share_url || evt.dataset?.shareUrl || `${window.location.origin}/events/${eventId}/`;
@@ -1643,6 +1944,38 @@
             });
 
             detailModal.show();
+        }
+
+        // Modal Weather Refresh Button
+        document.getElementById("modalWeatherRefreshBtn")?.addEventListener("click", function() {
+            if (activeModalEvent && activeModalEvent.location) {
+                const dtStr = `${activeModalEvent.date_formatted || activeModalEvent.date || ''} ${activeModalEvent.time_formatted || activeModalEvent.time || ''}`.trim();
+                const modalWeatherEl = document.getElementById("modalWeatherContent");
+                fetchEventWeather(activeModalEvent.location, dtStr, modalWeatherEl, true);
+            }
+        });
+
+        // Focused Weather Refresh Buttons
+        document.querySelectorAll(".refresh-weather-btn").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const loc = this.dataset.location;
+                const dt = this.dataset.datetime;
+                const targetSelector = this.dataset.target;
+                const targetEl = document.querySelector(targetSelector);
+                if (targetEl && loc) {
+                    fetchEventWeather(loc, dt, targetEl, true);
+                }
+            });
+        });
+
+        // Auto-load focused event weather on page load if present
+        const focusedWeatherEl = document.getElementById("focusedWeatherContent");
+        if (focusedWeatherEl) {
+            const loc = focusedWeatherEl.dataset.location;
+            const dt = focusedWeatherEl.dataset.datetime;
+            if (loc) {
+                fetchEventWeather(loc, dt, focusedWeatherEl, false);
+            }
         }
 
         detailButtons.forEach(btn => {

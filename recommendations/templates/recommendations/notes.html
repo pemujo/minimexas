@@ -38,20 +38,68 @@
     <!-- Project-Wide Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <style>
-        /* Modern Leaflet Map Styling */
-        #recommendationsMap {
-            border-radius: 0 0 16px 16px;
-            z-index: 1;
-        }
+        /* Modern Leaflet Map & Card Wrapper */
         .map-card-wrapper {
-            position: sticky;
-            top: 85px;
-            transition: all 0.25s ease;
             border-radius: 16px;
             border: 1px solid rgba(226, 232, 240, 0.9);
             box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
             background: #ffffff;
             overflow: hidden;
+            transition: all 0.25s ease;
+        }
+
+        #recommendationsMap {
+            border-radius: 0 0 16px 16px;
+            z-index: 1;
+            width: 100%;
+            background: #f8fafc;
+        }
+
+        /* Laptops & Wide Desktops (>= 992px): Map stays sticky & fully visible in frame while scrolling list */
+        @media (min-width: 992px) {
+            #rightMapColumn {
+                position: sticky;
+                top: 80px;
+                align-self: flex-start;
+                z-index: 10;
+            }
+            .map-card-wrapper {
+                position: sticky;
+                top: 80px;
+                display: flex;
+                flex-direction: column;
+                max-height: calc(100vh - 96px);
+            }
+            #recommendationsMap {
+                height: calc(100vh - 200px) !important;
+                min-height: 420px;
+                max-height: 640px;
+                flex: 1 1 auto;
+            }
+        }
+
+        /* Tablets & Cell Phones (< 992px): Map appears at top above list */
+        @media (max-width: 991.98px) {
+            #rightMapColumn {
+                position: static;
+                margin-bottom: 1.5rem;
+            }
+            .map-card-wrapper {
+                position: static;
+                box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.07);
+            }
+            #recommendationsMap {
+                height: 340px !important;
+            }
+        }
+
+        @media (max-width: 576px) {
+            #rightMapColumn {
+                margin-bottom: 1.25rem;
+            }
+            #recommendationsMap {
+                height: 290px !important;
+            }
         }
         /* Custom Leaflet Marker Pin */
         .custom-rec-pin {
@@ -143,10 +191,32 @@
         .rec-popup-card a.btn-primary span {
             color: #ffffff !important;
         }
-        /* Interactive Row Highlighting */
-        .recommendation-row.highlighted-row {
-            background-color: #fef3c7 !important;
+        /* Interactive Row Highlighting - Light Blue */
+        @keyframes highlightGlow {
+            0% {
+                background-color: #dbeafe !important;
+                box-shadow: inset 0 0 0 1px #93c5fd;
+            }
+            70% {
+                background-color: #eff6ff !important;
+                box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3);
+            }
+            100% {
+                background-color: #eff6ff !important;
+                box-shadow: none;
+            }
+        }
+        .recommendation-row.highlighted-row,
+        .recommendation-row.highlighted-row > td,
+        .recommendation-row.highlighted-row > th {
+            animation: highlightGlow 1.2s ease-out;
+            background-color: #eff6ff !important;
+            --bs-table-bg: #eff6ff !important;
+            --bs-table-accent-bg: #eff6ff !important;
             transition: background-color 0.4s ease;
+        }
+        .recommendation-row.highlighted-row > td:first-child {
+            border-left: 4px solid #2563eb !important;
         }
         /* Mobile Switcher */
         .view-switcher-pill {
@@ -234,14 +304,14 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <!-- Mobile / Tablet View Switcher -->
                 <div class="d-lg-none view-switcher-pill me-2">
-                    <button type="button" class="view-switcher-btn active" id="btnShowList">
-                        <i class="bi bi-list-ul me-1"></i> List
+                    <button type="button" class="view-switcher-btn active" id="btnShowBoth">
+                        <i class="bi bi-layout-split me-1"></i> Both
                     </button>
                     <button type="button" class="view-switcher-btn" id="btnShowMap">
                         <i class="bi bi-map-fill me-1"></i> Map
                     </button>
-                    <button type="button" class="view-switcher-btn" id="btnShowBoth">
-                        <i class="bi bi-layout-split me-1"></i> Both
+                    <button type="button" class="view-switcher-btn" id="btnShowList">
+                        <i class="bi bi-list-ul me-1"></i> List
                     </button>
                 </div>
 
@@ -295,11 +365,47 @@
             </div>
         </div>
 
-        <!-- 2-Column Responsive Layout: Left List, Right Map -->
+        <!-- 2-Column Responsive Layout: Map above List on Mobile, Map Sticky on Right on Laptop/Desktop -->
         <div class="row g-4 align-items-start">
             
-            <!-- Left Column: Recommendations Table / List -->
-            <div class="col-12 col-lg-7 col-xl-7" id="leftListColumn">
+            <!-- Map Column: order-1 on mobile/tablets (<992px) to render above the list, order-lg-2 on laptops/desktops (>=992px) to render on right -->
+            <div class="col-12 col-lg-5 col-xl-5 order-1 order-lg-2" id="rightMapColumn">
+                <div class="map-card-wrapper">
+                    <!-- Map Header Bar -->
+                    <div class="p-3 bg-white border-bottom d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                                <i class="bi bi-geo-alt-fill" style="font-size: 1rem;"></i>
+                            </span>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.92rem;">Community Map</h6>
+                                <span class="text-muted" style="font-size: 0.74rem;">
+                                    <span id="activeMapPinCount">0</span> recommendations located
+                                </span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button type="button" id="resetMapZoomBtn" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1" style="font-size: 0.74rem; font-weight: 600;" title="Fit all visible pins in view">
+                                <i class="bi bi-arrows-fullscreen me-1"></i> Fit Pins
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Map Container -->
+                    <div id="recommendationsMap"></div>
+
+                    <!-- Map Footer Bar -->
+                    <div class="p-2 px-3 bg-light border-top d-flex align-items-center justify-content-between text-muted" style="font-size: 0.75rem;">
+                        <span><i class="bi bi-info-circle me-1 text-primary"></i> Click any pin to open directions</span>
+                        <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="text-muted text-decoration-none fw-semibold">
+                            Google Maps <i class="bi bi-box-arrow-up-right" style="font-size: 0.65rem;"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List Column: order-2 on mobile/tablets (<992px) to render below map, order-lg-1 on laptops/desktops (>=992px) to render on left -->
+            <div class="col-12 col-lg-7 col-xl-7 order-2 order-lg-1" id="leftListColumn">
                 <div class="card card-custom">
                     <div class="table-responsive">
                         <table id="recommendationsTable" class="table table-hover table-custom align-middle mb-0">
@@ -343,7 +449,7 @@
                                             <div class="recommendation-text">{{ row.Recommendation|urlize|linebreaksbr }}</div>
                                             
                                             {% if row.has_location %}
-                                            <div class="mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2" style="border-color: rgba(226, 232, 240, 0.6) !important;">
+                                             <div class="mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2" style="border-color: rgba(226, 232, 240, 0.6) !important;">
                                                 <button type="button" class="loc-pill-btn focus-on-map-btn" data-index="{{ row.index }}" title="Show on Community Map">
                                                     <i class="bi bi-geo-alt-fill me-1"></i>
                                                     <span>{{ row.location_display|default:row.Location|truncatechars:32 }}</span>
@@ -398,42 +504,6 @@
                                 <i class="bi bi-x-circle me-1"></i> Clear Search
                             </button>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column: Interactive Leaflet Google Maps Element -->
-            <div class="col-12 col-lg-5 col-xl-5" id="rightMapColumn">
-                <div class="map-card-wrapper">
-                    <!-- Map Header Bar -->
-                    <div class="p-3 bg-white border-bottom d-flex align-items-center justify-content-between">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.1); color: #ef4444;">
-                                <i class="bi bi-geo-alt-fill" style="font-size: 1rem;"></i>
-                            </span>
-                            <div>
-                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.92rem;">Community Map</h6>
-                                <span class="text-muted" style="font-size: 0.74rem;">
-                                    <span id="activeMapPinCount">0</span> recommendations located
-                                </span>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-1">
-                            <button type="button" id="resetMapZoomBtn" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1" style="font-size: 0.74rem; font-weight: 600;" title="Fit all visible pins in view">
-                                <i class="bi bi-arrows-fullscreen me-1"></i> Fit Pins
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Map Container -->
-                    <div id="recommendationsMap" style="height: 520px; width: 100%; background: #f8fafc;"></div>
-
-                    <!-- Map Footer Bar -->
-                    <div class="p-2 px-3 bg-light border-top d-flex align-items-center justify-content-between text-muted" style="font-size: 0.75rem;">
-                        <span><i class="bi bi-info-circle me-1 text-primary"></i> Click any pin to open directions</span>
-                        <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="text-muted text-decoration-none fw-semibold">
-                            Google Maps <i class="bi bi-box-arrow-up-right" style="font-size: 0.65rem;"></i>
-                        </a>
                     </div>
                 </div>
             </div>
@@ -846,6 +916,9 @@
                 marker.on('click', function() {
                     highlightTableRow(item.index);
                 });
+                marker.on('popupopen', function() {
+                    highlightTableRow(item.index);
+                });
 
                 markersByIndex[item.index] = {
                     marker: marker,
@@ -916,14 +989,23 @@
             });
 
             function highlightTableRow(index) {
-                rows.forEach(r => r.classList.remove('highlighted-row'));
+                // If on mobile and list is hidden, switch back to 'Both' view
+                if (window.innerWidth < 992 && leftListCol && leftListCol.classList.contains('d-none')) {
+                    if (btnShowBoth) btnShowBoth.click();
+                }
+                rows.forEach(r => {
+                    r.classList.remove('highlighted-row');
+                    if (r._highlightTimer) {
+                        clearTimeout(r._highlightTimer);
+                    }
+                });
                 const targetRow = document.getElementById(`rec-row-${index}`);
                 if (targetRow) {
                     targetRow.classList.add('highlighted-row');
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    setTimeout(() => {
+                    targetRow._highlightTimer = setTimeout(() => {
                         targetRow.classList.remove('highlighted-row');
-                    }, 3500);
+                    }, 4000);
                 }
             }
 
@@ -964,6 +1046,10 @@
                 if (btn) {
                     const idx = btn.getAttribute('data-index');
                     if (idx !== null) {
+                        // If mobile and map is hidden, make it visible
+                        if (window.innerWidth < 992 && rightMapCol && rightMapCol.classList.contains('d-none')) {
+                            if (btnShowBoth) btnShowBoth.click();
+                        }
                         const mObj = markersByIndex[idx];
                         if (mObj) {
                             if (!markerClusterGroup.hasLayer(mObj.marker)) {
@@ -974,9 +1060,9 @@
                                 mObj.marker.openPopup();
                             }, 180);
                         }
-                        // If mobile, switch to map view
-                        if (window.innerWidth < 992 && btnShowMap && !btnShowBoth.classList.contains('active')) {
-                            btnShowMap.click();
+                        // If mobile, smooth scroll up to map
+                        if (window.innerWidth < 992 && rightMapCol) {
+                            rightMapCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }
                     }
                 }
