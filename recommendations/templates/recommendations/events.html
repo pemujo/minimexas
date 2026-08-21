@@ -1788,6 +1788,16 @@
             let adultsTipsHtml = (std.outfit_adults || []).map(t => `<li class="mb-1 text-secondary">${formatInlineMarkdown(t)}</li>`).join('');
             let kidsTipsHtml = (std.outfit_kids || []).map(t => `<li class="mb-1 text-secondary">${formatInlineMarkdown(t)}</li>`).join('');
 
+            const toC = (f) => Math.round((parseFloat(f) - 32) * 5 / 9);
+            const currentTempF = std.temp_current !== undefined ? Math.round(std.temp_current) : null;
+            const currentTempC = std.temp_current_c !== undefined ? Math.round(std.temp_current_c) : (currentTempF !== null ? toC(currentTempF) : null);
+            const currentTempStr = currentTempF !== null ? `${currentTempF}°F <span class="fw-normal text-muted" style="font-size: 0.88em;">(${currentTempC}°C)</span>` : '';
+
+            const maxTempF = Math.round(std.temp_max);
+            const maxTempC = std.temp_max_c !== undefined ? Math.round(std.temp_max_c) : toC(maxTempF);
+            const minTempF = Math.round(std.temp_min);
+            const minTempC = std.temp_min_c !== undefined ? Math.round(std.temp_min_c) : toC(minTempF);
+
             return `
                 <div class="p-3 rounded-3 bg-white bg-opacity-90 border shadow-xs h-100" style="border-color: #bfdbfe !important;">
                     <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color: rgba(191,219,254,0.6)!important;">
@@ -1801,13 +1811,13 @@
                     <div class="d-flex flex-wrap gap-2 align-items-center mb-3 p-2 rounded-2 bg-light border">
                         <div class="d-flex align-items-center gap-1 fw-bold text-dark" style="font-size: 1.05rem;">
                             <span>${std.emoji || '☀️'}</span>
-                            <span>${std.temp_current !== undefined ? std.temp_current + '°F' : ''}</span>
+                            <span>${currentTempStr}</span>
                         </div>
                         <span class="badge bg-white text-dark border px-2 py-1" style="font-size: 0.75rem;">
                             <i class="bi ${std.icon || 'bi-sun'} me-1"></i> ${std.condition || 'Clear'}
                         </span>
                         <span class="badge bg-white text-secondary border px-2 py-1" style="font-size: 0.72rem;">
-                            High: <strong>${std.temp_max}°F</strong> / Low: <strong>${std.temp_min}°F</strong>
+                            High: <strong>${maxTempF}°F (${maxTempC}°C)</strong> / Low: <strong>${minTempF}°F (${minTempC}°C)</strong>
                         </span>
                         <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1" style="font-size: 0.72rem;">
                             <i class="bi bi-droplet-half me-1"></i> Rain: ${std.rain_chance}%

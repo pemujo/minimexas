@@ -310,14 +310,20 @@ def get_openmeteo_weather_forecast(location: str, datetime_str: str, force_refre
         condition_tuple = WMO_WEATHER_CODES.get(weather_code, ("Clear / Sunny", "bi-sun-fill", "text-warning", "☀️"))
         condition_name, condition_icon, condition_color, condition_emoji = condition_tuple
 
+        # Temperature in Celsius
+        temp_max_c = round((temp_max - 32) * 5 / 9, 1)
+        temp_min_c = round((temp_min - 32) * 5 / 9, 1)
+        temp_current_c = round((temp_current - 32) * 5 / 9, 1) if temp_current is not None else round(temp_max_c, 1)
+
         # Recommendations
         outfit_adults, outfit_kids = generate_rule_based_outfit(temp_max, rain_prob, wind_speed)
 
         # Markdown formatted text
         short_loc = display_name.split(',')[0]
+        curr_str = f" (currently **{round(temp_current)}°F ({round(temp_current_c)}°C)**)" if temp_current is not None else ""
         md_lines = [
             f"### {condition_emoji} Weather for {short_loc}",
-            f"**Expected Conditions**: {condition_name} with temperatures between **{round(temp_min)}°F** and **{round(temp_max)}°F**" + (f" (currently **{round(temp_current)}°F**)" if temp_current is not None else "") + ".",
+            f"**Expected Conditions**: {condition_name} with temperatures between **{round(temp_min)}°F ({round(temp_min_c)}°C)** and **{round(temp_max)}°F ({round(temp_max_c)}°C)**{curr_str}.",
             f"- 🌧️ **Precipitation**: {rain_prob}% chance of rain",
             f"- 💨 **Wind**: up to {round(wind_speed)} mph",
             "",
@@ -339,8 +345,11 @@ def get_openmeteo_weather_forecast(location: str, datetime_str: str, force_refre
             "display_location": display_name,
             "datetime_str": dt_clean,
             "temp_current": round(temp_current, 1) if temp_current is not None else round(temp_max, 1),
+            "temp_current_c": temp_current_c,
             "temp_max": round(temp_max, 1),
+            "temp_max_c": temp_max_c,
             "temp_min": round(temp_min, 1),
+            "temp_min_c": temp_min_c,
             "condition": condition_name,
             "icon": condition_icon,
             "color_class": condition_color,
