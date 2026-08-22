@@ -1079,10 +1079,19 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Instant Acknowledgment / Loading Indicator -->
+                    <div class="alert alert-primary d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="background: #e0f2fe; color: #0369a1; border-radius: 12px;">
+                        <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div>
+                        <div class="small fw-semibold">
+                            <span>Creating event & syncing with calendar...</span>
+                            <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait a moment while we save your event and notify members.</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light border-0 px-4 py-3">
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" data-loading-text="Creating & Saving Event..." style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
                         <i class="bi bi-check2-circle me-1"></i> Save Event
                     </button>
                 </div>
@@ -1146,10 +1155,19 @@
                             <textarea name="description" id="editEventDesc" class="form-control" rows="3" required></textarea>
                         </div>
                     </div>
+
+                    <!-- Instant Acknowledgment / Loading Indicator -->
+                    <div class="alert alert-primary d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="background: #e0f2fe; color: #0369a1; border-radius: 12px;">
+                        <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div>
+                        <div class="small fw-semibold">
+                            <span>Updating event & syncing calendar...</span>
+                            <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait while we update your event details.</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light border-0 px-4 py-3">
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" data-loading-text="Updating Event..." style="background: linear-gradient(135deg, var(--brand-primary) 0%, #0d9488 100%);">
                         <i class="bi bi-check2-circle me-1"></i> Update Event
                     </button>
                 </div>
@@ -1176,10 +1194,18 @@
                     <p class="text-muted small mb-0">
                         You are about to delete <strong id="deleteEventTitle" class="text-dark"></strong>. This action will deactivate the event from the community calendar.
                     </p>
+
+                    <!-- Instant Acknowledgment / Loading Indicator -->
+                    <div class="alert alert-danger d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="border-radius: 12px;">
+                        <div class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></div>
+                        <div class="small fw-semibold">
+                            <span>Deleting event... Please wait.</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light border-0 px-4 py-3 justify-content-center">
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger rounded-pill px-4">
+                    <button type="submit" class="btn btn-danger rounded-pill px-4" data-loading-text="Deleting Event...">
                         <i class="bi bi-trash3 me-1"></i> Yes, Delete Event
                     </button>
                 </div>
@@ -1232,15 +1258,26 @@
                     <p class="text-muted small mb-0">
                         <i class="bi bi-shield-check text-success me-1"></i> This broadcast will be logged to the official community activity audit log.
                     </p>
+
+                    <!-- Instant Acknowledgment / Loading Indicator -->
+                    <div class="alert alert-primary d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="background: #e0f2fe; color: #0369a1; border-radius: 12px;">
+                        <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div>
+                        <div class="small fw-semibold">
+                            <span>Broadcasting announcement to subscribed members...</span>
+                            <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait while the emails are sent.</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="modal-footer bg-light border-0 px-4 py-3">
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4" data-loading-text="Sending Broadcast..." style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
                         <i class="bi bi-send-fill me-1"></i> Send Announcement Email
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
         </div>
     </div>
     {% endif %}
@@ -2100,6 +2137,32 @@
         document.getElementById("btnCalToday")?.addEventListener("click", () => {
             currentCalDate = new Date();
             renderCalendarMonth();
+        });
+
+        // --- Instant Acknowledgment & Submit Button Loading Indicator ---
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function (e) {
+                if (form.checkValidity && !form.checkValidity()) {
+                    return; // Let browser HTML5 validation fire
+                }
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const loadingBanner = form.querySelector('.form-loading-state');
+
+                if (loadingBanner) {
+                    loadingBanner.classList.remove('d-none');
+                    loadingBanner.classList.add('d-flex');
+                }
+
+                if (submitBtn) {
+                    const loadingText = submitBtn.getAttribute('data-loading-text') || 'Saving...';
+                    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> ${loadingText}`;
+                    submitBtn.classList.add('disabled');
+                    submitBtn.style.pointerEvents = 'none';
+                    setTimeout(() => {
+                        submitBtn.disabled = true;
+                    }, 20);
+                }
+            });
         });
 
     });

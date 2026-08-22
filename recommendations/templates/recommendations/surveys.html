@@ -1027,11 +1027,20 @@
                         Survey questions and voting options will be published instantly for verified community members.
                     </div>
 
+                    <!-- Instant Acknowledgment / Loading Indicator -->
+                    <div class="alert alert-primary d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="background: #e0f2fe; color: #0369a1; border-radius: 12px;">
+                        <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div>
+                        <div class="small fw-semibold">
+                            <span>Publishing survey & syncing with Google Sheets...</span>
+                            <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait a moment while we set up voting options and notify members.</div>
+                        </div>
+                    </div>
+
                 </div>
                 <div class="modal-footer bg-light p-3">
                     <button type="button" class="btn btn-outline-secondary rounded-pill px-4"
                         data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary-action rounded-pill px-4 fw-semibold">
+                    <button type="submit" class="btn btn-primary-action rounded-pill px-4 fw-semibold" data-loading-text="Publishing Survey...">
                         <i class="bi bi-send-fill me-1"></i> Publish Survey
                     </button>
                 </div>
@@ -1148,6 +1157,32 @@
                     }
                 });
             }
+
+            // 4. Instant Acknowledgment & Submit Button Loading Indicator
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    if (form.checkValidity && !form.checkValidity()) {
+                        return; // Let HTML5 validation show errors
+                    }
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    const loadingBanner = form.querySelector('.form-loading-state');
+
+                    if (loadingBanner) {
+                        loadingBanner.classList.remove('d-none');
+                        loadingBanner.classList.add('d-flex');
+                    }
+
+                    if (submitBtn) {
+                        const loadingText = submitBtn.getAttribute('data-loading-text') || 'Saving...';
+                        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> ${loadingText}`;
+                        submitBtn.classList.add('disabled');
+                        submitBtn.style.pointerEvents = 'none';
+                        setTimeout(() => {
+                            submitBtn.disabled = true;
+                        }, 20);
+                    }
+                });
+            });
         });
     </script>
 </body>
