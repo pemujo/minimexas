@@ -229,40 +229,57 @@ def get_openmeteo_weather_forecast(location: str, datetime_str: str, force_refre
         return past_result
 
     try:
-        # Step 1: Geocoding via Nominatim with Open-Meteo fallback
-        lat, lon, display_name = None, None, loc_clean
-        nom_url = "https://nominatim.openstreetmap.org/search"
-        headers = {"User-Agent": "MiniMexitasApp/1.0 (info@minimexitas.org)"}
-        nom_resp = requests.get(
-            nom_url,
-            params={"q": loc_clean, "format": "json", "limit": 1},
-            headers=headers,
-            timeout=6
-        )
-        nom_data = nom_resp.json()
-        if nom_data and len(nom_data) > 0:
-            lat = float(nom_data[0]["lat"])
-            lon = float(nom_data[0]["lon"])
-            display_name = nom_data[0].get("display_name", loc_clean)
+        # Step 1: Geocoding via Nominatim with Open-Meteo fallback (cached for 30 days)
+        geo_cache_key = f"nominatim_geocode_{hashlib.md5(loc_clean.lower().encode('utf-8')).hexdigest()}"
+        cached_geo = cache.get(geo_cache_key)
+        if cached_geo and isinstance(cached_geo, dict):
+            lat = cached_geo.get("lat")
+            lon = cached_geo.get("lon")
+            display_name = cached_geo.get("display_name", loc_clean)
         else:
-            # Fallback geocoder: Open-Meteo Geocoding
-            om_geo_url = "https://geocoding-api.open-meteo.com/v1/search"
-            # Try full name or first part before comma
-            for q in [loc_clean, loc_clean.split(',')[0].strip()]:
-                if not q:
-                    continue
-                om_geo_resp = requests.get(
-                    om_geo_url,
-                    params={"name": q, "count": 1, "language": "en", "format": "json"},
-                    timeout=5
+            lat, lon, display_name = None, None, loc_clean
+            nom_url = "https://nominatim.openstreetmap.org/search"
+            headers = {"User-Agent": "MiniMexitasApp/1.0 (info@minimexitas.org)"}
+            try:
+                nom_resp = requests.get(
+                    nom_url,
+                    params={"q": loc_clean, "format": "json", "limit": 1},
+                    headers=headers,
+                    timeout=6
                 )
-                om_geo_data = om_geo_resp.json()
-                if om_geo_data.get("results"):
-                    first = om_geo_data["results"][0]
-                    lat = float(first["latitude"])
-                    lon = float(first["longitude"])
-                    display_name = f"{first.get('name', loc_clean)}, {first.get('admin1', '')}".strip(', ')
-                    break
+                nom_data = nom_resp.json()
+                if nom_data and len(nom_data) > 0:
+                    lat = float(nom_data[0]["lat"])
+                    lon = float(nom_data[0]["lon"])
+                    display_name = nom_data[0].get("display_name", loc_clean)
+            except Exception as e:
+                logger.debug(f"Nominatim geocoding failed for {loc_clean}: {e}")
+
+            if lat is None or lon is None:
+                # Fallback geocoder: Open-Meteo Geocoding
+                om_geo_url = "https://geocoding-api.open-meteo.com/v1/search"
+                # Try full name or first part before comma
+                for q in [loc_clean, loc_clean.split(',')[0].strip()]:
+                    if not q:
+                        continue
+                    try:
+                        om_geo_resp = requests.get(
+                            om_geo_url,
+                            params={"name": q, "count": 1, "language": "en", "format": "json"},
+                            timeout=5
+                        )
+                        om_geo_data = om_geo_resp.json()
+                        if om_geo_data.get("results"):
+                            first = om_geo_data["results"][0]
+                            lat = float(first["latitude"])
+                            lon = float(first["longitude"])
+                            display_name = f"{first.get('name', loc_clean)}, {first.get('admin1', '')}".strip(', ')
+                            break
+                    except Exception as e:
+                        logger.debug(f"Open-Meteo geocoding fallback failed for {q}: {e}")
+
+            if lat is not None and lon is not None:
+                cache.set(geo_cache_key, {"lat": lat, "lon": lon, "display_name": display_name}, 60 * 60 * 24 * 30)
 
         if lat is None or lon is None:
             return {

@@ -1,7 +1,7 @@
 import logging
 import urllib.parse
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.urls import reverse
 
 logger = logging.getLogger(__name__)
@@ -514,24 +514,33 @@ def get_subscribed_members() -> list:
     """
     from .models import MemberProfile, MembershipRequest
 
-    # Step 1: Ensure approved requests have a corresponding MemberProfile
+    # Step 1: Ensure approved requests have a corresponding MemberProfile (in 1 bulk check)
     try:
-        approved_requests = (
+        approved_requests = list(
             MembershipRequest.objects.filter(status='approved')
             .exclude(email__isnull=True)
             .exclude(email='')
         )
-        for req in approved_requests:
-            clean_email = req.email.strip().lower()
-            if clean_email and not MemberProfile.objects.filter(email__iexact=clean_email).exists():
-                MemberProfile.objects.create(
-                    email=clean_email,
-                    full_name=req.full_name or '',
-                    phone_number=req.phone_number or '',
-                    region=req.region or '',
-                    city=req.city or '',
-                    email_notifications=True
-                )
+        if approved_requests:
+            existing_emails = set(
+                em.strip().lower() for em in 
+                MemberProfile.objects.exclude(email='').values_list('email', flat=True)
+            )
+            to_create = []
+            for req in approved_requests:
+                clean_email = req.email.strip().lower()
+                if clean_email and clean_email not in existing_emails:
+                    to_create.append(MemberProfile(
+                        email=clean_email,
+                        full_name=req.full_name or '',
+                        phone_number=req.phone_number or '',
+                        region=req.region or '',
+                        city=req.city or '',
+                        email_notifications=True
+                    ))
+                    existing_emails.add(clean_email)
+            if to_create:
+                MemberProfile.objects.bulk_create(to_create, ignore_conflicts=True)
     except Exception as e:
         logger.warning(f"Error checking approved membership requests for notification recipients: {e}")
 
@@ -582,26 +591,34 @@ def send_event_broadcast_email(event_data: dict, broadcast_by_name: str = None, 
     subject = f"🎉 Nuevo Evento MiniMexitas: {event_title}"
 
     sent_count = 0
+    connection = None
+    try:
+        connection = get_connection()
+        connection.open()
+    except Exception as e:
+        logger.warning(f"Could not open persistent mail connection for event broadcast: {e}")
+        connection = None
 
-    for m in members:
-        member_email = m.get('email', '').strip().lower()
-        if not member_email or '@' not in member_email:
-            continue
-        member_name = m.get('full_name', '').strip() or "Miembro"
+    try:
+        for m in members:
+            member_email = m.get('email', '').strip().lower()
+            if not member_email or '@' not in member_email:
+                continue
+            member_name = m.get('full_name', '').strip() or "Miembro"
 
-        # Generate unique 1-click RSVP action links for this member
-        token_going = generate_event_rsvp_token(event_id, member_email, 'going')
-        token_maybe = generate_event_rsvp_token(event_id, member_email, 'maybe')
-        token_declined = generate_event_rsvp_token(event_id, member_email, 'declined')
+            # Generate unique 1-click RSVP action links for this member
+            token_going = generate_event_rsvp_token(event_id, member_email, 'going')
+            token_maybe = generate_event_rsvp_token(event_id, member_email, 'maybe')
+            token_declined = generate_event_rsvp_token(event_id, member_email, 'declined')
 
-        base_rsvp_endpoint = f"{base_url}/events/rsvp/" if base_url else "/events/rsvp/"
-        rsvp_url_going = f"{base_rsvp_endpoint}?token={token_going}"
-        rsvp_url_maybe = f"{base_rsvp_endpoint}?token={token_maybe}"
-        rsvp_url_declined = f"{base_rsvp_endpoint}?token={token_declined}"
-        portal_events_url = f"{base_url}/events/{event_id}/" if (base_url and event_id) else (f"{base_url}/events/" if base_url else "/events/")
-        portal_profile_url = f"{base_url}/profile/" if base_url else "/profile/"
+            base_rsvp_endpoint = f"{base_url}/events/rsvp/" if base_url else "/events/rsvp/"
+            rsvp_url_going = f"{base_rsvp_endpoint}?token={token_going}"
+            rsvp_url_maybe = f"{base_rsvp_endpoint}?token={token_maybe}"
+            rsvp_url_declined = f"{base_rsvp_endpoint}?token={token_declined}"
+            portal_events_url = f"{base_url}/events/{event_id}/" if (base_url and event_id) else (f"{base_url}/events/" if base_url else "/events/")
+            portal_profile_url = f"{base_url}/profile/" if base_url else "/profile/"
 
-        plain_text_content = f"""¡Hola {member_name}!
+            plain_text_content = f"""¡Hola {member_name}!
 
 Hay un nuevo evento programado para la comunidad de MiniMexitas en el Área de la Bahía:
 
@@ -638,7 +655,7 @@ Para configurar tus preferencias de notificaciones por correo:
 Equipo de MiniMexitas
 """
 
-        html_content = f"""<!DOCTYPE html>
+            html_content = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -752,18 +769,25 @@ Equipo de MiniMexitas
 </html>
 """
 
-        try:
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=plain_text_content,
-                from_email=from_email,
-                to=[member_email]
-            )
-            msg.attach_alternative(html_content, "text/html")
-            msg.send(fail_silently=False)
-            sent_count += 1
-        except Exception as e:
-            logger.warning(f"Failed to dispatch event broadcast email to {member_email}: {e}")
+            try:
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=plain_text_content,
+                    from_email=from_email,
+                    to=[member_email],
+                    connection=connection
+                )
+                msg.attach_alternative(html_content, "text/html")
+                msg.send(fail_silently=False)
+                sent_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to dispatch event broadcast email to {member_email}: {e}")
+    finally:
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
     logger.info(f"Event broadcast '{event_title}' sent to {sent_count}/{len(members)} members.")
     return sent_count
@@ -815,14 +839,22 @@ def send_survey_broadcast_email(survey_obj, broadcast_by_name: str = None, broad
     ]) if options else '<li style="font-size: 14px; color: #64748b;">Opciones disponibles en el portal</li>'
 
     sent_count = 0
+    connection = None
+    try:
+        connection = get_connection()
+        connection.open()
+    except Exception as e:
+        logger.warning(f"Could not open persistent mail connection for survey broadcast: {e}")
+        connection = None
 
-    for m in members:
-        member_email = m.get('email', '').strip().lower()
-        if not member_email or '@' not in member_email:
-            continue
-        member_name = m.get('full_name', '').strip() or "Miembro"
+    try:
+        for m in members:
+            member_email = m.get('email', '').strip().lower()
+            if not member_email or '@' not in member_email:
+                continue
+            member_name = m.get('full_name', '').strip() or "Miembro"
 
-        plain_text_content = f"""¡Hola {member_name}!
+            plain_text_content = f"""¡Hola {member_name}!
 
 Hay una nueva consulta comunitaria abierta en el portal de MiniMexitas:
 
@@ -851,7 +883,7 @@ Para configurar tus preferencias de notificaciones por correo:
 Equipo de MiniMexitas
 """
 
-        html_content = f"""<!DOCTYPE html>
+            html_content = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -914,18 +946,25 @@ Equipo de MiniMexitas
 </html>
 """
 
-        try:
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=plain_text_content,
-                from_email=from_email,
-                to=[member_email]
-            )
-            msg.attach_alternative(html_content, "text/html")
-            msg.send(fail_silently=False)
-            sent_count += 1
-        except Exception as e:
-            logger.warning(f"Failed to dispatch survey broadcast email to {member_email}: {e}")
+            try:
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=plain_text_content,
+                    from_email=from_email,
+                    to=[member_email],
+                    connection=connection
+                )
+                msg.attach_alternative(html_content, "text/html")
+                msg.send(fail_silently=False)
+                sent_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to dispatch survey broadcast email to {member_email}: {e}")
+    finally:
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
     logger.info(f"Survey broadcast '{survey_title}' sent to {sent_count}/{len(members)} members.")
     return sent_count

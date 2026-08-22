@@ -303,10 +303,13 @@ def _get_worksheet_case_insensitive(sh, target_name):
         pass
 
     target_clean = str(target_name).strip().lower().replace("_", "").replace(" ", "")
-    try:
-        worksheets = sh.worksheets()
-    except Exception:
-        return None
+    worksheets = getattr(sh, '_cached_worksheets', None)
+    if worksheets is None:
+        try:
+            worksheets = sh.worksheets()
+            setattr(sh, '_cached_worksheets', worksheets)
+        except Exception:
+            return None
 
     for ws in worksheets:
         title = getattr(ws, 'title', '')
