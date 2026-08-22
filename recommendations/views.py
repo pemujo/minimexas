@@ -484,11 +484,15 @@ import datetime
 def _get_enriched_events(member_email, force_refresh=False):
     all_events = fetch_community_events(force_refresh=force_refresh)
 
-    # Fetch all RSVPs and Broadcast records from database
+    # Fetch all RSVPs and Broadcast records from database in optimized queries
     all_rsvps = list(CommunityEventRSVP.objects.all())
     broadcast_map = {b.event_id: b for b in CommunityEventBroadcast.objects.all()}
-    total_members_count = MemberProfile.objects.exclude(email='').count()
-    subscribed_members_count = MemberProfile.objects.exclude(email='').filter(email_notifications=True).count()
+    member_stats = MemberProfile.objects.exclude(email='').aggregate(
+        total=Count('id'),
+        subscribed=Count('id', filter=Q(email_notifications=True))
+    )
+    total_members_count = member_stats.get('total') or 0
+    subscribed_members_count = member_stats.get('subscribed') or 0
 
     # Organize RSVPs by event_id
     rsvps_by_event = {}
@@ -1478,9 +1482,14 @@ def join_request_view(request):
 def organizer_dashboard_view(request):
     profiles = MemberProfile.objects.all().order_by('-updated_at')
     
-    total_members = profiles.count()
-    total_with_region = profiles.exclude(region='').count()
-    total_with_phone = profiles.exclude(phone_number='').count()
+    stats = profiles.aggregate(
+        total=Count('id'),
+        with_region=Count('id', filter=~Q(region='')),
+        with_phone=Count('id', filter=~Q(phone_number=''))
+    )
+    total_members = stats.get('total') or 0
+    total_with_region = stats.get('with_region') or 0
+    total_with_phone = stats.get('with_phone') or 0
 
     # Pending & reviewed membership requests
     pending_requests_qs = MembershipRequest.objects.filter(status=MembershipRequest.STATUS_PENDING).order_by('-created_at')
@@ -1844,17 +1853,22 @@ def organizer_sync_sheets_view(request):
 
 
 def _build_survey_dict(s, user_email):
-    total_votes = s.total_votes
-    unique_voters = s.unique_voters_count
-    user_option_ids = s.user_voted_option_ids(user_email)
+    # Use prefetched votes from memory to avoid N+1 database queries
+    all_survey_votes = list(s.votes.all())
+    total_votes = len(all_survey_votes)
+    unique_voters = len(set(v.voter_email.strip().lower() for v in all_survey_votes if v.voter_email))
+
+    clean_user_email = user_email.strip().lower() if user_email else ''
+    user_option_ids = set(v.option_id for v in all_survey_votes if v.voter_email and v.voter_email.strip().lower() == clean_user_email)
     has_voted = len(user_option_ids) > 0
 
     options_data = []
     for opt in s.options.all():
-        opt_votes = opt.vote_count
+        opt_votes_list = list(opt.votes.all())
+        opt_votes = len(opt_votes_list)
         pct = round((opt_votes / total_votes * 100), 1) if total_votes > 0 else 0
         is_selected = opt.id in user_option_ids
-        voters = opt.voter_names
+        voters = [v.voter_name for v in opt_votes_list if v.voter_name]
 
         options_data.append({
             'id': opt.id,
