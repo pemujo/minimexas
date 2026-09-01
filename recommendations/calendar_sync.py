@@ -117,6 +117,10 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
                 category = "Family & Outdoors"
             elif any(k in summary.lower() for k in ["taco", "dinner", "food", "brunch", "drinks"]):
                 category = "Culinary & Social"
+            elif any(k in summary.lower() for k in ["mami", "mamis", "mama", "mamas", "madre", "madres"]):
+                category = "Salidas solo mamis"
+            elif any(k in summary.lower() for k in ["papi", "papis", "papa", "papas", "padre", "padres"]):
+                category = "Salidas solo papis"
 
             # Check if event has ended
             is_past = False

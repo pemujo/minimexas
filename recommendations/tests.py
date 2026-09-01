@@ -5,6 +5,7 @@ from django.test import TestCase, Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.core import mail
 from django.core.cache import cache
+from django.utils import timezone
 
 from recommendations.models import (
     MemberProfile, 
@@ -803,6 +804,34 @@ class MemberProfileViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Please provide your full name.")
 
+    def test_profile_post_duplicate_phone_rejected(self):
+        # Create another profile with an existing phone
+        MemberProfile.objects.create(
+            email="other_member@minimexitas.local",
+            full_name="Other Member",
+            phone_number="+1 415 555 8888",
+            region="san_francisco"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_name'] = 'Maria Gonzalez'
+        session['member_email'] = 'testuser@minimexitas.local'
+        session.save()
+
+        # Try to change current user's phone to other member's phone in different format
+        post_data = {
+            'full_name': 'Maria Gonzalez',
+            'phone_number': '(415) 555-8888',
+            'region': 'south_bay',
+        }
+        response = self.client.post(reverse('profile'), post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already registered to another member in the community directory")
+
+        self.profile.refresh_from_db()
+        self.assertNotEqual(self.profile.phone_number, '(415) 555-8888')
+
     @patch('recommendations.views.sync_profile_to_google_sheet')
     def test_profile_email_notifications_toggle_off_and_on(self, mock_sync):
         mock_sync.return_value = True
@@ -1223,6 +1252,77 @@ class MembershipRequestWorkflowTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "has already been submitted and is currently awaiting organizer review")
 
+    def test_join_request_post_duplicate_phone_in_directory(self):
+        # Existing member in directory has +1 415 555 1234
+        MemberProfile.objects.create(
+            email="existing.member@gmail.com",
+            full_name="Existing Member",
+            phone_number="+1 (415) 555-1234",
+            region="san_francisco"
+        )
+
+        # New user tries to sign up with DIFFERENT email but SAME phone in standard format
+        post_data = {
+            'full_name': 'New Applicant',
+            'email': 'new.applicant@gmail.com',
+            'phone_number': '415-555-1234',
+            'region': 'san_francisco',
+            'referral_source': 'Friend referral',
+        }
+
+        response = self.client.post(reverse('join_request'), post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "is already registered in the member directory with another account")
+        self.assertFalse(MembershipRequest.objects.filter(email='new.applicant@gmail.com').exists())
+
+    def test_join_request_post_duplicate_mexican_phone_in_directory(self):
+        # Existing member in directory has Mexican number
+        MemberProfile.objects.create(
+            email="monterrey.member@gmail.com",
+            full_name="Monterrey Member",
+            phone_number="+52 81 1234 5678",
+            region="south_bay"
+        )
+
+        # New user tries to sign up with DIFFERENT email but SAME Mexican phone with mobile 1 prefix
+        post_data = {
+            'full_name': 'Second Applicant',
+            'email': 'second.applicant@gmail.com',
+            'phone_number': '+52 1 81 1234 5678',
+            'region': 'south_bay',
+            'referral_source': 'WhatsApp group',
+        }
+
+        response = self.client.post(reverse('join_request'), post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "is already registered in the member directory with another account")
+        self.assertFalse(MembershipRequest.objects.filter(email='second.applicant@gmail.com').exists())
+
+    def test_join_request_post_duplicate_phone_in_pending_requests(self):
+        # Pending request with phone already exists
+        MembershipRequest.objects.create(
+            full_name="First Applicant",
+            email="first.applicant@gmail.com",
+            phone_number="+1 650 555 7777",
+            region="peninsula",
+            referral_source="Colleague",
+            status=MembershipRequest.STATUS_PENDING
+        )
+
+        # Second person with different email but same phone tries to submit
+        post_data = {
+            'full_name': 'Second Applicant',
+            'email': 'different.email@gmail.com',
+            'phone_number': '(650) 555-7777',
+            'region': 'peninsula',
+            'referral_source': 'Colleague',
+        }
+
+        response = self.client.post(reverse('join_request'), post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "has already been submitted and is currently awaiting organizer review")
+        self.assertEqual(MembershipRequest.objects.count(), 1)
+
     def test_google_login_callback_shows_pending_notice_when_request_exists(self):
         MembershipRequest.objects.create(
             full_name="Awaiting Applicant",
@@ -1438,6 +1538,35 @@ class MembershipRequestWorkflowTestCase(TestCase):
         response = self.client.post(reverse('organizer_direct_add_member'), post_data)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(MemberProfile.objects.filter(email='incomplete@gmail.com').exists())
+
+    def test_organizer_direct_add_duplicate_phone_rejected(self):
+        MemberProfile.objects.create(
+            email="existing_organizer_member@gmail.com",
+            full_name="Existing Member",
+            phone_number="+1 415 555 4321",
+            region="peninsula"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_name'] = 'Admin Organizer'
+        session['member_email'] = 'admin@minimexitas.local'
+        session.save()
+
+        # Try to direct-add someone with a duplicate phone in a different format
+        post_data = {
+            'full_name': 'Duplicate Phone Member',
+            'email': 'duplicate.phone@gmail.com',
+            'phone_number': '(415) 555-4321',
+            'region': 'peninsula',
+            'role': 'Member'
+        }
+
+        response = self.client.post(reverse('organizer_direct_add_member'), post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('error=duplicate_phone', response.url)
+        self.assertFalse(MemberProfile.objects.filter(email='duplicate.phone@gmail.com').exists())
 
     def test_non_admin_cannot_approve_reject_or_direct_add(self):
         req = MembershipRequest.objects.create(
@@ -2959,6 +3088,66 @@ class CommunityEventDualSourceTestCase(TestCase):
         self.assertEqual(audit.target_name, "Event: Dia de Muertos Community Altar")
         self.assertEqual(audit.actor_email, "elena.organizer@minimexitas.org")
 
+    @patch('recommendations.views.sync_community_event_to_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_create_event_salidas_solo_mamis(self, mock_sheet_audit, mock_sheet_event):
+        mock_sheet_audit.return_value = True
+        mock_sheet_event.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session['member_name'] = "Elena Gomez"
+        session.save()
+
+        response = self.client.post(reverse('event_create'), {
+            'title': 'Cena y Cócteles - Solo Mamis',
+            'category': 'Salidas solo mamis',
+            'start_date': '2026-11-15',
+            'start_time': '19:00',
+            'end_date': '2026-11-15',
+            'end_time': '22:00',
+            'location': 'Loló, San Francisco',
+            'location_url': 'https://maps.google.com/?q=Lolo+SF',
+            'description': 'Noche de plática y cócteles solo para mamás de la comunidad.',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        event = CommunityEvent.objects.get(title="Cena y Cócteles - Solo Mamis")
+        self.assertEqual(event.category, "Salidas solo mamis")
+        self.assertEqual(event.location, "Loló, San Francisco")
+
+    @patch('recommendations.views.sync_community_event_to_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_create_event_salidas_solo_papis(self, mock_sheet_audit, mock_sheet_event):
+        mock_sheet_audit.return_value = True
+        mock_sheet_event.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session['member_name'] = "Elena Gomez"
+        session.save()
+
+        response = self.client.post(reverse('event_create'), {
+            'title': 'Pártido y Cervezas - Solo Papis',
+            'category': 'Salidas solo papis',
+            'start_date': '2026-11-20',
+            'start_time': '18:00',
+            'end_date': '2026-11-20',
+            'end_time': '21:00',
+            'location': 'Kezar Pub, San Francisco',
+            'location_url': 'https://maps.google.com/?q=Kezar+Pub+SF',
+            'description': 'Reunión informal para ver el partido de fútbol solo para papás.',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        event = CommunityEvent.objects.get(title="Pártido y Cervezas - Solo Papis")
+        self.assertEqual(event.category, "Salidas solo papis")
+        self.assertEqual(event.location, "Kezar Pub, San Francisco")
+
     @patch('recommendations.views.send_event_broadcast_email')
     @patch('recommendations.views.sync_community_event_to_google_sheet')
     @patch('recommendations.views.sync_audit_log_to_google_sheet')
@@ -3082,6 +3271,39 @@ class CommunityEventDualSourceTestCase(TestCase):
         self.assertIsNotNone(audit)
         self.assertEqual(audit.target_name, "Event: Updated Fiesta de Primavera")
         self.assertEqual(audit.actor_email, "elena.organizer@minimexitas.org")
+
+    @patch('recommendations.views.sync_community_event_to_google_sheet')
+    @patch('recommendations.views.sync_audit_log_to_google_sheet')
+    def test_organizer_edit_event_category_to_mamis(self, mock_sheet_audit, mock_sheet_event):
+        mock_sheet_audit.return_value = True
+        mock_sheet_event.return_value = True
+
+        event = CommunityEvent.objects.create(
+            title="Reunión Especial",
+            category="Community Gathering",
+            start_datetime=datetime.datetime(2026, 9, 20, 15, 0, tzinfo=datetime.timezone.utc),
+            location="Dolores Park",
+            description="Reunión general"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['is_admin'] = True
+        session['member_email'] = "elena.organizer@minimexitas.org"
+        session.save()
+
+        response = self.client.post(reverse('event_edit', kwargs={'event_id': event.id}), {
+            'title': 'Salida Brunch Mamis',
+            'category': 'Salidas solo mamis',
+            'start_date': '2026-09-20',
+            'start_time': '11:00',
+            'location': 'Zazie, SF',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        event.refresh_from_db()
+        self.assertEqual(event.category, "Salidas solo mamis")
+        self.assertEqual(event.title, "Salida Brunch Mamis")
 
     def test_organizer_edit_event_view_forbidden_for_non_admin(self):
         event = CommunityEvent.objects.create(
@@ -4011,12 +4233,15 @@ class GeminiWeatherTestCase(TestCase):
         self._login()
         from recommendations.weather import get_event_weather_forecast
 
+        future_date = (timezone.now() + timezone.timedelta(days=30)).date()
+        future_dt_str = f"{future_date.isoformat()} 14:00"
+
         # Mock Gemini SDK client response
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
 
         mock_candidate = MagicMock()
-        mock_candidate.grounding_metadata.web_search_queries = ['weather Mission Dolores SF 2026-08-22']
+        mock_candidate.grounding_metadata.web_search_queries = [f'weather Mission Dolores SF {future_date.isoformat()}']
         
         mock_chunk = MagicMock()
         mock_chunk.web.title = 'National Weather Service'
@@ -4037,7 +4262,7 @@ class GeminiWeatherTestCase(TestCase):
         # 1. First Call: Cache miss -> calls Gemini API
         res1 = get_event_weather_forecast(
             location='Mission Dolores Park, SF',
-            datetime_str='2026-08-22 14:00',
+            datetime_str=future_dt_str,
             force_refresh=False,
             provider='gemini'
         )
@@ -4058,7 +4283,7 @@ class GeminiWeatherTestCase(TestCase):
         mock_client.models.generate_content.reset_mock()
         res2 = get_event_weather_forecast(
             location='Mission Dolores Park, SF',
-            datetime_str='2026-08-22 14:00',
+            datetime_str=future_dt_str,
             force_refresh=False,
             provider='gemini'
         )
@@ -4069,7 +4294,7 @@ class GeminiWeatherTestCase(TestCase):
         # 3. Third Call with force_refresh=True -> bypasses cache and calls Gemini again
         res3 = get_event_weather_forecast(
             location='Mission Dolores Park, SF',
-            datetime_str='2026-08-22 14:00',
+            datetime_str=future_dt_str,
             force_refresh=True,
             provider='gemini'
         )
@@ -4081,6 +4306,10 @@ class GeminiWeatherTestCase(TestCase):
     def test_standard_openmeteo_weather(self, mock_requests_get):
         self._login()
         from recommendations.weather import get_openmeteo_weather_forecast
+
+        future_date = (timezone.now() + timezone.timedelta(days=30)).date()
+        future_date_iso = future_date.isoformat()
+        future_dt_str = f"{future_date_iso} 10:00"
 
         # Mock Nominatim geocoding & Open-Meteo forecast responses
         def side_effect(url, **kwargs):
@@ -4099,7 +4328,7 @@ class GeminiWeatherTestCase(TestCase):
                         'windspeed': 10.5,
                     },
                     'daily': {
-                        'time': ['2026-08-22'],
+                        'time': [future_date_iso],
                         'temperature_2m_max': [68.0],
                         'temperature_2m_min': [54.0],
                         'weathercode': [2],
@@ -4112,7 +4341,7 @@ class GeminiWeatherTestCase(TestCase):
         mock_requests_get.side_effect = side_effect
 
         # 1. Fetch Open-Meteo forecast
-        res = get_openmeteo_weather_forecast('Mission Dolores Park, SF', '2026-08-22 10:00', force_refresh=True)
+        res = get_openmeteo_weather_forecast('Mission Dolores Park, SF', future_dt_str, force_refresh=True)
         self.assertTrue(res['available'])
         self.assertEqual(res['provider'], 'standard')
         self.assertEqual(res['temp_current'], 65.2)

@@ -1191,6 +1191,8 @@ def profile_view(request):
             error_message = "Please provide your full name."
         elif not phone_number or len(phone_digits) < 10:
             error_message = "A valid WhatsApp phone number (minimum 10 digits, e.g., +52 55 1234 5678 or +1 415 555 1234) is required."
+        elif is_phone_registered_in_directory(phone_number, exclude_email=profile.email):
+            error_message = f"The phone number ({phone_number}) is already registered to another member in the community directory. Each member must have a unique phone number."
         else:
             # Handle selected interests checkboxes
             selected_interests = request.POST.getlist('interests')
@@ -1335,6 +1337,66 @@ def get_whatsapp_url(phone):
     return f"https://wa.me/{digits}"
 
 
+def is_phone_registered_in_directory(phone_number: str, exclude_email: str = None) -> bool:
+    """
+    Checks whether a phone number is already registered to a MemberProfile in the directory.
+    Matches exact digits or 10-digit national number suffixes (covering +1, +52, +52 1 prefixes).
+    Optionally excludes a profile by email (useful when updating an existing profile).
+    """
+    if not phone_number:
+        return False
+    target_digits = "".join(ch for ch in str(phone_number) if ch.isdigit())
+    if len(target_digits) < 10:
+        return False
+    target_last10 = target_digits[-10:]
+
+    qs = MemberProfile.objects.exclude(phone_number='')
+    if exclude_email:
+        qs = qs.exclude(email__iexact=exclude_email.strip().lower())
+
+    for existing_phone in qs.values_list('phone_number', flat=True):
+        if not existing_phone:
+            continue
+        ex_digits = "".join(ch for ch in str(existing_phone) if ch.isdigit())
+        if len(ex_digits) >= 10:
+            if ex_digits[-10:] == target_last10:
+                return True
+        elif ex_digits and ex_digits == target_digits:
+            return True
+
+    return False
+
+
+def is_phone_in_pending_requests(phone_number: str, exclude_email: str = None) -> bool:
+    """
+    Checks whether a phone number is already part of an active pending MembershipRequest.
+    """
+    if not phone_number:
+        return False
+    target_digits = "".join(ch for ch in str(phone_number) if ch.isdigit())
+    if len(target_digits) < 10:
+        return False
+    target_last10 = target_digits[-10:]
+
+    qs = MembershipRequest.objects.filter(
+        status=MembershipRequest.STATUS_PENDING
+    ).exclude(phone_number='')
+    if exclude_email:
+        qs = qs.exclude(email__iexact=exclude_email.strip().lower())
+
+    for pending_phone in qs.values_list('phone_number', flat=True):
+        if not pending_phone:
+            continue
+        p_digits = "".join(ch for ch in str(pending_phone) if ch.isdigit())
+        if len(p_digits) >= 10:
+            if p_digits[-10:] == target_last10:
+                return True
+        elif p_digits and p_digits == target_digits:
+            return True
+
+    return False
+
+
 @member_required
 def member_directory_view(request):
     """
@@ -1421,54 +1483,58 @@ def join_request_view(request):
             error_message = "Please select your primary Bay Area region."
         elif not referral_source:
             error_message = "Please let us know how you heard about MiniMexitas or who referred you."
+        elif MemberProfile.objects.filter(email__iexact=email).exists():
+            # Check if user email is already an approved member in the directory
+            error_message = f"An account for ({email}) is already registered! You can sign in directly using your Google account."
+        elif is_phone_registered_in_directory(phone_number):
+            # Check if phone number is already registered in the directory
+            error_message = f"The phone number ({phone_number}) is already registered in the member directory with another account. Each member must have a unique phone number."
         else:
-            # Check if user is already an approved member
-            if MemberProfile.objects.filter(email=email).exists():
-                error_message = f"An account for ({email}) is already registered! You can sign in directly using your Google account."
+            # Check if there is already a pending request for this email
+            existing_req = MembershipRequest.objects.filter(email__iexact=email).order_by('-created_at').first()
+            if existing_req and existing_req.status == MembershipRequest.STATUS_PENDING:
+                error_message = f"A membership request for ({email}) has already been submitted and is currently awaiting organizer review. We will contact you soon!"
+            elif is_phone_in_pending_requests(phone_number):
+                error_message = f"A membership request with the phone number ({phone_number}) has already been submitted and is currently awaiting organizer review. We will contact you soon!"
             else:
-                # Check if there is already a pending request
-                existing_req = MembershipRequest.objects.filter(email=email).order_by('-created_at').first()
-                if existing_req and existing_req.status == MembershipRequest.STATUS_PENDING:
-                    error_message = f"A membership request for ({email}) has already been submitted and is currently awaiting organizer review. We will contact you soon!"
-                else:
-                    req_obj = MembershipRequest.objects.create(
-                        full_name=full_name,
-                        email=email,
-                        phone_number=phone_number,
-                        region=region,
-                        city=city,
-                        referral_source=referral_source,
-                        status=MembershipRequest.STATUS_PENDING
-                    )
+                req_obj = MembershipRequest.objects.create(
+                    full_name=full_name,
+                    email=email,
+                    phone_number=phone_number,
+                    region=region,
+                    city=city,
+                    referral_source=referral_source,
+                    status=MembershipRequest.STATUS_PENDING
+                )
 
-                    # Log to MembershipAuditLog
-                    audit_entry = MembershipAuditLog.objects.create(
-                        action=MembershipAuditLog.ACTION_SUBMITTED,
-                        target_email=email,
-                        target_name=full_name,
-                        actor_name=full_name,
-                        actor_email=email,
-                        notes=f"Referral: {referral_source} | Phone: {phone_number} | Region: {region} {f'({city})' if city else ''}".strip()
-                    )
-                    try:
-                        sync_audit_log_to_google_sheet(audit_entry)
-                    except Exception as e:
-                        logger.warning(f"Failed to sync submission audit log for {email} to Google Sheet: {e}")
+                # Log to MembershipAuditLog
+                audit_entry = MembershipAuditLog.objects.create(
+                    action=MembershipAuditLog.ACTION_SUBMITTED,
+                    target_email=email,
+                    target_name=full_name,
+                    actor_name=full_name,
+                    actor_email=email,
+                    notes=f"Referral: {referral_source} | Phone: {phone_number} | Region: {region} {f'({city})' if city else ''}".strip()
+                )
+                try:
+                    sync_audit_log_to_google_sheet(audit_entry)
+                except Exception as e:
+                    logger.warning(f"Failed to sync submission audit log for {email} to Google Sheet: {e}")
 
-                    # Send notification email to all admins
-                    try:
-                        send_admin_new_request_notification(req_obj, request=request)
-                    except Exception as e:
-                        logger.warning(f"Failed to dispatch admin notification email for new request ({email}): {e}")
+                # Send notification email to all admins
+                try:
+                    send_admin_new_request_notification(req_obj, request=request)
+                except Exception as e:
+                    logger.warning(f"Failed to dispatch admin notification email for new request ({email}): {e}")
 
-                    # Dual-sync pending request to Google Sheets for zero-data-loss protection
-                    try:
-                        sync_pending_request_to_google_sheet(req_obj)
-                    except Exception as e:
-                        logger.warning(f"Failed to dual-sync pending request for {email} to Google Sheet: {e}")
+                # Dual-sync pending request to Google Sheets for zero-data-loss protection
+                try:
+                    sync_pending_request_to_google_sheet(req_obj)
+                except Exception as e:
+                    logger.warning(f"Failed to dual-sync pending request for {email} to Google Sheet: {e}")
 
-                    success_submitted = True
-                    submitted_email = email
+                success_submitted = True
+                submitted_email = email
 
     return render(request, 'recommendations/join.html', {
         'region_choices': MemberProfile.REGION_CHOICES,
@@ -1575,6 +1641,8 @@ def organizer_dashboard_view(request):
             action_message = "Member directory reconciliation sync completed successfully."
     elif request.GET.get('sync_error'):
         action_error = request.session.pop('sync_flash_error', "Failed to synchronize member directory.")
+    elif request.GET.get('error') == 'duplicate_phone':
+        action_error = request.session.pop('dashboard_flash_error', "The phone number is already registered to another member in the directory.")
     elif request.GET.get('error') == 'self_delete_forbidden':
         action_error = "For safety, organizers cannot delete themselves from the organizer dashboard. Use your Profile page if you wish to leave the community."
 
@@ -1737,6 +1805,10 @@ def organizer_direct_add_member_view(request):
 
     if not email or '@' not in email or not full_name or len(phone_digits) < 10:
         return redirect('organizer_dashboard')
+
+    if is_phone_registered_in_directory(phone_number, exclude_email=email):
+        request.session['dashboard_flash_error'] = f"The phone number ({phone_number}) is already registered to another member in the directory."
+        return redirect(reverse('organizer_dashboard') + '?error=duplicate_phone')
 
     profile, _ = MemberProfile.objects.get_or_create(
         email=email,
