@@ -316,6 +316,8 @@ class CommunityEvent(models.Model):
     CATEGORY_FAMILY = 'Family & Outdoors'
     CATEGORY_CULINARY = 'Culinary & Social'
     CATEGORY_COMMUNITY = 'Community Gathering'
+    CATEGORY_MAMIS = 'Salidas solo mamis'
+    CATEGORY_PAPIS = 'Salidas solo papis'
 
     CATEGORY_CHOICES = [
         (CATEGORY_CULTURAL, 'Cultural & Heritage'),
@@ -323,6 +325,8 @@ class CommunityEvent(models.Model):
         (CATEGORY_FAMILY, 'Family & Outdoors'),
         (CATEGORY_CULINARY, 'Culinary & Social'),
         (CATEGORY_COMMUNITY, 'Community Gathering'),
+        (CATEGORY_MAMIS, 'Salidas solo mamis'),
+        (CATEGORY_PAPIS, 'Salidas solo papis'),
     ]
 
     title = models.CharField(max_length=255, verbose_name="Event Title")

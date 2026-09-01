@@ -350,7 +350,7 @@
                             </div>
                             <div>
                                 <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
-                                    <span class="badge {% if 'Cultural' in target_event.category %}category-tag cultural{% elif 'Tech' in target_event.category or 'Network' in target_event.category %}category-tag tech{% elif 'Family' in target_event.category or 'Outdoor' in target_event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                    <span class="badge {% if 'Cultural' in target_event.category %}category-tag cultural{% elif 'Tech' in target_event.category or 'Network' in target_event.category %}category-tag tech{% elif 'Family' in target_event.category or 'Outdoor' in target_event.category %}category-tag family{% elif 'mamis' in target_event.category|lower %}category-tag mamis{% elif 'papis' in target_event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                         {{ target_event.category }}
                                     </span>
                                     {% if target_event.is_portal_event %}
@@ -559,6 +559,8 @@
                         <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Networking & Tech">Networking</button>
                         <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Family & Outdoors">Outdoors</button>
                         <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Culinary & Social">Culinary</button>
+                        <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Salidas solo mamis">Solo Mamis</button>
+                        <button type="button" class="btn btn-sm btn-outline-pill filter-cat-btn" data-category="Salidas solo papis">Solo Papis</button>
                     </div>
                 </div>
 
@@ -609,7 +611,7 @@
                                         </div>
                                         <div>
                                             <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
-                                                <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                                <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% elif 'mamis' in event.category|lower %}category-tag mamis{% elif 'papis' in event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                                     {{ event.category }}
                                                 </span>
                                                 {% if event.is_portal_event %}
@@ -842,7 +844,7 @@
                                         </div>
                                         <div>
                                             <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
-                                                <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% else %}category-tag culinary{% endif %}">
+                                                <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% elif 'mamis' in event.category|lower %}category-tag mamis{% elif 'papis' in event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                                     {{ event.category }}
                                                 </span>
                                                 {% if event.is_portal_event %}
@@ -1034,6 +1036,8 @@
                                 <option value="Networking & Tech">Networking & Tech</option>
                                 <option value="Family & Outdoors">Family & Outdoors</option>
                                 <option value="Culinary & Social">Culinary & Social</option>
+                                <option value="Salidas solo mamis">Salidas solo mamis</option>
+                                <option value="Salidas solo papis">Salidas solo papis</option>
                                 <option value="Community Gathering" selected>Community Gathering</option>
                             </select>
                         </div>
@@ -1123,6 +1127,8 @@
                                 <option value="Networking & Tech">Networking & Tech</option>
                                 <option value="Family & Outdoors">Family & Outdoors</option>
                                 <option value="Culinary & Social">Culinary & Social</option>
+                                <option value="Salidas solo mamis">Salidas solo mamis</option>
+                                <option value="Salidas solo papis">Salidas solo papis</option>
                                 <option value="Community Gathering">Community Gathering</option>
                             </select>
                         </div>
@@ -1952,7 +1958,18 @@
             const myRsvp = evt.my_rsvp || evt.myRsvp || evt.dataset?.myRsvp || "";
 
             document.getElementById("modalEventHeading").textContent = eventTitle;
-            document.getElementById("modalEventCategory").textContent = evt.category || "";
+            const catBadge = document.getElementById("modalEventCategory");
+            if (catBadge) {
+                catBadge.textContent = evt.category || "";
+                catBadge.className = "badge category-tag mb-2";
+                const catLower = (evt.category || "").toLowerCase();
+                if (catLower.includes("cultural")) catBadge.classList.add("cultural");
+                else if (catLower.includes("family") || catLower.includes("outdoor")) catBadge.classList.add("family");
+                else if (catLower.includes("culinary")) catBadge.classList.add("culinary");
+                else if (catLower.includes("mamis")) catBadge.classList.add("mamis");
+                else if (catLower.includes("papis")) catBadge.classList.add("papis");
+                else catBadge.classList.add("tech");
+            }
             document.getElementById("modalEventDate").textContent = evt.date_formatted || evt.date || "";
             document.getElementById("modalEventTime").textContent = evt.time_formatted || evt.time || "";
             document.getElementById("modalEventLocation").textContent = evt.location || "";
@@ -2092,9 +2109,12 @@
                 
                 dayEvents.forEach(e => {
                     let catClass = "tech";
-                    if (e.category.includes("Cultural")) catClass = "cultural";
-                    else if (e.category.includes("Family") || e.category.includes("Outdoor")) catClass = "family";
-                    else if (e.category.includes("Culinary")) catClass = "culinary";
+                    const catLower = (e.category || "").toLowerCase();
+                    if (catLower.includes("cultural")) catClass = "cultural";
+                    else if (catLower.includes("family") || catLower.includes("outdoor")) catClass = "family";
+                    else if (catLower.includes("culinary")) catClass = "culinary";
+                    else if (catLower.includes("mamis")) catClass = "mamis";
+                    else if (catLower.includes("papis")) catClass = "papis";
 
                     html += `<a href="javascript:void(0)" class="calendar-event-chip ${catClass}" title="${e.title} (${e.time_formatted})">${e.title}</a>`;
                 });
