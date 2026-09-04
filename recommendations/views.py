@@ -14,6 +14,7 @@ from .sheets import (
     fetch_recommendations,
     sync_recommendation_to_google_sheet,
     update_recommendation_in_google_sheet,
+    delete_recommendation_from_google_sheet,
     sync_profile_to_google_sheet,
     sync_pending_request_to_google_sheet,
     update_pending_request_status_in_google_sheet,
@@ -292,8 +293,32 @@ def home_view(request):
     })
 
 
+def _can_member_manage_recommendation(is_admin, member_email, member_name, row_email, row_author):
+    """
+    Checks if a user is authorized to edit or delete a recommendation.
+    Administrators can manage all recommendations.
+    Regular members can only manage their own recommendations (matching email, or author name fallback).
+    """
+    if is_admin:
+        return True
+    m_email = str(member_email or '').strip().lower()
+    m_name = str(member_name or '').strip().lower()
+    r_email = str(row_email or '').strip().lower()
+    r_author = str(row_author or '').strip().lower()
+
+    if r_email and m_email:
+        return r_email == m_email
+    if r_author and m_name:
+        return r_author == m_name
+    return False
+
+
 @member_required
-def notes_list_view(request):
+def notes_list_view(request, rec_id=None):
+    """
+    Renders the recommendation hub with interactive Leaflet map, category filters,
+    and individual direct share link support (/recommendations/<int:rec_id>/).
+    """
     force_refresh = request.GET.get('refresh') == '1'
     if force_refresh:
         cache.delete('whatsapp_recommendations_cache')
@@ -315,7 +340,29 @@ def notes_list_view(request):
     if error_message:
         error = error_message
 
-    is_admin = request.session.get('is_admin', False)
+    is_admin = bool(request.session.get('is_admin', False))
+    member_email = request.session.get('member_email', '').strip().lower()
+    member_name = request.session.get('member_name', '').strip()
+    if not member_name and member_email:
+        from recommendations.models import MemberProfile
+        prof = MemberProfile.objects.filter(email__iexact=member_email).first()
+        if prof and prof.full_name:
+            member_name = prof.full_name
+            request.session['member_name'] = member_name
+    if not member_name:
+        member_name = 'Member'
+
+    # Direct URL target recommendation resolution
+    target_rec_param = rec_id or request.GET.get('rec') or request.GET.get('id')
+    target_num = None
+    if target_rec_param is not None:
+        try:
+            target_num = int(target_rec_param)
+        except (ValueError, TypeError):
+            target_num = None
+
+    target_rec = None
+    target_rec_index = None
 
     enriched_notes = []
     mapped_count = 0
@@ -325,6 +372,23 @@ def notes_list_view(request):
         item['row_num'] = idx + 2
         if item.get('has_location'):
             mapped_count += 1
+
+        can_manage = _can_member_manage_recommendation(
+            is_admin=is_admin,
+            member_email=member_email,
+            member_name=member_name,
+            row_email=item.get('Created_By_Email'),
+            row_author=item.get('Shared_By')
+        )
+        item['can_edit'] = can_manage
+        item['can_delete'] = can_manage
+
+        # Direct link match: match by row_num (Google sheet row, e.g. 2, 3), 0-based index, or 1-based index
+        if target_num is not None and target_rec is None:
+            if item['row_num'] == target_num or item['index'] == target_num or (idx + 1) == target_num:
+                target_rec = item
+                target_rec_index = idx
+
         enriched_notes.append(item)
 
     notes_json = json.dumps(enriched_notes, default=str)
@@ -336,15 +400,24 @@ def notes_list_view(request):
         'error': error,
         'success_message': success_message,
         'is_admin': is_admin,
-        'member_name': request.session.get('member_name', 'Member'),
-        'member_email': request.session.get('member_email', ''),
+        'member_name': member_name,
+        'member_email': member_email,
+        'target_rec': target_rec,
+        'target_rec_id': target_num,
+        'target_rec_index': target_rec_index,
+        'is_direct_detail': target_rec is not None,
+        'active_page': 'recommendations',
     })
 
 
-@admin_required
-def organizer_create_recommendation_view(request):
+# Alias for direct recommendation detail routing
+recommendation_detail_view = notes_list_view
+
+
+@member_required
+def create_recommendation_view(request):
     """
-    Allows organizers/admins to create and publish a new community recommendation.
+    Allows all verified members (and organizers) to create and publish a new community recommendation.
     Synchronizes the new recommendation directly into Google Sheets,
     invalidates the cache, and records an entry in the MembershipAuditLog.
     """
@@ -355,7 +428,19 @@ def organizer_create_recommendation_view(request):
     custom_category = request.POST.get('custom_category', '').strip()
     subject = custom_category if (category.lower() in ('other', 'otro', '') and custom_category) else (category or 'General')
 
-    shared_by = request.POST.get('shared_by', '').strip() or request.session.get('member_name', 'Organizer')
+    member_name = request.session.get('member_name', '').strip()
+    member_email = request.session.get('member_email', '').strip().lower()
+    if not member_name and member_email:
+        from recommendations.models import MemberProfile
+        prof = MemberProfile.objects.filter(email__iexact=member_email).first()
+        if prof and prof.full_name:
+            member_name = prof.full_name
+            request.session['member_name'] = member_name
+    if not member_name:
+        member_name = request.POST.get('shared_by', '').strip() or 'Member'
+
+    # Auto-populated with the user's name and cannot be changed
+    shared_by = member_name
     recommendation_text = request.POST.get('recommendation', '').strip()
     location = request.POST.get('location', '').strip()
     date_str = request.POST.get('date', '').strip()
@@ -367,16 +452,14 @@ def organizer_create_recommendation_view(request):
         request.session['recommendation_error_message'] = "Please provide recommendation details."
         return redirect('recommendations:notes_list')
 
-    admin_name = request.session.get('member_name', 'Organizer')
-    admin_email = request.session.get('member_email', '').strip().lower()
-
     # Synchronize to Google Sheet
     synced = sync_recommendation_to_google_sheet(
         shared_by=shared_by,
         subject=subject,
         recommendation=recommendation_text,
         date_str=date_str,
-        location=location
+        location=location,
+        created_by_email=member_email
     )
 
     # Invalidate cache so recommendation appears immediately
@@ -391,8 +474,8 @@ def organizer_create_recommendation_view(request):
             action=MembershipAuditLog.ACTION_RECOMMENDATION_CREATED,
             target_name=subject,
             target_email='',
-            actor_name=admin_name,
-            actor_email=admin_email,
+            actor_name=member_name,
+            actor_email=member_email,
             notes=notes_audit
         )
     except Exception as e:
@@ -401,40 +484,73 @@ def organizer_create_recommendation_view(request):
     if synced:
         request.session['recommendation_success_message'] = f"Recommendation '{subject}' published successfully!"
     else:
-        request.session['recommendation_error_message'] = "Could not sync recommendation to Google Sheet, but your request was processed."
+        request.session['recommendation_error_message'] = "Could not publish recommendation at this time, but your request was processed."
 
     return redirect('recommendations:notes_list')
 
 
-@admin_required
-def organizer_edit_recommendation_view(request):
+@member_required
+def edit_recommendation_view(request):
     """
-    Allows organizers/admins to edit an existing community recommendation.
+    Allows users to edit their own recommendations, and administrators to edit all recommendations.
     Synchronizes the edits directly into Google Sheets,
     invalidates the cache, and records an entry in the MembershipAuditLog.
     """
     if request.method != 'POST':
         return redirect('recommendations:notes_list')
 
+    is_admin = bool(request.session.get('is_admin', False))
+    member_name = request.session.get('member_name', 'Member')
+    member_email = request.session.get('member_email', '').strip().lower()
+
     row_index = request.POST.get('row_index', '').strip()
     category = request.POST.get('category', '').strip()
     custom_category = request.POST.get('custom_category', '').strip()
     subject = custom_category if (category.lower() in ('other', 'otro', '') and custom_category) else (category or 'General')
 
-    shared_by = request.POST.get('shared_by', '').strip() or request.session.get('member_name', 'Organizer')
+    shared_by = request.POST.get('shared_by', '').strip() or member_name
     recommendation_text = request.POST.get('recommendation', '').strip()
     location = request.POST.get('location', '').strip()
     date_str = request.POST.get('date', '').strip()
     original_subject = request.POST.get('original_subject', '').strip()
     original_shared_by = request.POST.get('original_shared_by', '').strip()
     original_recommendation = request.POST.get('original_recommendation', '').strip()
+    created_by_email = request.POST.get('created_by_email', '').strip().lower()
 
     if not recommendation_text:
         request.session['recommendation_error_message'] = "Please provide recommendation details."
         return redirect('recommendations:notes_list')
 
-    admin_name = request.session.get('member_name', 'Organizer')
-    admin_email = request.session.get('member_email', '').strip().lower()
+    # Security check: verify ownership if not admin
+    if not is_admin:
+        notes = cache.get('whatsapp_recommendations_cache')
+        if notes is None:
+            try:
+                notes = fetch_recommendations()
+            except Exception:
+                notes = []
+
+        target_item = None
+        try:
+            r_idx = int(row_index)
+            if 0 <= r_idx - 2 < len(notes):
+                target_item = notes[r_idx - 2]
+        except (ValueError, TypeError):
+            pass
+
+        if not target_item and (original_recommendation or original_subject):
+            for n in (notes or []):
+                if original_recommendation and original_recommendation.strip().lower() in str(n.get('Recommendation', '')).strip().lower():
+                    target_item = n
+                    break
+
+        actual_email = target_item.get('Created_By_Email', '') if target_item else created_by_email
+        actual_author = target_item.get('Shared_By', '') if target_item else original_shared_by
+
+        if not _can_member_manage_recommendation(is_admin, member_email, member_name, actual_email, actual_author):
+            logger.warning(f"Unauthorized recommendation edit attempt by {member_email} for item owned by {actual_email or actual_author}")
+            request.session['recommendation_error_message'] = "You do not have permission to edit this recommendation."
+            return redirect('recommendations:notes_list')
 
     # Synchronize update to Google Sheet
     synced = update_recommendation_in_google_sheet(
@@ -446,7 +562,9 @@ def organizer_edit_recommendation_view(request):
         location=location,
         original_subject=original_subject,
         original_shared_by=original_shared_by,
-        original_recommendation=original_recommendation
+        original_recommendation=original_recommendation,
+        created_by_email=created_by_email or member_email,
+        original_created_by_email=created_by_email
     )
 
     # Invalidate cache so updated recommendation appears immediately
@@ -461,8 +579,8 @@ def organizer_edit_recommendation_view(request):
             action=MembershipAuditLog.ACTION_RECOMMENDATION_UPDATED,
             target_name=subject,
             target_email='',
-            actor_name=admin_name,
-            actor_email=admin_email,
+            actor_name=member_name,
+            actor_email=member_email,
             notes=notes_audit
         )
     except Exception as e:
@@ -471,9 +589,99 @@ def organizer_edit_recommendation_view(request):
     if synced:
         request.session['recommendation_success_message'] = f"Recommendation '{subject}' updated successfully!"
     else:
-        request.session['recommendation_error_message'] = "Could not sync recommendation update to Google Sheet, but your request was processed."
+        request.session['recommendation_error_message'] = "Could not save recommendation update at this time, but your request was processed."
 
     return redirect('recommendations:notes_list')
+
+
+@member_required
+def delete_recommendation_view(request):
+    """
+    Allows users to delete their own recommendations, and administrators to delete all recommendations.
+    Synchronizes the removal directly from Google Sheets,
+    invalidates the cache, and records an entry in the MembershipAuditLog.
+    """
+    if request.method != 'POST':
+        return redirect('recommendations:notes_list')
+
+    is_admin = bool(request.session.get('is_admin', False))
+    member_name = request.session.get('member_name', 'Member')
+    member_email = request.session.get('member_email', '').strip().lower()
+
+    row_index = request.POST.get('row_index', '').strip()
+    subject = request.POST.get('subject', '').strip()
+    shared_by = request.POST.get('shared_by', '').strip()
+    recommendation_text = request.POST.get('recommendation', '').strip()
+    created_by_email = request.POST.get('created_by_email', '').strip().lower()
+
+    # Security check: verify ownership if not admin
+    if not is_admin:
+        notes = cache.get('whatsapp_recommendations_cache')
+        if notes is None:
+            try:
+                notes = fetch_recommendations()
+            except Exception:
+                notes = []
+
+        target_item = None
+        try:
+            r_idx = int(row_index)
+            if 0 <= r_idx - 2 < len(notes):
+                target_item = notes[r_idx - 2]
+        except (ValueError, TypeError):
+            pass
+
+        if not target_item and (recommendation_text or subject):
+            for n in (notes or []):
+                if recommendation_text and recommendation_text.strip().lower() in str(n.get('Recommendation', '')).strip().lower():
+                    target_item = n
+                    break
+
+        actual_email = target_item.get('Created_By_Email', '') if target_item else created_by_email
+        actual_author = target_item.get('Shared_By', '') if target_item else shared_by
+
+        if not _can_member_manage_recommendation(is_admin, member_email, member_name, actual_email, actual_author):
+            logger.warning(f"Unauthorized recommendation delete attempt by {member_email} for item owned by {actual_email or actual_author}")
+            request.session['recommendation_error_message'] = "You do not have permission to delete this recommendation."
+            return redirect('recommendations:notes_list')
+
+    # Delete from Google Sheet
+    synced = delete_recommendation_from_google_sheet(
+        row_index=row_index,
+        subject=subject,
+        shared_by=shared_by,
+        recommendation=recommendation_text,
+        created_by_email=created_by_email
+    )
+
+    # Invalidate cache so deleted recommendation disappears immediately
+    cache.delete('whatsapp_recommendations_cache')
+
+    # Audit log
+    try:
+        notes_audit = f"Deleted recommendation '{subject or 'Item'}' shared by {shared_by or 'Member'}"
+        MembershipAuditLog.objects.create(
+            action=MembershipAuditLog.ACTION_RECOMMENDATION_DELETED,
+            target_name=subject or 'Recommendation',
+            target_email='',
+            actor_name=member_name,
+            actor_email=member_email,
+            notes=notes_audit
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record recommendation deletion in audit log: {e}")
+
+    if synced:
+        request.session['recommendation_success_message'] = f"Recommendation '{subject or 'Item'}' was deleted successfully."
+    else:
+        request.session['recommendation_error_message'] = "Could not delete recommendation at this time, but your request was processed."
+
+    return redirect('recommendations:notes_list')
+
+
+# Aliases for backward compatibility
+organizer_create_recommendation_view = create_recommendation_view
+organizer_edit_recommendation_view = edit_recommendation_view
 
 
 from .calendar_sync import fetch_community_events

@@ -243,6 +243,8 @@ def _normalize_record_keys(record):
         elif lower_key in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'google_maps', 'maps_url', 'location_url', 'address', 'direccion', 'dirección', 'lugar', 'place'):
             normalized['Location'] = value
             location_raw = value
+        elif lower_key in ('created_by_email', 'createdbyemail', 'email', 'gmail', 'author_email', 'authoremail', 'correo', 'mail', 'creadopor', 'creado_por', 'user_email', 'creator_email'):
+            normalized['Created_By_Email'] = value
 
     # Parse and enrich location metadata & coordinates
     loc_info = parse_location_and_coords(
@@ -356,7 +358,7 @@ def fetch_recommendations():
         all_values = worksheet.get_all_values()
         if all_values and isinstance(all_values, list) and len(all_values) > 0 and isinstance(all_values[0], (list, tuple)):
             headers = [str(h).strip() for h in all_values[0]]
-            canonical_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location']
+            canonical_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location', 'Created By Email']
             if not headers or all(not h for h in headers):
                 headers = canonical_headers
 
@@ -370,12 +372,18 @@ def fetch_recommendations():
                         record[headers[col_idx]] = cell
                     elif col_idx == 4:
                         record['Location'] = cell
+                    elif col_idx == 5:
+                        record['Created By Email'] = cell
                     else:
                         record[f'col_{col_idx}'] = cell
 
                 has_loc_in_rec = any(str(k).strip().lower() in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'address', 'direccion') for k in record)
                 if not has_loc_in_rec and len(row) >= 5:
                     record['Location'] = row[4]
+
+                has_email_in_rec = any(str(k).strip().lower() in ('created_by_email', 'createdbyemail', 'email', 'gmail', 'author_email', 'correo', 'mail') for k in record)
+                if not has_email_in_rec and len(row) >= 6:
+                    record['Created By Email'] = row[5]
 
                 records.append(_normalize_record_keys(record))
             if records:
@@ -394,7 +402,7 @@ def fetch_recommendations():
     return []
 
 
-def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date_str=None, location=None):
+def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date_str=None, location=None, created_by_email=None):
     """
     Appends a new community recommendation to the 'Recomendaciones' (or 'Recommendations') tab.
     Matches column headers dynamically, initializes default headers if missing, and appends the row.
@@ -419,19 +427,19 @@ def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date
                 worksheet = None
 
         if not worksheet:
-            worksheet = sh.add_worksheet(title="Recomendaciones", rows=100, cols=5)
+            worksheet = sh.add_worksheet(title="Recomendaciones", rows=100, cols=6)
 
         all_values = worksheet.get_all_values()
-        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location']
+        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location', 'Created By Email']
 
         if not all_values:
-            worksheet.update(values=[expected_headers], range_name='A1:E1')
+            worksheet.update(values=[expected_headers], range_name='A1:F1')
             all_values = [expected_headers]
 
-        headers = all_values[0]
+        headers = [str(h).strip() for h in all_values[0]]
         if not headers or all(not str(h).strip() for h in headers):
             headers = expected_headers
-            worksheet.update(values=[headers], range_name='A1:E1')
+            worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
 
         if not date_str:
             date_str = datetime.now().strftime("%Y-%m-%d")
@@ -474,9 +482,19 @@ def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date
             'dirección': str(location or '').strip(),
             'place': str(location or '').strip(),
             'lugar': str(location or '').strip(),
+            'created by email': str(created_by_email or '').strip(),
+            'created_by_email': str(created_by_email or '').strip(),
+            'createdbyemail': str(created_by_email or '').strip(),
+            'email': str(created_by_email or '').strip(),
+            'gmail': str(created_by_email or '').strip(),
+            'author_email': str(created_by_email or '').strip(),
+            'author email': str(created_by_email or '').strip(),
+            'correo': str(created_by_email or '').strip(),
+            'creadopor': str(created_by_email or '').strip(),
+            'creado_por': str(created_by_email or '').strip(),
         }
 
-        # Check if headers include a location column; if not and location provided, add header
+        # Check if headers include location / created_by_email columns; if missing, add them
         has_location_header = any(str(h).strip().lower() in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'address', 'direccion') for h in headers)
         if not has_location_header and location and str(location).strip():
             headers.append('Location')
@@ -485,15 +503,23 @@ def sync_recommendation_to_google_sheet(shared_by, subject, recommendation, date
             except Exception:
                 pass
 
+        has_email_header = any(str(h).strip().lower() in ('created by email', 'created_by_email', 'createdbyemail', 'email', 'gmail', 'author_email', 'correo') for h in headers)
+        if not has_email_header and created_by_email and str(created_by_email).strip():
+            headers.append('Created By Email')
+            try:
+                worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
+            except Exception:
+                pass
+
         if headers:
             row_data = [field_map.get(str(h).strip().lower(), '') for h in headers]
             if all(not str(val).strip() for val in row_data):
-                row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip()]
+                row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip(), str(created_by_email or '').strip()]
         else:
-            row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip()]
+            row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip(), str(created_by_email or '').strip()]
 
         worksheet.append_row(row_data)
-        logger.info(f"Successfully synced new recommendation in '{subject}' shared by '{shared_by}' with location '{location or ''}' to Google Sheet.")
+        logger.info(f"Successfully synced recommendation in '{subject}' shared by '{shared_by}' (by {created_by_email or 'member'}) to Google Sheet.")
         return True
     except Exception as e:
         logger.warning(f"Failed to sync recommendation to Google Sheet: {e}")
@@ -509,7 +535,9 @@ def update_recommendation_in_google_sheet(
     location=None,
     original_subject=None,
     original_shared_by=None,
-    original_recommendation=None
+    original_recommendation=None,
+    created_by_email=None,
+    original_created_by_email=None
 ):
     """
     Updates an existing community recommendation row in the 'Recomendaciones' (or 'Recommendations') tab.
@@ -538,21 +566,30 @@ def update_recommendation_in_google_sheet(
             return False
 
         all_values = worksheet.get_all_values()
-        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location']
+        expected_headers = ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location', 'Created By Email']
 
         if not all_values:
-            worksheet.update(values=[expected_headers], range_name='A1:E1')
+            worksheet.update(values=[expected_headers], range_name='A1:F1')
             all_values = [expected_headers]
 
         headers = [str(h).strip() for h in all_values[0]]
         if not headers or all(not h for h in headers):
             headers = expected_headers
-            worksheet.update(values=[headers], range_name='A1:E1')
+            worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
 
-        # Check if headers include a location column; if not and location provided, add header
+        # Check if headers include location / created_by_email columns; if missing, add them
         has_location_header = any(str(h).strip().lower() in ('location', 'ubicacion', 'ubicación', 'map', 'maps', 'address', 'direccion') for h in headers)
         if not has_location_header and location and str(location).strip():
             headers.append('Location')
+            try:
+                worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
+            except Exception:
+                pass
+
+        effective_email = str(created_by_email or original_created_by_email or '').strip()
+        has_email_header = any(str(h).strip().lower() in ('created by email', 'created_by_email', 'createdbyemail', 'email', 'gmail', 'author_email', 'correo') for h in headers)
+        if not has_email_header and effective_email:
+            headers.append('Created By Email')
             try:
                 worksheet.update(values=[headers], range_name=f'A1:{chr(ord("A") + len(headers) - 1)}1')
             except Exception:
@@ -600,11 +637,21 @@ def update_recommendation_in_google_sheet(
             'dirección': str(location or '').strip(),
             'place': str(location or '').strip(),
             'lugar': str(location or '').strip(),
+            'created by email': effective_email,
+            'created_by_email': effective_email,
+            'createdbyemail': effective_email,
+            'email': effective_email,
+            'gmail': effective_email,
+            'author_email': effective_email,
+            'author email': effective_email,
+            'correo': effective_email,
+            'creadopor': effective_email,
+            'creado_por': effective_email,
         }
 
         row_data = [field_map.get(str(h).strip().lower(), '') for h in headers]
         if all(not str(val).strip() for val in row_data):
-            row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip()]
+            row_data = [date_str, subject, shared_by, recommendation, str(location or '').strip(), effective_email]
 
         target_row_idx = None
         try:
@@ -630,6 +677,13 @@ def update_recommendation_in_google_sheet(
                     break
 
         if target_row_idx:
+            # Preserve existing email cell if updated without new email
+            if not effective_email and len(all_values[target_row_idx - 1]) > len(row_data) - 1:
+                for h_idx, h_name in enumerate(headers):
+                    if str(h_name).strip().lower() in ('created by email', 'created_by_email', 'createdbyemail', 'email', 'gmail', 'author_email', 'correo'):
+                        if h_idx < len(all_values[target_row_idx - 1]) and all_values[target_row_idx - 1][h_idx]:
+                            row_data[h_idx] = all_values[target_row_idx - 1][h_idx]
+
             while len(row_data) < len(headers):
                 row_data.append('')
             end_col = chr(ord('A') + len(row_data) - 1) if len(row_data) <= 26 else 'Z'
@@ -643,6 +697,86 @@ def update_recommendation_in_google_sheet(
             return True
     except Exception as e:
         logger.warning(f"Failed to update recommendation in Google Sheet: {e}")
+        return False
+
+
+def delete_recommendation_from_google_sheet(
+    row_index=None,
+    subject=None,
+    shared_by=None,
+    recommendation=None,
+    created_by_email=None
+):
+    """
+    Deletes a recommendation row from the 'Recomendaciones' (or 'Recommendations') tab in Google Sheets.
+    Finds the row using row_index (1-indexed, header is row 1) or matches by content/subject/shared_by.
+    """
+    try:
+        gc = get_gspread_client()
+        sh = open_google_spreadsheet(gc)
+
+        worksheet = (
+            _get_worksheet_case_insensitive(sh, "Recomendaciones")
+            or _get_worksheet_case_insensitive(sh, "Recommendations")
+            or _get_worksheet_case_insensitive(sh, "Notes")
+        )
+        if not worksheet:
+            try:
+                worksheet = getattr(sh, 'sheet1', None)
+            except Exception:
+                worksheet = None
+
+        if not worksheet:
+            return True
+
+        all_values = worksheet.get_all_values()
+        if not all_values or len(all_values) <= 1:
+            return True
+
+        target_row_idx = None
+        try:
+            r_idx = int(row_index)
+            if 1 < r_idx <= len(all_values):
+                target_row_idx = r_idx
+        except (ValueError, TypeError):
+            target_row_idx = None
+
+        # Verify content if row_index was provided, or search by content
+        if target_row_idx:
+            if recommendation or subject:
+                row_cells = [str(c).lower() for c in all_values[target_row_idx - 1]]
+                row_str = " ".join(row_cells)
+                rec_clean = str(recommendation or '').strip().lower()
+                sub_clean = str(subject or '').strip().lower()
+                if (rec_clean and rec_clean not in row_str) and (sub_clean and sub_clean not in row_str):
+                    target_row_idx = None
+
+        if not target_row_idx and (recommendation or subject or shared_by):
+            rec_clean = str(recommendation or '').strip().lower()
+            sub_clean = str(subject or '').strip().lower()
+            author_clean = str(shared_by or '').strip().lower()
+
+            for idx, existing_row in enumerate(all_values[1:], start=2):
+                row_str = " ".join([str(c).lower() for c in existing_row])
+                if rec_clean and rec_clean in row_str:
+                    target_row_idx = idx
+                    break
+                if sub_clean and author_clean and sub_clean in row_str and author_clean in row_str:
+                    target_row_idx = idx
+                    break
+                if rec_clean and author_clean and rec_clean in row_str and author_clean in row_str:
+                    target_row_idx = idx
+                    break
+
+        if target_row_idx:
+            worksheet.delete_rows(target_row_idx)
+            logger.info(f"Successfully deleted recommendation row at Google Sheet row {target_row_idx}.")
+            return True
+        else:
+            logger.info("Recommendation row not found in Google Sheet (already absent).")
+            return True
+    except Exception as e:
+        logger.warning(f"Failed to delete recommendation from Google Sheet: {e}")
         return False
 
 
