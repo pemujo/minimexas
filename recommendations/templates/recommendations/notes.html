@@ -232,6 +232,18 @@
         .recommendation-row.highlighted-row > td:first-child {
             border-left: 4px solid #2563eb !important;
         }
+        /* Share button styling */
+        .share-rec-btn {
+            background: #ffffff;
+            color: #475569;
+            border-color: #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .share-rec-btn:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+            border-color: #94a3b8;
+        }
         /* Mobile Switcher */
         .view-switcher-pill {
             background: #f1f5f9;
@@ -467,11 +479,9 @@
                     </button>
                 </div>
 
-                {% if is_admin %}
                 <button type="button" class="btn btn-sm btn-primary-gradient d-inline-flex align-items-center rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#createRecommendationModal" style="font-size: 0.85rem; font-weight: 600;">
                     <i class="bi bi-plus-circle-fill me-1"></i> Add Recommendation
                 </button>
-                {% endif %}
                 <a href="?refresh=1" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center rounded-pill px-3 shadow-sm" title="Refresh recommendations" style="border-color: rgba(255,255,255,0.15); font-size: 0.85rem;">
                     <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                 </a>
@@ -485,6 +495,30 @@
                 </span>
             </div>
         </div>
+
+        {% if is_direct_detail and target_rec %}
+        <!-- Shared Recommendation Direct Link Top Bar -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 p-2 px-3 rounded-4 bg-light border shadow-sm">
+            <a href="{% url 'recommendations:notes_list' %}" class="btn btn-sm btn-light border rounded-pill px-3 py-1 fw-semibold text-secondary shadow-sm">
+                <i class="bi bi-arrow-left me-1"></i> View All Recommendations
+            </a>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 fw-semibold" style="font-size: 0.75rem;">
+                    <i class="bi bi-box-arrow-in-up-right me-1"></i> Shared Recommendation Direct Link
+                </span>
+
+                <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 py-1 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm share-rec-btn"
+                    data-rec-url="{{ request.scheme }}://{{ request.get_host }}{% url 'recommendation_detail' target_rec.row_num %}"
+                    data-index="{{ target_rec.index }}"
+                    data-row-num="{{ target_rec.row_num }}"
+                    title="Copy Direct Link">
+                    <i class="bi bi-link-45deg text-secondary fs-6"></i>
+                    <span class="small copy-label">Copy Link</span>
+                </button>
+            </div>
+        </div>
+        {% endif %}
 
         {% if success_message %}
             <div class="alert alert-success alert-custom shadow-sm mb-4 d-flex align-items-center" role="alert">
@@ -566,10 +600,8 @@
                                     <th style="width: 13%;">Date</th>
                                     <th style="width: 21%;">Subject</th>
                                     <th style="width: 18%;">Shared By</th>
-                                    <th style="width: {% if is_admin %}38%{% else %}48%{% endif %};">Recommendation</th>
-                                    {% if is_admin %}
-                                    <th style="width: 10%; text-align: center;">Action</th>
-                                    {% endif %}
+                                    <th style="width: 38%;">Recommendation</th>
+                                    <th style="width: 10%; text-align: center;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="tableBody">
@@ -614,26 +646,51 @@
                                             </div>
                                             {% endif %}
                                         </td>
-                                        {% if is_admin %}
                                         <td class="rec-cell-action text-center align-middle">
-                                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 edit-rec-btn shadow-sm"
-                                                data-index="{{ row.index }}"
-                                                data-row-num="{{ row.row_num|default:'' }}"
-                                                data-subject="{{ row.Subject|default:'' }}"
-                                                data-shared-by="{{ row.Shared_By|default:'' }}"
-                                                data-date="{{ row.Date|default:'' }}"
-                                                data-location="{{ row.Location|default:'' }}"
-                                                data-recommendation="{{ row.Recommendation|default:'' }}"
-                                                title="Edit Recommendation"
-                                                style="font-size: 0.78rem; font-weight: 600;">
-                                                <i class="bi bi-pencil-square me-1"></i> Edit
-                                            </button>
+                                            <div class="d-inline-flex align-items-center gap-1">
+                                                <!-- Copy / Share Direct Link -->
+                                                <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1 share-rec-btn shadow-sm"
+                                                    data-rec-url="{{ request.scheme }}://{{ request.get_host }}{% url 'recommendation_detail' row.row_num %}"
+                                                    data-index="{{ row.index }}"
+                                                    data-row-num="{{ row.row_num|default:'' }}"
+                                                    title="Copy Direct Link"
+                                                    style="font-size: 0.78rem; font-weight: 600;">
+                                                    <i class="bi bi-link-45deg"></i> <span class="d-none d-sm-inline">Share</span>
+                                                </button>
+                                                {% if row.can_edit %}
+                                                <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 edit-rec-btn shadow-sm"
+                                                    data-index="{{ row.index }}"
+                                                    data-row-num="{{ row.row_num|default:'' }}"
+                                                    data-subject="{{ row.Subject|default:'' }}"
+                                                    data-shared-by="{{ row.Shared_By|default:'' }}"
+                                                    data-created-by-email="{{ row.Created_By_Email|default:'' }}"
+                                                    data-date="{{ row.Date|default:'' }}"
+                                                    data-location="{{ row.Location|default:'' }}"
+                                                    data-recommendation="{{ row.Recommendation|default:'' }}"
+                                                    title="Edit Recommendation"
+                                                    style="font-size: 0.78rem; font-weight: 600;">
+                                                    <i class="bi bi-pencil-square me-1"></i> Edit
+                                                </button>
+                                                {% endif %}
+                                                {% if row.can_delete %}
+                                                <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-1 delete-rec-btn shadow-sm"
+                                                    data-index="{{ row.index }}"
+                                                    data-row-num="{{ row.row_num|default:'' }}"
+                                                    data-subject="{{ row.Subject|default:'' }}"
+                                                    data-shared-by="{{ row.Shared_By|default:'' }}"
+                                                    data-created-by-email="{{ row.Created_By_Email|default:'' }}"
+                                                    data-recommendation="{{ row.Recommendation|default:'' }}"
+                                                    title="Delete Recommendation"
+                                                    style="font-size: 0.78rem; font-weight: 600;">
+                                                    <i class="bi bi-trash3-fill"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
                                         </td>
-                                        {% endif %}
                                     </tr>
                                 {% empty %}
                                     <tr id="serverEmptyRow">
-                                        <td colspan="{% if is_admin %}5{% else %}4{% endif %}" class="text-center py-5">
+                                        <td colspan="5" class="text-center py-5">
                                             <div class="branded-empty-state mx-auto my-3" style="max-width: 440px;">
                                                 <img src="{% static 'images/minimexitas_logo.png' %}" alt="MiniMexitas Logo" class="empty-state-logo">
                                                 <h6 class="fw-bold text-dark">No recommendations found</h6>
@@ -663,15 +720,13 @@
         </div>
     </div>
 
-    {% if is_admin %}
-    <!-- CREATE RECOMMENDATION MODAL (ORGANIZERS ONLY) -->
+    <!-- CREATE RECOMMENDATION MODAL -->
     <div class="modal fade" id="createRecommendationModal" tabindex="-1" aria-labelledby="createRecommendationModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <form action="{% url 'recommendations:recommendation_create' %}" method="POST" id="createRecommendationForm" class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
                 {% csrf_token %}
                 <div class="modal-header bg-dark text-white p-4">
                     <div>
-                        <div class="badge bg-warning text-dark font-monospace mb-1" style="font-size: 0.65rem;">ORGANIZER ACTION</div>
                         <h5 class="modal-title fw-bold" id="createRecommendationModalLabel">
                             <i class="bi bi-plus-circle-fill me-2 text-warning"></i> Add Community Recommendation
                         </h5>
@@ -706,8 +761,8 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small">Shared By (Member Name) <span class="text-danger">*</span></label>
-                            <input type="text" name="shared_by" class="form-control" value="{{ member_name }}" placeholder="e.g. Maria Gonzalez" required>
-                            <div class="text-muted" style="font-size: 0.75rem;">Name of the community member or source making the recommendation.</div>
+                            <input type="text" name="shared_by" class="form-control bg-light" value="{{ member_name }}" readonly style="cursor: not-allowed;" required>
+                            <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-lock-fill me-1 text-secondary"></i> Automatically set to your verified member profile name.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small">Date</label>
@@ -716,7 +771,7 @@
                         </div>
                     </div>
 
-                    <!-- Location / Google Maps Link (NEW FIELD) -->
+                    <!-- Location / Google Maps Link -->
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark small">
                             <i class="bi bi-geo-alt-fill text-danger me-1"></i> Location / Google Maps Link <span class="text-muted fw-normal">(Optional)</span>
@@ -736,16 +791,11 @@
                         <textarea name="recommendation" class="form-control" rows="4" placeholder="Provide name of business/doctor, phone number, address, website link, pricing info, and personal tips or endorsement..." required></textarea>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-2 text-muted" style="font-size: 0.8rem;">
-                        <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-5"></i>
-                        <span>This recommendation will be automatically synced to the <strong>Google Sheets</strong> recommendations tab and visible on the map immediately.</span>
-                    </div>
-
                     <!-- Instant Acknowledgment / Loading Indicator -->
                     <div class="alert alert-primary d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="background: #e0f2fe; color: #0369a1; border-radius: 12px;">
                         <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div>
                         <div class="small fw-semibold">
-                            <span>Publishing recommendation & syncing Google Sheets...</span>
+                            <span>Publishing recommendation...</span>
                             <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait a moment while we update the directory.</div>
                         </div>
                     </div>
@@ -761,7 +811,7 @@
         </div>
     </div>
 
-    <!-- EDIT RECOMMENDATION MODAL (ORGANIZERS ONLY) -->
+    <!-- EDIT RECOMMENDATION MODAL -->
     <div class="modal fade" id="editRecommendationModal" tabindex="-1" aria-labelledby="editRecommendationModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <form action="{% url 'recommendations:recommendation_edit' %}" method="POST" id="editRecommendationForm" class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
@@ -770,10 +820,10 @@
                 <input type="hidden" name="original_subject" id="editModalOriginalSubject">
                 <input type="hidden" name="original_shared_by" id="editModalOriginalSharedBy">
                 <input type="hidden" name="original_recommendation" id="editModalOriginalRecommendation">
+                <input type="hidden" name="created_by_email" id="editModalCreatedByEmail">
 
                 <div class="modal-header bg-dark text-white p-4">
                     <div>
-                        <div class="badge bg-warning text-dark font-monospace mb-1" style="font-size: 0.65rem;">ORGANIZER ACTION</div>
                         <h5 class="modal-title fw-bold" id="editRecommendationModalLabel">
                             <i class="bi bi-pencil-square me-2 text-warning"></i> Edit Community Recommendation
                         </h5>
@@ -808,8 +858,8 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small">Shared By (Member Name) <span class="text-danger">*</span></label>
-                            <input type="text" name="shared_by" id="editModalRecSharedBy" class="form-control" placeholder="e.g. Maria Gonzalez" required>
-                            <div class="text-muted" style="font-size: 0.75rem;">Name of the community member or source making the recommendation.</div>
+                            <input type="text" name="shared_by" id="editModalRecSharedBy" class="form-control bg-light" readonly style="cursor: not-allowed;" required>
+                            <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-lock-fill me-1 text-secondary"></i> Member author name is locked and cannot be changed.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark small">Date</label>
@@ -838,16 +888,11 @@
                         <textarea name="recommendation" id="editModalRecDetails" class="form-control" rows="4" placeholder="Provide name of business/doctor, phone number, address, website link, pricing info, and personal tips or endorsement..." required></textarea>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-2 text-muted" style="font-size: 0.8rem;">
-                        <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-5"></i>
-                        <span>Changes will be saved directly into <strong>Google Sheets</strong> and updated on the Community Map immediately.</span>
-                    </div>
-
                     <!-- Instant Acknowledgment / Loading Indicator -->
                     <div class="alert alert-primary d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="background: #e0f2fe; color: #0369a1; border-radius: 12px;">
                         <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div>
                         <div class="small fw-semibold">
-                            <span>Updating recommendation & syncing Google Sheets...</span>
+                            <span>Updating recommendation...</span>
                             <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait a moment while we update the directory.</div>
                         </div>
                     </div>
@@ -862,7 +907,53 @@
             </form>
         </div>
     </div>
-    {% endif %}
+
+    <!-- DELETE RECOMMENDATION MODAL -->
+    <div class="modal fade" id="deleteRecommendationModal" tabindex="-1" aria-labelledby="deleteRecommendationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="{% url 'recommendations:recommendation_delete' %}" method="POST" id="deleteRecommendationForm" class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                {% csrf_token %}
+                <input type="hidden" name="row_index" id="deleteModalRowIndex">
+                <input type="hidden" name="subject" id="deleteModalSubject">
+                <input type="hidden" name="shared_by" id="deleteModalSharedBy">
+                <input type="hidden" name="recommendation" id="deleteModalRecommendation">
+                <input type="hidden" name="created_by_email" id="deleteModalCreatedByEmail">
+
+                <div class="modal-header bg-danger text-white p-4">
+                    <h5 class="modal-title fw-bold" id="deleteRecommendationModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Delete Recommendation
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <p class="text-dark mb-3">Are you sure you want to delete this recommendation?</p>
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <div class="fw-bold text-dark" id="deleteModalPreviewSubject"></div>
+                        <div class="small text-muted" id="deleteModalPreviewSharedBy"></div>
+                        <div class="small text-secondary mt-2" id="deleteModalPreviewRecommendation" style="max-height: 80px; overflow-y: auto;"></div>
+                    </div>
+                    <div class="text-danger small"><i class="bi bi-info-circle me-1"></i> This action will permanently remove the recommendation and cannot be undone.</div>
+
+                    <!-- Instant Acknowledgment / Loading Indicator -->
+                    <div class="alert alert-danger d-none form-loading-state align-items-center gap-2 mb-0 mt-3 border-0 shadow-sm" style="border-radius: 12px;">
+                        <div class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></div>
+                        <div class="small fw-semibold">
+                            <span>Deleting recommendation...</span>
+                            <div class="text-muted fw-normal" style="font-size: 0.75rem;">Please wait a moment while we update the directory.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 shadow-sm" data-loading-text="Deleting..." style="font-weight: 600;">
+                        <i class="bi bi-trash3-fill me-1"></i> Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- FOOTER COMPONENT -->
     {% include 'recommendations/footer.html' %}
@@ -1021,23 +1112,51 @@
                 const locDisplay = escapeHtml(item.location_display || item.Location || 'Location');
                 const locUrl = item.location_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.Location || '')}`;
 
-                {% if is_admin %}
-                const editBtnHtml = `
-                    <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 edit-rec-btn shadow-sm"
+                let actionsHtml = '';
+                if (item.can_edit) {
+                    actionsHtml += `
+                        <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 edit-rec-btn shadow-sm"
+                            data-index="${item.index}"
+                            data-row-num="${item.row_num || (item.index + 2)}"
+                            data-subject="${subject}"
+                            data-shared-by="${author}"
+                            data-created-by-email="${escapeHtml(item.Created_By_Email || '')}"
+                            data-date="${escapeHtml(item.Date || '')}"
+                            data-location="${escapeHtml(item.Location || '')}"
+                            data-recommendation="${escapeHtml(item.Recommendation || '')}"
+                            title="Edit Recommendation"
+                            style="font-size: 0.74rem; font-weight: 600;">
+                            <i class="bi bi-pencil-square me-1"></i> Edit
+                        </button>
+                    `;
+                }
+                if (item.can_delete) {
+                    actionsHtml += `
+                        <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-1 delete-rec-btn shadow-sm ms-1"
+                            data-index="${item.index}"
+                            data-row-num="${item.row_num || (item.index + 2)}"
+                            data-subject="${subject}"
+                            data-shared-by="${author}"
+                            data-created-by-email="${escapeHtml(item.Created_By_Email || '')}"
+                            data-recommendation="${escapeHtml(item.Recommendation || '')}"
+                            title="Delete Recommendation"
+                            style="font-size: 0.74rem; font-weight: 600;">
+                            <i class="bi bi-trash3-fill"></i>
+                        </button>
+                    `;
+                }
+
+                const rowNum = item.row_num || (item.index + 2);
+                let shareHtml = `
+                    <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1 share-rec-btn shadow-sm me-1"
+                        data-rec-url="${window.location.origin}/recommendations/${rowNum}/"
                         data-index="${item.index}"
-                        data-row-num="${item.row_num || (item.index + 2)}"
-                        data-subject="${subject}"
-                        data-shared-by="${author}"
-                        data-date="${escapeHtml(item.Date || '')}"
-                        data-location="${escapeHtml(item.Location || '')}"
-                        data-recommendation="${escapeHtml(item.Recommendation || '')}"
+                        data-row-num="${rowNum}"
+                        title="Copy Direct Link"
                         style="font-size: 0.74rem; font-weight: 600;">
-                        <i class="bi bi-pencil-square me-1"></i> Edit
+                        <i class="bi bi-link-45deg"></i> Share
                     </button>
                 `;
-                {% else %}
-                const editBtnHtml = '';
-                {% endif %}
 
                 return `
                     <div class="rec-popup-card">
@@ -1054,7 +1173,10 @@
                                     <i class="bi bi-arrow-down-left-square me-1"></i> List
                                 </button>
                             </div>
-                            ${editBtnHtml}
+                            <div class="d-flex align-items-center">
+                                ${shareHtml}
+                                ${actionsHtml}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1239,6 +1361,75 @@
             });
 
             // -------------------------------------------------------------
+            // Recommendation Direct Share & Clipboard Copy Helper
+            // -------------------------------------------------------------
+            function copyTextToClipboard(text, btnElement, successLabel = 'Copied!') {
+                function showSuccess() {
+                    const originalHtml = btnElement.innerHTML;
+                    btnElement.innerHTML = `<i class="bi bi-check2 text-success me-1"></i> <span class="text-success fw-semibold">${successLabel}</span>`;
+                    setTimeout(function () {
+                        btnElement.innerHTML = originalHtml;
+                    }, 2200);
+                }
+
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(showSuccess).catch(function () {
+                        fallbackCopy(text, showSuccess);
+                    });
+                } else {
+                    fallbackCopy(text, showSuccess);
+                }
+            }
+
+            function fallbackCopy(text, callback) {
+                const tempInput = document.createElement('textarea');
+                tempInput.value = text;
+                tempInput.style.position = 'fixed';
+                tempInput.style.left = '-9999px';
+                document.body.appendChild(tempInput);
+                tempInput.focus();
+                tempInput.select();
+                try {
+                    document.execCommand('copy');
+                    callback();
+                } catch (e) {
+                    console.error('Copy fallback failed:', e);
+                }
+                document.body.removeChild(tempInput);
+            }
+
+            // Global delegation for recommendation share buttons
+            document.addEventListener('click', function (e) {
+                const shareBtn = e.target.closest('.share-rec-btn, .copy-rec-link-btn');
+                if (shareBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const url = shareBtn.getAttribute('data-rec-url') || window.location.href;
+                    if (url) {
+                        copyTextToClipboard(url, shareBtn);
+                    }
+                }
+            });
+
+            // Initial Focus & Scroll on Direct Share Link
+            const directTargetIndex = {% if target_rec_index is not None %}{{ target_rec_index }}{% else %}null{% endif %};
+            if (directTargetIndex !== null) {
+                setTimeout(function () {
+                    highlightTableRow(directTargetIndex);
+                    const markerObj = markersByIndex[directTargetIndex];
+                    if (markerObj) {
+                        if (!markerClusterGroup.hasLayer(markerObj.marker)) {
+                            markerClusterGroup.addLayer(markerObj.marker);
+                        }
+                        map.setView(markerObj.coords, 14, { animate: true });
+                        setTimeout(function () {
+                            markerObj.marker.openPopup();
+                        }, 250);
+                    }
+                }, 350);
+            }
+
+            // -------------------------------------------------------------
             // Filter Rows & Sync Map Markers
             // -------------------------------------------------------------
             function filterRows() {
@@ -1346,7 +1537,6 @@
                 });
             }
 
-            {% if is_admin %}
             // Edit Recommendation click delegation
             document.addEventListener('click', function(e) {
                 const editBtn = e.target.closest('.edit-rec-btn');
@@ -1362,6 +1552,7 @@
                 const origSubInput = document.getElementById('editModalOriginalSubject');
                 const origAuthorInput = document.getElementById('editModalOriginalSharedBy');
                 const origRecInput = document.getElementById('editModalOriginalRecommendation');
+                const origCreatedByEmailInput = document.getElementById('editModalCreatedByEmail');
 
                 const catSelect = document.getElementById('editModalRecCategory');
                 const customCatWrapper = document.getElementById('editModalCustomCategoryWrapper');
@@ -1377,11 +1568,13 @@
                 const date = editBtn.getAttribute('data-date') || (item ? item.Date : '') || '';
                 const location = editBtn.getAttribute('data-location') || (item ? item.Location : '') || '';
                 const recommendation = editBtn.getAttribute('data-recommendation') || (item ? item.Recommendation : '') || '';
+                const createdByEmail = editBtn.getAttribute('data-created-by-email') || (item ? item.Created_By_Email : '') || '';
 
                 if (rowNumInput) rowNumInput.value = rowNum;
                 if (origSubInput) origSubInput.value = subject;
                 if (origAuthorInput) origAuthorInput.value = sharedBy;
                 if (origRecInput) origRecInput.value = recommendation;
+                if (origCreatedByEmailInput) origCreatedByEmailInput.value = createdByEmail;
 
                 if (sharedByInput) sharedByInput.value = sharedBy;
                 if (dateInput) {
@@ -1426,6 +1619,47 @@
                 bsModal.show();
             });
 
+            // Delete Recommendation click delegation
+            document.addEventListener('click', function(e) {
+                const deleteBtn = e.target.closest('.delete-rec-btn');
+                if (!deleteBtn) return;
+
+                const idx = deleteBtn.getAttribute('data-index');
+                let item = (idx !== null && notesData && notesData[idx]) ? notesData[idx] : null;
+
+                const modal = document.getElementById('deleteRecommendationModal');
+                if (!modal) return;
+
+                const rowNumInput = document.getElementById('deleteModalRowIndex');
+                const subInput = document.getElementById('deleteModalSubject');
+                const authorInput = document.getElementById('deleteModalSharedBy');
+                const recInput = document.getElementById('deleteModalRecommendation');
+                const createdByEmailInput = document.getElementById('deleteModalCreatedByEmail');
+
+                const previewSub = document.getElementById('deleteModalPreviewSubject');
+                const previewAuthor = document.getElementById('deleteModalPreviewSharedBy');
+                const previewRec = document.getElementById('deleteModalPreviewRecommendation');
+
+                const rowNum = deleteBtn.getAttribute('data-row-num') || (item ? item.row_num : '') || (idx !== null ? (parseInt(idx) + 2) : '');
+                const subject = deleteBtn.getAttribute('data-subject') || (item ? item.Subject : '') || '';
+                const sharedBy = deleteBtn.getAttribute('data-shared-by') || (item ? item.Shared_By : '') || '';
+                const recommendation = deleteBtn.getAttribute('data-recommendation') || (item ? item.Recommendation : '') || '';
+                const createdByEmail = deleteBtn.getAttribute('data-created-by-email') || (item ? item.Created_By_Email : '') || '';
+
+                if (rowNumInput) rowNumInput.value = rowNum;
+                if (subInput) subInput.value = subject;
+                if (authorInput) authorInput.value = sharedBy;
+                if (recInput) recInput.value = recommendation;
+                if (createdByEmailInput) createdByEmailInput.value = createdByEmail;
+
+                if (previewSub) previewSub.textContent = subject || 'General Recommendation';
+                if (previewAuthor) previewAuthor.textContent = sharedBy ? `Shared by ${sharedBy}` : '';
+                if (previewRec) previewRec.textContent = recommendation;
+
+                const bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+                bsModal.show();
+            });
+
             // Edit modal custom category toggle
             const editModalCategory = document.getElementById('editModalRecCategory');
             const editCustomCategoryWrapper = document.getElementById('editModalCustomCategoryWrapper');
@@ -1440,7 +1674,6 @@
                     }
                 });
             }
-            {% endif %}
 
             // Instant Acknowledgment & Submit Button Loading Indicator
             document.querySelectorAll('form').forEach(form => {

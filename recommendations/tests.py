@@ -37,6 +37,8 @@ from recommendations.sheets import (
     sync_community_event_to_google_sheet,
     delete_community_event_from_google_sheet,
     sync_recommendation_to_google_sheet,
+    update_recommendation_in_google_sheet,
+    delete_recommendation_from_google_sheet,
 )
 from recommendations.calendar_sync import (
     get_google_calendar_add_url,
@@ -3569,8 +3571,8 @@ class OrganizerCreateRecommendationTestCase(TestCase):
         row_arg = mock_ws.append_row.call_args[0][0]
         self.assertEqual(row_arg, ["2026-08-18", "Pediatricians", "Dr. Laura", "Bilingual clinic in Mission SF: (415) 555-0199"])
 
-    def test_notes_list_view_shows_add_button_for_admin_only(self):
-        # Non-admin member
+    def test_notes_list_view_shows_add_button_for_all_members(self):
+        # Non-admin member sees Add Recommendation button
         session = self.client.session
         session['is_verified_member'] = True
         session['member_email'] = self.regular_profile.email
@@ -3581,9 +3583,10 @@ class OrganizerCreateRecommendationTestCase(TestCase):
         with patch('recommendations.views.fetch_recommendations', return_value=[]):
             response = self.client.get(reverse('recommendations:notes_list'))
             self.assertEqual(response.status_code, 200)
-            self.assertNotContains(response, 'data-bs-target="#createRecommendationModal"')
+            self.assertContains(response, 'data-bs-target="#createRecommendationModal"')
+            self.assertContains(response, 'Add Recommendation')
 
-        # Admin member
+        # Admin member also sees Add Recommendation button
         session = self.client.session
         session['is_verified_member'] = True
         session['member_email'] = self.admin_profile.email
@@ -3597,55 +3600,185 @@ class OrganizerCreateRecommendationTestCase(TestCase):
             self.assertContains(response, 'data-bs-target="#createRecommendationModal"')
             self.assertContains(response, 'Add Recommendation')
 
-    def test_organizer_create_recommendation_forbidden_for_non_admin(self):
-        session = self.client.session
-        session['is_verified_member'] = True
-        session['member_email'] = self.regular_profile.email
-        session['is_admin'] = False
-        session.save()
-
+    def test_unauthenticated_create_recommendation_redirects_to_login(self):
         response = self.client.post(reverse('recommendations:recommendation_create'), {
             'category': 'Food & Dining',
             'shared_by': 'Carlos',
             'recommendation': 'Best Birria tacos in San Jose: Birrieria Jalisco',
         })
-        # admin_required redirects unauthorized users
-        self.assertIn(response.status_code, [302, 403])
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
         self.assertEqual(MembershipAuditLog.objects.count(), 0)
 
     @patch('recommendations.views.sync_recommendation_to_google_sheet', return_value=True)
-    def test_organizer_create_recommendation_success(self, mock_sync_sheet):
+    def test_member_create_recommendation_success(self, mock_sync_sheet):
         session = self.client.session
         session['is_verified_member'] = True
-        session['member_email'] = self.admin_profile.email
-        session['member_name'] = self.admin_profile.full_name
-        session['is_admin'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
         session.save()
 
         response = self.client.post(reverse('recommendations:recommendation_create'), {
             'category': 'Food & Dining',
-            'shared_by': 'Chef Mateo',
+            'shared_by': self.regular_profile.full_name,
             'recommendation': 'Autentica Taqueria en Palo Alto: Tacos El Grullo',
             'date': '2026-08-18',
             'location': '2288 Mission St, San Francisco'
         })
         self.assertRedirects(response, reverse('recommendations:notes_list'))
         mock_sync_sheet.assert_called_once_with(
-            shared_by='Chef Mateo',
+            shared_by=self.regular_profile.full_name,
             subject='Food & Dining',
             recommendation='Autentica Taqueria en Palo Alto: Tacos El Grullo',
             date_str='2026-08-18',
-            location='2288 Mission St, San Francisco'
+            location='2288 Mission St, San Francisco',
+            created_by_email=self.regular_profile.email
         )
 
         audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_CREATED).first()
         self.assertIsNotNone(audit)
-        self.assertEqual(audit.actor_email, self.admin_profile.email)
+        self.assertEqual(audit.actor_email, self.regular_profile.email)
         self.assertEqual(audit.target_name, 'Food & Dining')
-        self.assertIn('Chef Mateo', audit.notes)
+        self.assertIn(self.regular_profile.full_name, audit.notes)
 
     @patch('recommendations.views.sync_recommendation_to_google_sheet', return_value=True)
-    def test_organizer_create_recommendation_custom_category(self, mock_sync_sheet):
+    def test_member_create_recommendation_custom_category(self, mock_sync_sheet):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_create'), {
+            'category': 'Other',
+            'custom_category': 'Bilingual Pediatricians',
+            'shared_by': 'Carlos Member',
+            'recommendation': 'Dr. Sandra Gomez in Redwood City',
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_sync_sheet.assert_called_once()
+        self.assertEqual(mock_sync_sheet.call_args[1]['subject'], 'Bilingual Pediatricians')
+        self.assertEqual(mock_sync_sheet.call_args[1]['location'], '')
+        self.assertEqual(mock_sync_sheet.call_args[1]['created_by_email'], self.regular_profile.email)
+
+    @patch('recommendations.views.sync_recommendation_to_google_sheet', return_value=True)
+    def test_member_create_recommendation_locks_shared_by_to_user_name(self, mock_sync_sheet):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        # Attempt to spoof a different author name in the POST payload
+        response = self.client.post(reverse('recommendations:recommendation_create'), {
+            'category': 'Food & Dining',
+            'shared_by': 'Fake Spoofed Name',
+            'recommendation': 'Tacos on 24th',
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_sync_sheet.assert_called_once()
+        # Ensure it was saved with the user's verified name instead of the spoofed POST name
+        self.assertEqual(mock_sync_sheet.call_args[1]['shared_by'], self.regular_profile.full_name)
+        self.assertEqual(mock_sync_sheet.call_args[1]['created_by_email'], self.regular_profile.email)
+
+    @patch('recommendations.views.update_recommendation_in_google_sheet', return_value=True)
+    @patch('recommendations.views.fetch_recommendations')
+    def test_member_edit_own_recommendation_success(self, mock_fetch, mock_update_sheet):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-18',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Carlos Member',
+                'Recommendation': 'Old recommendation text',
+                'Location': '',
+                'Created_By_Email': self.regular_profile.email,
+                'row_num': 2,
+            }
+        ]
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_edit'), {
+            'row_index': '2',
+            'category': 'Food & Dining',
+            'shared_by': 'Carlos Member',
+            'recommendation': 'Updated recommendation text with new hours',
+            'date': '2026-08-19',
+            'location': '2288 Mission St, San Francisco',
+            'created_by_email': self.regular_profile.email,
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_update_sheet.assert_called_once_with(
+            row_index='2',
+            shared_by='Carlos Member',
+            subject='Food & Dining',
+            recommendation='Updated recommendation text with new hours',
+            date_str='2026-08-19',
+            location='2288 Mission St, San Francisco',
+            original_subject='',
+            original_shared_by='',
+            original_recommendation='',
+            created_by_email=self.regular_profile.email,
+            original_created_by_email=self.regular_profile.email,
+        )
+
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_UPDATED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.actor_email, self.regular_profile.email)
+
+    @patch('recommendations.views.update_recommendation_in_google_sheet')
+    @patch('recommendations.views.fetch_recommendations')
+    def test_member_edit_other_member_recommendation_forbidden(self, mock_fetch, mock_update_sheet):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-18',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Other Member',
+                'Recommendation': 'Original text',
+                'Location': '',
+                'Created_By_Email': 'other@minimexitas.org',
+                'row_num': 2,
+            }
+        ]
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_edit'), {
+            'row_index': '2',
+            'category': 'Food & Dining',
+            'shared_by': 'Other Member',
+            'recommendation': 'Malicious update attempt',
+            'created_by_email': 'other@minimexitas.org',
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_update_sheet.assert_not_called()
+        self.assertEqual(MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_UPDATED).count(), 0)
+
+    @patch('recommendations.views.update_recommendation_in_google_sheet', return_value=True)
+    @patch('recommendations.views.fetch_recommendations')
+    def test_admin_can_edit_any_recommendation(self, mock_fetch, mock_update_sheet):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-18',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Regular Member',
+                'Recommendation': 'Original text',
+                'Location': '',
+                'Created_By_Email': self.regular_profile.email,
+                'row_num': 2,
+            }
+        ]
         session = self.client.session
         session['is_verified_member'] = True
         session['member_email'] = self.admin_profile.email
@@ -3653,16 +3786,153 @@ class OrganizerCreateRecommendationTestCase(TestCase):
         session['is_admin'] = True
         session.save()
 
-        response = self.client.post(reverse('recommendations:recommendation_create'), {
-            'category': 'Other',
-            'custom_category': 'Bilingual Pediatricians',
-            'shared_by': 'Lucia R.',
-            'recommendation': 'Dr. Sandra Gomez in Redwood City',
+        response = self.client.post(reverse('recommendations:recommendation_edit'), {
+            'row_index': '2',
+            'category': 'Food & Dining',
+            'shared_by': 'Regular Member',
+            'recommendation': 'Admin moderated text',
+            'created_by_email': self.regular_profile.email,
         })
         self.assertRedirects(response, reverse('recommendations:notes_list'))
-        mock_sync_sheet.assert_called_once()
-        self.assertEqual(mock_sync_sheet.call_args[1]['subject'], 'Bilingual Pediatricians')
-        self.assertEqual(mock_sync_sheet.call_args[1]['location'], '')
+        mock_update_sheet.assert_called_once()
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_UPDATED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.actor_email, self.admin_profile.email)
+
+    @patch('recommendations.views.delete_recommendation_from_google_sheet', return_value=True)
+    @patch('recommendations.views.fetch_recommendations')
+    def test_member_delete_own_recommendation_success(self, mock_fetch, mock_delete_sheet):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-18',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Carlos Member',
+                'Recommendation': 'My old recommendation',
+                'Location': '',
+                'Created_By_Email': self.regular_profile.email,
+                'row_num': 2,
+            }
+        ]
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_delete'), {
+            'row_index': '2',
+            'subject': 'Food & Dining',
+            'shared_by': 'Carlos Member',
+            'recommendation': 'My old recommendation',
+            'created_by_email': self.regular_profile.email,
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_delete_sheet.assert_called_once_with(
+            row_index='2',
+            subject='Food & Dining',
+            shared_by='Carlos Member',
+            recommendation='My old recommendation',
+            created_by_email=self.regular_profile.email,
+        )
+
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_DELETED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.actor_email, self.regular_profile.email)
+
+    @patch('recommendations.views.delete_recommendation_from_google_sheet')
+    @patch('recommendations.views.fetch_recommendations')
+    def test_member_delete_other_member_recommendation_forbidden(self, mock_fetch, mock_delete_sheet):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-18',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Other Member',
+                'Recommendation': 'Someone elses recommendation',
+                'Location': '',
+                'Created_By_Email': 'other@minimexitas.org',
+                'row_num': 2,
+            }
+        ]
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.regular_profile.email
+        session['member_name'] = self.regular_profile.full_name
+        session['is_admin'] = False
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_delete'), {
+            'row_index': '2',
+            'subject': 'Food & Dining',
+            'shared_by': 'Other Member',
+            'recommendation': 'Someone elses recommendation',
+            'created_by_email': 'other@minimexitas.org',
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_delete_sheet.assert_not_called()
+        self.assertEqual(MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_DELETED).count(), 0)
+
+    @patch('recommendations.views.delete_recommendation_from_google_sheet', return_value=True)
+    @patch('recommendations.views.fetch_recommendations')
+    def test_admin_can_delete_any_recommendation(self, mock_fetch, mock_delete_sheet):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-18',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Regular Member',
+                'Recommendation': 'Regular member note',
+                'Location': '',
+                'Created_By_Email': self.regular_profile.email,
+                'row_num': 2,
+            }
+        ]
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = self.admin_profile.email
+        session['member_name'] = self.admin_profile.full_name
+        session['is_admin'] = True
+        session.save()
+
+        response = self.client.post(reverse('recommendations:recommendation_delete'), {
+            'row_index': '2',
+            'subject': 'Food & Dining',
+            'shared_by': 'Regular Member',
+            'recommendation': 'Regular member note',
+            'created_by_email': self.regular_profile.email,
+        })
+        self.assertRedirects(response, reverse('recommendations:notes_list'))
+        mock_delete_sheet.assert_called_once()
+        audit = MembershipAuditLog.objects.filter(action=MembershipAuditLog.ACTION_RECOMMENDATION_DELETED).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.actor_email, self.admin_profile.email)
+
+    @patch('recommendations.sheets.get_gspread_client')
+    def test_delete_recommendation_from_google_sheet_unit_success(self, mock_get_client):
+        mock_ws = MagicMock()
+        mock_ws.title = "Recomendaciones"
+        mock_ws.get_all_values.return_value = [
+            ['Date', 'Subject', 'Shared By', 'Recommendation', 'Location', 'Created By Email'],
+            ['2026-08-18', 'Food & Dining', 'Carlos', 'Great tacos in SF', '2288 Mission St', 'carlos@example.com'],
+            ['2026-08-19', 'Doctors', 'Ana', 'Pediatrician in SJ', '', 'ana@example.com'],
+        ]
+
+        mock_sh = MagicMock()
+        mock_sh.worksheets.return_value = [mock_ws]
+        mock_sh.worksheet.return_value = mock_ws
+        mock_client = MagicMock()
+        mock_client.open.return_value = mock_sh
+        mock_client.open_by_key.return_value = mock_sh
+        mock_get_client.return_value = mock_client
+
+        success = delete_recommendation_from_google_sheet(
+            row_index=2,
+            subject='Food & Dining',
+            shared_by='Carlos',
+            recommendation='Great tacos in SF',
+            created_by_email='carlos@example.com'
+        )
+        self.assertTrue(success)
+        mock_ws.delete_rows.assert_called_once_with(2)
 
     def test_parse_location_and_coords_variations(self):
         from recommendations.sheets import parse_location_and_coords
@@ -4086,16 +4356,19 @@ class EditRecommendationTestCase(TestCase):
         update_call = mock_ws.update.call_args
         self.assertEqual(update_call[1]['range_name'], 'A3:E3')
 
-    def test_organizer_edit_view_requires_admin(self):
-        # Authenticated non-admin gets 403 Forbidden
+    def test_organizer_edit_view_permissions(self):
+        # Authenticated non-admin editing another user's recommendation gets redirected with error
         self._login_as(self.regular_profile)
         response = self.client.post(reverse('recommendations:recommendation_edit'), {
             'row_index': '2',
             'category': 'Food & Dining',
-            'shared_by': 'Carlos',
-            'recommendation': 'Unauthorized edit attempt'
+            'shared_by': 'Other Member',
+            'recommendation': 'Unauthorized edit attempt',
+            'created_by_email': 'other@minimexitas.org',
         })
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('recommendations:notes_list'))
+        self.assertIn("You do not have permission", self.client.session.get('recommendation_error_message', ''))
 
         # Unauthenticated user gets redirected to login
         self.client.session.flush()
@@ -4125,7 +4398,8 @@ class EditRecommendationTestCase(TestCase):
             'recommendation': 'Updated pediatric recommendation with weekend hours.',
             'original_subject': 'Doctors & Health',
             'original_shared_by': 'Dr. Laura',
-            'original_recommendation': 'Old pediatric recommendation'
+            'original_recommendation': 'Old pediatric recommendation',
+            'created_by_email': self.admin_profile.email,
         })
 
         self.assertEqual(response.status_code, 302)
@@ -4143,12 +4417,13 @@ class EditRecommendationTestCase(TestCase):
         self.assertIn('2288 Mission St', log_entry.notes)
 
     @patch('recommendations.views.fetch_recommendations')
-    def test_notes_list_view_renders_edit_button_for_admin_only(self, mock_fetch):
+    def test_notes_list_view_renders_edit_button_for_authorized_users(self, mock_fetch):
         mock_fetch.return_value = [
             {
                 'Date': '2026-08-19',
                 'Subject': 'Food & Dining',
                 'Shared_By': 'Carlos',
+                'Created_By_Email': self.regular_profile.email,
                 'Recommendation': 'Delicious tacos on 24th St',
                 'Location': '24th St SF',
                 'location_display': '24th St SF',
@@ -4157,23 +4432,130 @@ class EditRecommendationTestCase(TestCase):
                 'lng': -122.41,
                 'has_location': True,
                 'index': 0,
+            },
+            {
+                'Date': '2026-08-19',
+                'Subject': 'Kids & Activities',
+                'Shared_By': 'Other Parent',
+                'Created_By_Email': 'other.parent@example.com',
+                'Recommendation': 'Great playground nearby',
+                'Location': '',
+                'has_location': False,
+                'index': 1,
             }
         ]
 
-        # 1. As regular member: NO edit buttons or edit modal
+        # 1. As regular member: HAS edit & delete button for own item, but NOT for other's item
         self._login_as(self.regular_profile)
         res_member = self.client.get(reverse('recommendations:notes_list'))
         self.assertEqual(res_member.status_code, 200)
-        self.assertNotContains(res_member, 'edit-rec-btn')
-        self.assertNotContains(res_member, 'id="editRecommendationModal"')
+        self.assertContains(res_member, 'edit-rec-btn')
+        self.assertContains(res_member, 'delete-rec-btn')
+        self.assertContains(res_member, 'id="editRecommendationModal"')
+        self.assertContains(res_member, 'id="deleteRecommendationModal"')
+        self.assertContains(res_member, f'value="{self.regular_profile.full_name}" readonly')
+        self.assertContains(res_member, 'id="editModalRecSharedBy" class="form-control bg-light" readonly')
+        self.assertNotContains(res_member, 'Google Sheet')
+        self.assertNotContains(res_member, 'Google Sheets')
 
-        # 2. As admin: HAS edit button and edit modal
+        # 2. As admin: HAS edit button for all items
         self._login_as(self.admin_profile)
         res_admin = self.client.get(reverse('recommendations:notes_list'))
         self.assertEqual(res_admin.status_code, 200)
         self.assertContains(res_admin, 'edit-rec-btn')
+        self.assertContains(res_admin, 'delete-rec-btn')
         self.assertContains(res_admin, 'id="editRecommendationModal"')
+        self.assertContains(res_admin, 'id="deleteRecommendationModal"')
         self.assertContains(res_admin, 'data-row-num="2"')
+
+    @patch('recommendations.views.fetch_recommendations')
+    def test_notes_list_view_renders_share_button_for_all_items(self, mock_fetch):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-19',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Carlos',
+                'Created_By_Email': self.regular_profile.email,
+                'Recommendation': 'Delicious tacos on 24th St',
+                'Location': '24th St SF',
+                'location_display': '24th St SF',
+                'location_url': 'https://maps.google.com',
+                'lat': 37.75,
+                'lng': -122.41,
+                'has_location': True,
+                'index': 0,
+            },
+            {
+                'Date': '2026-08-19',
+                'Subject': 'Kids & Activities',
+                'Shared_By': 'Other Parent',
+                'Created_By_Email': 'other.parent@example.com',
+                'Recommendation': 'Great playground nearby',
+                'Location': '',
+                'has_location': False,
+                'index': 1,
+            }
+        ]
+        self._login_as(self.regular_profile)
+        response = self.client.get(reverse('recommendations:notes_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'share-rec-btn')
+        self.assertContains(response, 'data-rec-url=')
+        self.assertContains(response, '/recommendations/2/')
+        self.assertContains(response, '/recommendations/3/')
+
+    @patch('recommendations.views.fetch_recommendations')
+    def test_notes_list_view_direct_url_access(self, mock_fetch):
+        mock_fetch.return_value = [
+            {
+                'Date': '2026-08-19',
+                'Subject': 'Food & Dining',
+                'Shared_By': 'Carlos',
+                'Created_By_Email': self.regular_profile.email,
+                'Recommendation': 'Delicious tacos on 24th St',
+                'Location': '24th St SF',
+                'location_display': '24th St SF',
+                'location_url': 'https://maps.google.com',
+                'lat': 37.75,
+                'lng': -122.41,
+                'has_location': True,
+                'index': 0,
+            },
+            {
+                'Date': '2026-08-19',
+                'Subject': 'Kids & Activities',
+                'Shared_By': 'Other Parent',
+                'Created_By_Email': 'other.parent@example.com',
+                'Recommendation': 'Great playground nearby',
+                'Location': '',
+                'has_location': False,
+                'index': 1,
+            }
+        ]
+        self._login_as(self.regular_profile)
+
+        # 1. Access via /recommendations/<rec_id>/
+        response = self.client.get(reverse('recommendation_detail', kwargs={'rec_id': 2}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context.get('is_direct_detail'))
+        self.assertEqual(response.context.get('target_rec_id'), 2)
+        self.assertIsNotNone(response.context.get('target_rec'))
+        self.assertContains(response, 'Shared Recommendation Direct Link')
+        self.assertContains(response, 'View All Recommendations')
+        self.assertContains(response, 'Copy Link')
+
+        # 2. Access via namespaced route /recommendations/<rec_id>/
+        response_ns = self.client.get(reverse('recommendations:recommendation_detail', kwargs={'rec_id': 3}))
+        self.assertEqual(response_ns.status_code, 200)
+        self.assertTrue(response_ns.context.get('is_direct_detail'))
+        self.assertEqual(response_ns.context.get('target_rec_id'), 3)
+        self.assertContains(response_ns, 'Shared Recommendation Direct Link')
+
+        # 3. Access via query param ?rec=2
+        response_query = self.client.get(f"{reverse('recommendations:notes_list')}?rec=2")
+        self.assertEqual(response_query.status_code, 200)
+        self.assertTrue(response_query.context.get('is_direct_detail'))
+
 
 
 class GeminiWeatherTestCase(TestCase):
