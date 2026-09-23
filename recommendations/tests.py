@@ -2959,6 +2959,141 @@ class EventRSVPAndBroadcastTestCase(TestCase):
         rsvp = CommunityEventRSVP.objects.get(event_id="evt_tacos_2026", member_email="carlos@minimexitas.org")
         self.assertEqual(rsvp.status, "maybe")
 
+    @patch('recommendations.views.sync_event_rsvp_to_google_sheet')
+    def test_event_rsvp_view_with_adults_kids_and_contribution(self, mock_sheet_sync):
+        mock_sheet_sync.return_value = True
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "carlos@minimexitas.org"
+        session['member_name'] = "Carlos Santana"
+        session.save()
+
+        # Submit RSVP 'going' with 2 adults, 3 kids, and contribution
+        response = self.client.post(
+            reverse('event_rsvp'),
+            {
+                'event_id': 'evt_tacos_2026',
+                'event_title': 'Mexican Food Tour & Taco Picnic',
+                'status': 'going',
+                'adults': '2',
+                'kids': '3',
+                'contribution': 'Guacamole & Homemade Tortilla Chips',
+                'notes': 'Looking forward to it!',
+                'ajax': '1',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['status'], 'going')
+        self.assertEqual(data['going_count'], 1)
+        self.assertEqual(data['total_adults'], 2)
+        self.assertEqual(data['total_kids'], 3)
+        self.assertEqual(data['total_people'], 5)
+        self.assertEqual(data['my_rsvp_adults'], 2)
+        self.assertEqual(data['my_rsvp_kids'], 3)
+        self.assertEqual(data['my_rsvp_contribution'], 'Guacamole & Homemade Tortilla Chips')
+        self.assertEqual(len(data['attendee_details']), 1)
+        self.assertEqual(data['attendee_details'][0]['name'], 'Carlos Santana')
+        self.assertEqual(data['attendee_details'][0]['adults'], 2)
+        self.assertEqual(data['attendee_details'][0]['kids'], 3)
+        self.assertEqual(data['attendee_details'][0]['contribution'], 'Guacamole & Homemade Tortilla Chips')
+        self.assertEqual(len(data['contributions']), 1)
+        self.assertEqual(data['contributions'][0]['member_name'], 'Carlos Santana')
+        self.assertEqual(data['contributions'][0]['contribution'], 'Guacamole & Homemade Tortilla Chips')
+
+        # Check model in DB
+        rsvp = CommunityEventRSVP.objects.get(event_id="evt_tacos_2026", member_email="carlos@minimexitas.org")
+        self.assertEqual(rsvp.status, "going")
+        self.assertEqual(rsvp.adults_count, 2)
+        self.assertEqual(rsvp.kids_count, 3)
+        self.assertEqual(rsvp.contribution, "Guacamole & Homemade Tortilla Chips")
+        self.assertEqual(rsvp.total_people, 5)
+
+    def test_event_rsvp_view_validation_mandatory_adults(self):
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "carlos@minimexitas.org"
+        session['member_name'] = "Carlos Santana"
+        session.save()
+
+        # Adults count < 1 when going must fail
+        response = self.client.post(
+            reverse('event_rsvp'),
+            {
+                'event_id': 'evt_tacos_2026',
+                'event_title': 'Mexican Food Tour & Taco Picnic',
+                'status': 'going',
+                'adults': '0',
+                'ajax': '1',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn("at least 1 adult", data['error'])
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_events_view_renders_headcount_breakdown_and_potluck(self, mock_fetch_events):
+        mock_fetch_events.return_value = [{
+            'id': 'evt_potluck_2026',
+            'title': 'MiniMexitas Spring Potluck Picnic',
+            'category': 'Culinary & Social',
+            'start_datetime': datetime.datetime(2026, 9, 10, 13, 0),
+            'year': 2026,
+            'month': 9,
+            'day': '10',
+            'date_formatted': 'Sep 10, 2026',
+            'time_formatted': '1:00 PM',
+            'location': 'Coyote Point Park, San Mateo',
+            'location_url': 'https://maps.google.com/?q=Coyote+Point',
+            'description': 'Family potluck picnic!',
+            'google_calendar_link': 'https://calendar.google.com/calendar',
+            'organizer': 'Sofia Admin',
+            'is_past': False,
+        }]
+
+        # Create 2 RSVPs
+        CommunityEventRSVP.objects.create(
+            event_id="evt_potluck_2026",
+            event_title="MiniMexitas Spring Potluck Picnic",
+            member_email="sofia@minimexitas.org",
+            member_name="Sofia Admin",
+            status="going",
+            adults_count=2,
+            kids_count=2,
+            contribution="Carnitas & Salsas"
+        )
+        CommunityEventRSVP.objects.create(
+            event_id="evt_potluck_2026",
+            event_title="MiniMexitas Spring Potluck Picnic",
+            member_email="carlos@minimexitas.org",
+            member_name="Carlos Santana",
+            status="going",
+            adults_count=1,
+            kids_count=1,
+            contribution="Aguas Frescas"
+        )
+
+        session = self.client.session
+        session['is_verified_member'] = True
+        session['member_email'] = "carlos@minimexitas.org"
+        session['member_name'] = "Carlos Santana"
+        session.save()
+
+        response = self.client.get(reverse('events'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "MiniMexitas Spring Potluck Picnic")
+        self.assertContains(response, "Carnitas &amp; Salsas")
+        self.assertContains(response, "Aguas Frescas")
+        self.assertContains(response, "Sofia Admin")
+        self.assertContains(response, "Carlos Santana")
+        self.assertContains(response, "2 Adult")
+        self.assertContains(response, "Things Members Are Bringing")
+
     @patch('recommendations.views.send_event_broadcast_email')
     @patch('recommendations.views.sync_audit_log_to_google_sheet')
     def test_organizer_event_broadcast_view_authorized_admin(self, mock_sheet_audit, mock_send_email):

@@ -157,6 +157,54 @@
             scrollbar-width: thin;
         }
 
+        .attendees-details-list {
+            max-height: 240px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        .attendee-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 0.76rem;
+            transition: all 0.2s ease;
+        }
+
+        .attendee-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+
+        .attendee-breakdown-badge {
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .contribution-tag {
+            font-size: 0.72rem;
+            background: #fefce8;
+            border: 1px solid #fef08a;
+            color: #854d0e;
+            border-radius: 6px;
+            padding: 2px 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .potluck-board {
+            background: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
         .attendee-pill {
             font-size: 0.72rem;
             padding: 2px 8px;
@@ -446,17 +494,25 @@
 
                     <!-- Interactive Member RSVP Widget -->
                     {% if not target_event.is_past %}
-                    <div class="rsvp-card-container mb-3 p-3 bg-light rounded-3 border">
+                    <div class="rsvp-card-container mb-3 p-3 bg-light rounded-3 border" id="focusedRsvpContainer">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="text-muted small fw-semibold" style="font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em;">
                                 🎟️ Your Attendance:
                             </span>
                             <span class="small text-muted" style="font-size: 0.76rem;">
-                                <span class="fw-bold text-success going-count-badge">{{ target_event.going_count }}</span> Confirmed Going
+                                <span class="fw-bold text-success going-count-badge">{{ target_event.going_count }}</span> Going
+                                <span class="headcount-summary-badge text-muted">({{ target_event.total_adults|default:target_event.going_count }} Adult{{ target_event.total_adults|default:target_event.going_count|pluralize }}{% if target_event.total_kids %}, {{ target_event.total_kids }} Kid{{ target_event.total_kids|pluralize }}{% endif %})</span>
                             </span>
                         </div>
                         
-                        <div class="rsvp-btn-group w-100 justify-content-between mb-3" data-event-id="{{ target_event.id }}" data-event-title="{{ target_event.title }}">
+                        <div class="rsvp-btn-group w-100 justify-content-between mb-2" 
+                            data-event-id="{{ target_event.id }}" 
+                            data-event-title="{{ target_event.title }}"
+                            data-my-rsvp="{{ target_event.my_rsvp|default:'' }}"
+                            data-my-adults="{{ target_event.my_rsvp_adults|default:1 }}"
+                            data-my-kids="{{ target_event.my_rsvp_kids|default:0 }}"
+                            data-my-contribution="{{ target_event.my_rsvp_contribution|default:'' }}"
+                            data-my-notes="{{ target_event.my_rsvp_notes|default:'' }}">
                             <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if target_event.my_rsvp == 'going' %}active-going{% endif %}" data-status="going">
                                 <i class="bi bi-check-circle-fill"></i> Going
                             </button>
@@ -468,15 +524,83 @@
                             </button>
                         </div>
 
+                        <!-- User RSVP summary indicator if responded -->
+                        <div class="user-rsvp-indicator-box mb-3 {% if not target_event.my_rsvp %}d-none{% endif %}">
+                            <div class="p-2 px-3 rounded-2 border d-flex align-items-center justify-content-between {% if target_event.my_rsvp == 'going' %}bg-success-subtle border-success-subtle text-success-emphasis{% elif target_event.my_rsvp == 'maybe' %}bg-warning-subtle border-warning-subtle text-warning-emphasis{% else %}bg-secondary-subtle border-secondary-subtle text-secondary-emphasis{% endif %}" style="font-size: 0.76rem;">
+                                <div class="user-rsvp-summary-text">
+                                    <i class="bi {% if target_event.my_rsvp == 'going' %}bi-check-circle-fill text-success{% elif target_event.my_rsvp == 'maybe' %}bi-question-circle-fill text-warning{% else %}bi-x-circle-fill text-secondary{% endif %} me-1"></i>
+                                    <strong>Your RSVP:</strong> 
+                                    <span class="user-rsvp-status-label">
+                                        {% if target_event.my_rsvp == 'going' %}
+                                            Going ({{ target_event.my_rsvp_adults|default:1 }} Adult{{ target_event.my_rsvp_adults|default:1|pluralize }}{% if target_event.my_rsvp_kids %}, {{ target_event.my_rsvp_kids }} Kid{{ target_event.my_rsvp_kids|pluralize }}{% endif %})
+                                            {% if target_event.my_rsvp_contribution %} · <i class="bi bi-basket-fill text-warning"></i> Bringing: <em>{{ target_event.my_rsvp_contribution }}</em>{% endif %}
+                                        {% elif target_event.my_rsvp == 'maybe' %}
+                                            Maybe
+                                        {% elif target_event.my_rsvp == 'declined' %}
+                                            Can't Go
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <button type="button" class="btn btn-xs btn-outline-dark rounded-pill py-0 px-2 btn-edit-rsvp" style="font-size: 0.7rem;"
+                                    data-event-id="{{ target_event.id }}"
+                                    data-event-title="{{ target_event.title }}"
+                                    data-status="{{ target_event.my_rsvp|default:'going' }}"
+                                    data-adults="{{ target_event.my_rsvp_adults|default:1 }}"
+                                    data-kids="{{ target_event.my_rsvp_kids|default:0 }}"
+                                    data-contribution="{{ target_event.my_rsvp_contribution|default:'' }}"
+                                    data-notes="{{ target_event.my_rsvp_notes|default:'' }}">
+                                    <i class="bi bi-pencil-square me-1"></i>Edit RSVP
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Confirmed Attendees List -->
                         <div class="pt-2 border-top">
-                            <div class="small fw-semibold text-dark mb-1" style="font-size: 0.74rem;">Confirmed Attendees:</div>
-                            <div class="attendees-chips-container d-flex flex-wrap gap-1">
-                                {% for attendee in target_event.attendees %}
-                                <span class="attendee-pill">{{ attendee }}</span>
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="small fw-semibold text-dark" style="font-size: 0.74rem;">Confirmed Attendees & Guests:</span>
+                                <span class="badge bg-white text-muted border small" style="font-size: 0.68rem;">
+                                    <span class="attendee-count-label">{{ target_event.attendees|length }}</span> Member{{ target_event.attendees|length|pluralize }}
+                                </span>
+                            </div>
+                            <div class="attendees-details-list d-flex flex-column gap-2" id="targetEventAttendeesList">
+                                {% for att in target_event.attendee_details %}
+                                <div class="attendee-card d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-person-fill text-primary"></i>
+                                        <span class="fw-semibold text-dark">{{ att.name }}</span>
+                                        <span class="attendee-breakdown-badge">
+                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% endif %}
+                                        </span>
+                                    </div>
+                                    {% if att.contribution %}
+                                    <div class="contribution-tag">
+                                        <i class="bi bi-basket-fill text-warning"></i>
+                                        <span>Bringing: <strong>{{ att.contribution }}</strong></span>
+                                    </div>
+                                    {% endif %}
+                                </div>
                                 {% empty %}
                                 <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>
                                 {% endfor %}
+                            </div>
+
+                            <!-- Community Potluck / Contributions Board -->
+                            <div class="potluck-board-container mt-3 {% if not target_event.contributions_list %}d-none{% endif %}">
+                                <div class="potluck-board">
+                                    <div class="small fw-bold text-dark mb-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-basket2-fill text-warning fs-6"></i>
+                                        <span>Things Members Are Bringing (Contributions):</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 contributions-chips-list">
+                                        {% for item in target_event.contributions_list %}
+                                        <span class="badge bg-white text-dark border shadow-xs p-2 d-inline-flex align-items-center gap-1" style="font-size: 0.76rem;">
+                                            <i class="bi bi-gift-fill text-primary me-1"></i>
+                                            <strong>{{ item.contribution }}</strong>
+                                            <span class="text-muted small ms-1">({{ item.member_name }})</span>
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -733,11 +857,20 @@
                                                 data-bs-target="#attendees-{{ forloop.counter }}" 
                                                 aria-expanded="false" 
                                                 style="font-size: 0.74rem;">
-                                            <span class="fw-bold text-success going-count-badge">{{ event.going_count }}</span> Going <i class="bi bi-chevron-down ms-1" style="font-size: 0.65rem;"></i>
+                                            <span class="fw-bold text-success going-count-badge">{{ event.going_count }}</span> Going
+                                            <span class="headcount-summary-badge text-muted">({{ event.total_adults|default:event.going_count }} Adult{{ event.total_adults|default:event.going_count|pluralize }}{% if event.total_kids %}, {{ event.total_kids }} Kid{{ event.total_kids|pluralize }}{% endif %})</span>
+                                            <i class="bi bi-chevron-down ms-1" style="font-size: 0.65rem;"></i>
                                         </button>
                                     </div>
                                     
-                                    <div class="rsvp-btn-group w-100 justify-content-between" data-event-id="{{ event.id }}" data-event-title="{{ event.title }}">
+                                    <div class="rsvp-btn-group w-100 justify-content-between mb-2" 
+                                        data-event-id="{{ event.id }}" 
+                                        data-event-title="{{ event.title }}"
+                                        data-my-rsvp="{{ event.my_rsvp|default:'' }}"
+                                        data-my-adults="{{ event.my_rsvp_adults|default:1 }}"
+                                        data-my-kids="{{ event.my_rsvp_kids|default:0 }}"
+                                        data-my-contribution="{{ event.my_rsvp_contribution|default:'' }}"
+                                        data-my-notes="{{ event.my_rsvp_notes|default:'' }}">
                                         <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if event.my_rsvp == 'going' %}active-going{% endif %}" data-status="going">
                                             <i class="bi bi-check-circle-fill"></i> Going
                                         </button>
@@ -749,16 +882,84 @@
                                         </button>
                                     </div>
 
+                                    <!-- User RSVP Indicator -->
+                                    <div class="user-rsvp-indicator-box mb-2 {% if not event.my_rsvp %}d-none{% endif %}">
+                                        <div class="p-1 px-2 rounded-2 border d-flex align-items-center justify-content-between {% if event.my_rsvp == 'going' %}bg-success-subtle border-success-subtle text-success-emphasis{% elif event.my_rsvp == 'maybe' %}bg-warning-subtle border-warning-subtle text-warning-emphasis{% else %}bg-secondary-subtle border-secondary-subtle text-secondary-emphasis{% endif %}" style="font-size: 0.72rem;">
+                                            <div class="user-rsvp-summary-text text-truncate me-1">
+                                                <i class="bi {% if event.my_rsvp == 'going' %}bi-check-circle-fill text-success{% elif event.my_rsvp == 'maybe' %}bi-question-circle-fill text-warning{% else %}bi-x-circle-fill text-secondary{% endif %} me-1"></i>
+                                                <strong>Your RSVP:</strong> 
+                                                <span class="user-rsvp-status-label">
+                                                    {% if event.my_rsvp == 'going' %}
+                                                        Going ({{ event.my_rsvp_adults|default:1 }}A{% if event.my_rsvp_kids %}, {{ event.my_rsvp_kids }}K{% endif %})
+                                                        {% if event.my_rsvp_contribution %} · <i class="bi bi-basket-fill text-warning"></i> <em>{{ event.my_rsvp_contribution|truncatechars:20 }}</em>{% endif %}
+                                                    {% elif event.my_rsvp == 'maybe' %}
+                                                        Maybe
+                                                    {% elif event.my_rsvp == 'declined' %}
+                                                        Can't Go
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                            <button type="button" class="btn btn-xs btn-outline-dark rounded-pill py-0 px-2 btn-edit-rsvp flex-shrink-0" style="font-size: 0.68rem;"
+                                                data-event-id="{{ event.id }}"
+                                                data-event-title="{{ event.title }}"
+                                                data-status="{{ event.my_rsvp|default:'going' }}"
+                                                data-adults="{{ event.my_rsvp_adults|default:1 }}"
+                                                data-kids="{{ event.my_rsvp_kids|default:0 }}"
+                                                data-contribution="{{ event.my_rsvp_contribution|default:'' }}"
+                                                data-notes="{{ event.my_rsvp_notes|default:'' }}">
+                                                <i class="bi bi-pencil-square me-1"></i>Edit
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <!-- Collapsible Attendees List -->
                                     <div class="collapse mt-2 attendees-collapse-box" id="attendees-{{ forloop.counter }}">
                                         <div class="pt-2 border-top">
-                                            <div class="small fw-semibold text-dark mb-1" style="font-size: 0.72rem;">Confirmed Attendees:</div>
-                                            <div class="attendees-chips-container d-flex flex-wrap gap-1">
-                                                {% for attendee in event.attendees %}
-                                                <span class="attendee-pill">{{ attendee }}</span>
+                                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                                <span class="small fw-semibold text-dark" style="font-size: 0.72rem;">Confirmed Attendees:</span>
+                                                <span class="badge bg-white text-muted border small" style="font-size: 0.65rem;">
+                                                    <span class="attendee-count-label">{{ event.attendees|length }}</span> Member{{ event.attendees|length|pluralize }}
+                                                </span>
+                                            </div>
+                                            <div class="attendees-details-list d-flex flex-column gap-1 mb-2">
+                                                {% for att in event.attendee_details %}
+                                                <div class="attendee-card p-1 px-2 d-flex flex-wrap align-items-center justify-content-between gap-1">
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <i class="bi bi-person text-primary" style="font-size: 0.75rem;"></i>
+                                                        <span class="fw-semibold text-dark" style="font-size: 0.74rem;">{{ att.name }}</span>
+                                                        <span class="attendee-breakdown-badge" style="font-size: 0.65rem;">
+                                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% endif %}
+                                                        </span>
+                                                    </div>
+                                                    {% if att.contribution %}
+                                                    <div class="contribution-tag" style="font-size: 0.68rem; padding: 1px 6px;">
+                                                        <i class="bi bi-basket-fill text-warning"></i>
+                                                        <span><strong>{{ att.contribution }}</strong></span>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
                                                 {% empty %}
                                                 <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>
                                                 {% endfor %}
+                                            </div>
+
+                                            <!-- Potluck items on card -->
+                                            <div class="potluck-board-container {% if not event.contributions_list %}d-none{% endif %}">
+                                                <div class="potluck-board p-2 rounded-2">
+                                                    <div class="fw-semibold text-dark d-flex align-items-center gap-1 mb-1" style="font-size: 0.7rem;">
+                                                        <i class="bi bi-basket2-fill text-warning"></i>
+                                                        <span>Things Members Are Bringing:</span>
+                                                    </div>
+                                                    <div class="d-flex flex-wrap gap-1 contributions-chips-list">
+                                                        {% for item in event.contributions_list %}
+                                                        <span class="badge bg-white text-dark border p-1 px-2" style="font-size: 0.68rem;">
+                                                            <i class="bi bi-gift-fill text-primary me-1"></i>
+                                                            <strong>{{ item.contribution }}</strong>
+                                                            <span class="text-muted small ms-1">({{ item.member_name }})</span>
+                                                        </span>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1353,8 +1554,15 @@
 
                     <!-- Modal RSVP Box -->
                     <div class="p-3 bg-light rounded-3 border mb-4" id="modalRsvpContainer">
-                        <div class="small fw-bold text-dark mb-2">🎟️ Your Attendance (RSVP)</div>
-                        <div class="rsvp-btn-group w-100 justify-content-between" id="modalRsvpBtnGroup" data-event-id="" data-event-title="">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="small fw-bold text-dark">🎟️ Your Attendance (RSVP)</span>
+                            <span class="small text-muted" style="font-size: 0.74rem;">
+                                <span class="fw-bold text-success going-count-badge" id="modalGoingCount">0</span> Going
+                                <span class="headcount-summary-badge text-muted" id="modalHeadcountSummary"></span>
+                            </span>
+                        </div>
+
+                        <div class="rsvp-btn-group w-100 justify-content-between mb-2" id="modalRsvpBtnGroup" data-event-id="" data-event-title="">
                             <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="going">
                                 <i class="bi bi-check-circle-fill"></i> Going
                             </button>
@@ -1364,6 +1572,43 @@
                             <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="declined">
                                 <i class="bi bi-x-circle-fill"></i> Can't Go
                             </button>
+                        </div>
+
+                        <!-- User RSVP Summary in Modal -->
+                        <div class="user-rsvp-indicator-box mb-3 d-none" id="modalUserRsvpIndicator">
+                            <div class="p-2 px-3 rounded-2 border d-flex align-items-center justify-content-between bg-success-subtle border-success-subtle text-success-emphasis" style="font-size: 0.76rem;">
+                                <div class="user-rsvp-summary-text">
+                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                    <strong>Your RSVP:</strong> <span class="user-rsvp-status-label"></span>
+                                </div>
+                                <button type="button" class="btn btn-xs btn-outline-dark rounded-pill py-0 px-2 btn-edit-rsvp" style="font-size: 0.7rem;">
+                                    <i class="bi bi-pencil-square me-1"></i>Edit
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Confirmed Attendees in Modal -->
+                        <div class="pt-2 border-top">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="small fw-semibold text-dark" style="font-size: 0.74rem;">Confirmed Attendees & Guests:</span>
+                                <span class="badge bg-white text-muted border small" style="font-size: 0.68rem;" id="modalAttendeeCountBadge">
+                                    0 Members
+                                </span>
+                            </div>
+                            <div class="attendees-details-list d-flex flex-column gap-2 mb-2" id="modalAttendeesList">
+                                <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>
+                            </div>
+
+                            <!-- Potluck Contributions in Modal -->
+                            <div class="potluck-board-container d-none" id="modalPotluckContainer">
+                                <div class="potluck-board mt-2">
+                                    <div class="small fw-bold text-dark mb-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-basket2-fill text-warning fs-6"></i>
+                                        <span>Things Members Are Bringing:</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 contributions-chips-list" id="modalPotluckChips"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1383,6 +1628,100 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- EVENT RSVP MODAL -->
+    <div class="modal fade" id="eventRsvpModal" tabindex="-1" aria-labelledby="eventRsvpModalLabel" aria-hidden="true" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content border-0 shadow-lg" id="eventRsvpForm" style="border-radius: var(--radius-xl); overflow: hidden;">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
+                    <div>
+                        <span class="badge bg-white-subtle text-white border border-white-subtle rounded-pill px-2 py-0 mb-1" style="font-size: 0.7rem;">
+                            🎟️ Event RSVP
+                        </span>
+                        <h5 class="modal-title fw-bold mb-0" id="eventRsvpModalTitle">Confirm Attendance</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="event_id" id="rsvpModalEventId" value="">
+                    <input type="hidden" name="event_title" id="rsvpModalEventTitle" value="">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small mb-1">Your RSVP Status *</label>
+                        <div class="d-flex gap-2" id="rsvpModalStatusGroup">
+                            <input type="radio" class="btn-check" name="status" id="rsvpStatusGoing" value="going" checked autocomplete="off">
+                            <label class="btn btn-outline-success flex-fill rounded-pill fw-semibold py-2" for="rsvpStatusGoing">
+                                <i class="bi bi-check-circle-fill me-1"></i> Going
+                            </label>
+
+                            <input type="radio" class="btn-check" name="status" id="rsvpStatusMaybe" value="maybe" autocomplete="off">
+                            <label class="btn btn-outline-warning flex-fill rounded-pill fw-semibold py-2" for="rsvpStatusMaybe">
+                                <i class="bi bi-question-circle-fill me-1"></i> Maybe
+                            </label>
+
+                            <input type="radio" class="btn-check" name="status" id="rsvpStatusDeclined" value="declined" autocomplete="off">
+                            <label class="btn btn-outline-secondary flex-fill rounded-pill fw-semibold py-2" for="rsvpStatusDeclined">
+                                <i class="bi bi-x-circle-fill me-1"></i> Can't Go
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Attendance Details (shown when Going or Maybe) -->
+                    <div id="rsvpAttendanceDetailsSection">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label for="rsvpModalAdults" class="form-label fw-bold text-dark small mb-1">
+                                    Number of Adults *
+                                </label>
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpAdultsDecBtn"><i class="bi bi-dash"></i></button>
+                                    <input type="number" class="form-control form-control-sm text-center fw-bold" id="rsvpModalAdults" name="adults" min="1" max="50" value="1" required>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpAdultsIncBtn"><i class="bi bi-plus"></i></button>
+                                </div>
+                                <div class="form-text text-muted" style="font-size: 0.72rem;">Incl. yourself (min 1)</div>
+                            </div>
+                            <div class="col-6">
+                                <label for="rsvpModalKids" class="form-label fw-bold text-dark small mb-1">
+                                    Number of Kids <span class="text-muted fw-normal">(optional)</span>
+                                </label>
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpKidsDecBtn"><i class="bi bi-dash"></i></button>
+                                    <input type="number" class="form-control form-control-sm text-center fw-bold" id="rsvpModalKids" name="kids" min="0" max="50" value="0">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpKidsIncBtn"><i class="bi bi-plus"></i></button>
+                                </div>
+                                <div class="form-text text-muted" style="font-size: 0.72rem;">Children attending</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="rsvpModalContribution" class="form-label fw-bold text-dark small mb-1">
+                                Contribution (Things I am bringing) <span class="text-muted fw-normal">(optional)</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted"><i class="bi bi-basket-fill text-warning"></i></span>
+                                <input type="text" class="form-control" id="rsvpModalContribution" name="contribution" maxlength="255" placeholder="e.g. Guacamole & chips, beverages, dessert...">
+                            </div>
+                            <div class="form-text text-muted" style="font-size: 0.72rem;">Food, drinks, or items you plan to bring for the group.</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label for="rsvpModalNotes" class="form-label fw-bold text-dark small mb-1">
+                            Notes / Comments <span class="text-muted fw-normal">(optional)</span>
+                        </label>
+                        <textarea class="form-control" id="rsvpModalNotes" name="notes" rows="2" placeholder="Any dietary restrictions, questions, or notes for the organizer..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 px-4 py-3 justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold" id="rsvpModalSubmitBtn">
+                        <span class="submit-text"><i class="bi bi-check2-circle me-1"></i> Save RSVP</span>
+                        <span class="spinner-border spinner-border-sm d-none ms-1" role="status"></span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1630,12 +1969,170 @@
             return cookieValue;
         }
 
-        async function submitRSVP(eventId, eventTitle, status, triggeringBtnGroup) {
-            const formData = new FormData();
-            formData.append("event_id", eventId);
-            formData.append("event_title", eventTitle);
-            formData.append("status", status);
+        // --- Interactive RSVP Modal & Headcount Logic ---
+        const eventRsvpModalEl = document.getElementById("eventRsvpModal");
+        const eventRsvpModal = eventRsvpModalEl ? new bootstrap.Modal(eventRsvpModalEl) : null;
+        const eventRsvpForm = document.getElementById("eventRsvpForm");
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function renderAttendeeCardsHtml(attendeeDetails) {
+            if (!attendeeDetails || attendeeDetails.length === 0) {
+                return `<span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>`;
+            }
+            return attendeeDetails.map(att => {
+                const adults = parseInt(att.adults) || 1;
+                const kids = parseInt(att.kids) || 0;
+                const adultText = `${adults} Adult${adults !== 1 ? 's' : ''}`;
+                const kidText = kids > 0 ? `, ${kids} Kid${kids !== 1 ? 's' : ''}` : '';
+                const contribHtml = att.contribution ? `
+                    <div class="contribution-tag">
+                        <i class="bi bi-basket-fill text-warning"></i>
+                        <span>Bringing: <strong>${escapeHtml(att.contribution)}</strong></span>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="attendee-card d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-person-fill text-primary"></i>
+                            <span class="fw-semibold text-dark">${escapeHtml(att.name)}</span>
+                            <span class="attendee-breakdown-badge">${adultText}${kidText}</span>
+                        </div>
+                        ${contribHtml}
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function renderPotluckChipsHtml(contributions) {
+            if (!contributions || contributions.length === 0) return '';
+            return contributions.map(c => `
+                <span class="badge bg-white text-dark border shadow-xs p-2 d-inline-flex align-items-center gap-1" style="font-size: 0.76rem;">
+                    <i class="bi bi-gift-fill text-primary me-1"></i>
+                    <strong>${escapeHtml(c.contribution)}</strong>
+                    <span class="text-muted small ms-1">(${escapeHtml(c.member_name)})</span>
+                </span>
+            `).join("");
+        }
+
+        function formatHeadcountSummary(totalAdults, totalKids) {
+            if (!totalAdults && !totalKids) return '';
+            const adultText = `${totalAdults} Adult${totalAdults !== 1 ? 's' : ''}`;
+            const kidText = totalKids > 0 ? `, ${totalKids} Kid${totalKids !== 1 ? 's' : ''}` : '';
+            return `(${adultText}${kidText})`;
+        }
+
+        function toggleRsvpDetailsSection(status) {
+            const detailsSec = document.getElementById("rsvpAttendanceDetailsSection");
+            const adultsInput = document.getElementById("rsvpModalAdults");
+            if (!detailsSec) return;
+            if (status === 'declined') {
+                detailsSec.style.opacity = '0.4';
+                detailsSec.style.pointerEvents = 'none';
+                if (adultsInput) adultsInput.required = false;
+            } else {
+                detailsSec.style.opacity = '1';
+                detailsSec.style.pointerEvents = 'auto';
+                if (adultsInput) adultsInput.required = true;
+            }
+        }
+
+        document.querySelectorAll('input[name="status"]').forEach(radio => {
+            radio.addEventListener("change", function() {
+                toggleRsvpDetailsSection(this.value);
+            });
+        });
+
+        document.getElementById("rsvpAdultsIncBtn")?.addEventListener("click", () => {
+            const inp = document.getElementById("rsvpModalAdults");
+            if (inp) inp.value = Math.min(50, (parseInt(inp.value) || 1) + 1);
+        });
+        document.getElementById("rsvpAdultsDecBtn")?.addEventListener("click", () => {
+            const inp = document.getElementById("rsvpModalAdults");
+            if (inp) inp.value = Math.max(1, (parseInt(inp.value) || 1) - 1);
+        });
+        document.getElementById("rsvpKidsIncBtn")?.addEventListener("click", () => {
+            const inp = document.getElementById("rsvpModalKids");
+            if (inp) inp.value = Math.min(50, (parseInt(inp.value) || 0) + 1);
+        });
+        document.getElementById("rsvpKidsDecBtn")?.addEventListener("click", () => {
+            const inp = document.getElementById("rsvpModalKids");
+            if (inp) inp.value = Math.max(0, (parseInt(inp.value) || 0) - 1);
+        });
+
+        function openRsvpModal(eventId, eventTitle, initialStatus, adults, kids, contribution, notes) {
+            document.getElementById("rsvpModalEventId").value = eventId || "";
+            document.getElementById("rsvpModalEventTitle").value = eventTitle || "";
+            document.getElementById("eventRsvpModalTitle").textContent = eventTitle ? `RSVP: ${eventTitle}` : "Confirm Attendance";
+
+            const targetStatus = initialStatus || 'going';
+            const radioBtn = document.querySelector(`input[name="status"][value="${targetStatus}"]`);
+            if (radioBtn) radioBtn.checked = true;
+
+            const adultsVal = Math.max(1, parseInt(adults) || 1);
+            const kidsVal = Math.max(0, parseInt(kids) || 0);
+            document.getElementById("rsvpModalAdults").value = adultsVal;
+            document.getElementById("rsvpModalKids").value = kidsVal;
+            document.getElementById("rsvpModalContribution").value = contribution || "";
+            document.getElementById("rsvpModalNotes").value = notes || "";
+
+            toggleRsvpDetailsSection(targetStatus);
+            eventRsvpModal?.show();
+        }
+
+        // Handle trigger clicks
+        document.addEventListener("click", function(e) {
+            const rsvpTrigger = e.target.closest(".rsvp-trigger-btn");
+            if (rsvpTrigger) {
+                const group = rsvpTrigger.closest(".rsvp-btn-group");
+                const eventId = group?.getAttribute("data-event-id") || rsvpTrigger.dataset.eventId;
+                const eventTitle = group?.getAttribute("data-event-title") || rsvpTrigger.dataset.eventTitle;
+                const clickedStatus = rsvpTrigger.getAttribute("data-status") || "going";
+                const currentAdults = group?.getAttribute("data-my-adults") || "1";
+                const currentKids = group?.getAttribute("data-my-kids") || "0";
+                const currentContrib = group?.getAttribute("data-my-contribution") || "";
+                const currentNotes = group?.getAttribute("data-my-notes") || "";
+
+                openRsvpModal(eventId, eventTitle, clickedStatus, currentAdults, currentKids, currentContrib, currentNotes);
+                return;
+            }
+
+            const editRsvpBtn = e.target.closest(".btn-edit-rsvp");
+            if (editRsvpBtn) {
+                const d = editRsvpBtn.dataset;
+                openRsvpModal(d.eventId, d.eventTitle, d.status || "going", d.adults || "1", d.kids || "0", d.contribution || "", d.notes || "");
+                return;
+            }
+        });
+
+        // Submit RSVP Form
+        eventRsvpForm?.addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById("rsvpModalSubmitBtn");
+            const spinner = submitBtn?.querySelector(".spinner-border");
+            const submitText = submitBtn?.querySelector(".submit-text");
+
+            const formData = new FormData(eventRsvpForm);
             formData.append("ajax", "1");
+
+            const eventId = formData.get("event_id");
+            const status = formData.get("status");
+            const adults = parseInt(formData.get("adults")) || 1;
+            const kids = parseInt(formData.get("kids")) || 0;
+            const contribution = (formData.get("contribution") || "").trim();
+
+            if (status === 'going' && adults < 1) {
+                alert("Please specify at least 1 adult attending.");
+                return;
+            }
+
+            if (submitBtn) submitBtn.disabled = true;
+            if (spinner) spinner.classList.remove("d-none");
 
             try {
                 const response = await fetch("{% url 'event_rsvp' %}", {
@@ -1650,55 +2147,143 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
-                        // Update button groups for this event everywhere (card and modal)
+                        eventRsvpModal?.hide();
+
+                        // 1. Update eventsData array
+                        const evtItem = eventsData.find(e => String(e.id) === String(eventId));
+                        if (evtItem) {
+                            evtItem.my_rsvp = data.status;
+                            evtItem.my_rsvp_adults = data.my_rsvp_adults;
+                            evtItem.my_rsvp_kids = data.my_rsvp_kids;
+                            evtItem.my_rsvp_contribution = data.my_rsvp_contribution;
+                            evtItem.going_count = data.going_count;
+                            evtItem.total_adults = data.total_adults;
+                            evtItem.total_kids = data.total_kids;
+                            evtItem.total_people = data.total_people;
+                            evtItem.attendees = data.attendees;
+                            evtItem.attendee_details = data.attendee_details;
+                            evtItem.contributions_list = data.contributions;
+                        }
+
+                        // 2. Update all button groups for this event
                         document.querySelectorAll(`.rsvp-btn-group[data-event-id="${eventId}"]`).forEach(group => {
+                            group.setAttribute("data-my-rsvp", data.status);
+                            group.setAttribute("data-my-adults", data.my_rsvp_adults);
+                            group.setAttribute("data-my-kids", data.my_rsvp_kids);
+                            group.setAttribute("data-my-contribution", data.my_rsvp_contribution || "");
+
                             group.querySelectorAll(".btn-rsvp-pill").forEach(b => {
                                 b.classList.remove("active-going", "active-maybe", "active-declined");
-                                if (b.getAttribute("data-status") === status) {
-                                    b.classList.add(`active-${status}`);
+                                if (b.getAttribute("data-status") === data.status) {
+                                    b.classList.add(`active-${data.status}`);
                                 }
                             });
                         });
 
-                        // Update card attendee counter and attendee chip list
-                        const eventCard = document.getElementById(`event-card-${eventId}`);
-                        if (eventCard) {
-                            const goingBadge = eventCard.querySelector(".going-count-badge");
+                        // 3. Update User RSVP Indicator boxes everywhere
+                        document.querySelectorAll(`.rsvp-card-container`).forEach(container => {
+                            const group = container.querySelector(`.rsvp-btn-group[data-event-id="${eventId}"]`);
+                            if (!group) return;
+
+                            const indicatorBox = container.querySelector(".user-rsvp-indicator-box");
+                            if (indicatorBox) {
+                                if (data.status) {
+                                    indicatorBox.classList.remove("d-none");
+                                    const labelEl = indicatorBox.querySelector(".user-rsvp-status-label");
+                                    if (labelEl) {
+                                        if (data.status === 'going') {
+                                            const aText = `${data.my_rsvp_adults} Adult${data.my_rsvp_adults !== 1 ? 's' : ''}`;
+                                            const kText = data.my_rsvp_kids > 0 ? `, ${data.my_rsvp_kids} Kid${data.my_rsvp_kids !== 1 ? 's' : ''}` : '';
+                                            const cText = data.my_rsvp_contribution ? ` · <i class="bi bi-basket-fill text-warning"></i> Bringing: <em>${escapeHtml(data.my_rsvp_contribution)}</em>` : '';
+                                            labelEl.innerHTML = `Going (${aText}${kText})${cText}`;
+                                        } else if (data.status === 'maybe') {
+                                            labelEl.textContent = 'Maybe';
+                                        } else {
+                                            labelEl.textContent = "Can't Go";
+                                        }
+                                    }
+
+                                    const editBtn = indicatorBox.querySelector(".btn-edit-rsvp");
+                                    if (editBtn) {
+                                        editBtn.dataset.status = data.status;
+                                        editBtn.dataset.adults = data.my_rsvp_adults;
+                                        editBtn.dataset.kids = data.my_rsvp_kids;
+                                        editBtn.dataset.contribution = data.my_rsvp_contribution || "";
+                                    }
+                                } else {
+                                    indicatorBox.classList.add("d-none");
+                                }
+                            }
+
+                            // Update Going Count & Headcount
+                            const goingBadge = container.querySelector(".going-count-badge");
                             if (goingBadge) goingBadge.textContent = data.going_count;
 
-                            const chipsContainer = eventCard.querySelector(".attendees-chips-container");
-                            if (chipsContainer && data.attendees) {
-                                if (data.attendees.length > 0) {
-                                    chipsContainer.innerHTML = data.attendees.map(name => `<span class="attendee-pill">${name}</span>`).join(" ");
+                            const headcountBadge = container.querySelector(".headcount-summary-badge");
+                            if (headcountBadge) headcountBadge.textContent = formatHeadcountSummary(data.total_adults, data.total_kids);
+
+                            const attCountBadge = container.querySelector(".attendee-count-label");
+                            if (attCountBadge) attCountBadge.textContent = data.attendees.length;
+
+                            // Update Attendees List
+                            const attendeesList = container.querySelector(".attendees-details-list");
+                            if (attendeesList && data.attendee_details) {
+                                attendeesList.innerHTML = renderAttendeeCardsHtml(data.attendee_details);
+                            }
+
+                            // Update Potluck Board
+                            const potluckContainer = container.querySelector(".potluck-board-container");
+                            const potluckChips = container.querySelector(".contributions-chips-list");
+                            if (potluckContainer && potluckChips) {
+                                if (data.contributions && data.contributions.length > 0) {
+                                    potluckContainer.classList.remove("d-none");
+                                    potluckChips.innerHTML = renderPotluckChipsHtml(data.contributions);
                                 } else {
-                                    chipsContainer.innerHTML = `<span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>`;
+                                    potluckContainer.classList.add("d-none");
+                                }
+                            }
+                        });
+
+                        // 4. Update Event Detail Modal if currently viewing this event
+                        if (activeModalEvent && String(activeModalEvent.id) === String(eventId)) {
+                            const modalGoing = document.getElementById("modalGoingCount");
+                            if (modalGoing) modalGoing.textContent = data.going_count;
+
+                            const modalHeadcount = document.getElementById("modalHeadcountSummary");
+                            if (modalHeadcount) modalHeadcount.textContent = formatHeadcountSummary(data.total_adults, data.total_kids);
+
+                            const modalAttList = document.getElementById("modalAttendeesList");
+                            if (modalAttList) modalAttList.innerHTML = renderAttendeeCardsHtml(data.attendee_details);
+
+                            const modalPotluckCont = document.getElementById("modalPotluckContainer");
+                            const modalPotluckChp = document.getElementById("modalPotluckChips");
+                            if (modalPotluckCont && modalPotluckChp) {
+                                if (data.contributions && data.contributions.length > 0) {
+                                    modalPotluckCont.classList.remove("d-none");
+                                    modalPotluckChp.innerHTML = renderPotluckChipsHtml(data.contributions);
+                                } else {
+                                    modalPotluckCont.classList.add("d-none");
                                 }
                             }
                         }
 
+                        // 5. Toast Feedback
                         const statusDisplayNames = {
-                            'going': '✅ Going / ¡Confirmado!',
-                            'maybe': '🟡 Maybe / Tal vez',
-                            'declined': '❌ Not Going / No podré'
+                            'going': `🎟️ RSVP Confirmed: Going (${data.my_rsvp_adults} Adult${data.my_rsvp_adults !== 1 ? 's' : ''}${data.my_rsvp_kids ? ', ' + data.my_rsvp_kids + ' Kid' + (data.my_rsvp_kids !== 1 ? 's' : '') : ''})${data.my_rsvp_contribution ? ' · Bringing: ' + data.my_rsvp_contribution : ''}`,
+                            'maybe': '🟡 RSVP Updated: Maybe',
+                            'declined': '❌ RSVP Updated: Can\'t Go'
                         };
-                        showRsvpToast(`RSVP updated: ${statusDisplayNames[status] || status}`);
+                        showRsvpToast(statusDisplayNames[data.status] || 'RSVP Updated!');
                     }
+                } else {
+                    alert("Error saving RSVP. Please try again.");
                 }
             } catch (err) {
-                console.error("RSVP Error:", err);
-            }
-        }
-
-        document.addEventListener("click", function(e) {
-            const rsvpBtn = e.target.closest(".rsvp-trigger-btn");
-            if (rsvpBtn) {
-                const group = rsvpBtn.closest(".rsvp-btn-group");
-                if (group) {
-                    const eventId = group.getAttribute("data-event-id");
-                    const eventTitle = group.getAttribute("data-event-title");
-                    const status = rsvpBtn.getAttribute("data-status");
-                    submitRSVP(eventId, eventTitle, status, group);
-                }
+                console.error("RSVP Submission Error:", err);
+                alert("Network error saving RSVP. Please try again.");
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+                if (spinner) spinner.classList.add("d-none");
             }
         });
 
@@ -1954,15 +2539,20 @@
         function openModalForEvent(evt) {
             activeModalEvent = evt;
             const eventId = evt.id || evt.dataset?.id || "";
-            const eventTitle = evt.title || "";
-            const myRsvp = evt.my_rsvp || evt.myRsvp || evt.dataset?.myRsvp || "";
+            const eventObj = eventsData.find(e => String(e.id) === String(eventId)) || evt;
+            const eventTitle = eventObj.title || evt.title || "";
+            const myRsvp = eventObj.my_rsvp || evt.my_rsvp || evt.dataset?.myRsvp || "";
+            const myAdults = eventObj.my_rsvp_adults || evt.dataset?.myAdults || 1;
+            const myKids = eventObj.my_rsvp_kids || evt.dataset?.myKids || 0;
+            const myContrib = eventObj.my_rsvp_contribution || evt.dataset?.myContribution || "";
+            const myNotes = eventObj.my_rsvp_notes || evt.dataset?.myNotes || "";
 
             document.getElementById("modalEventHeading").textContent = eventTitle;
             const catBadge = document.getElementById("modalEventCategory");
             if (catBadge) {
-                catBadge.textContent = evt.category || "";
+                catBadge.textContent = eventObj.category || evt.category || "";
                 catBadge.className = "badge category-tag mb-2";
-                const catLower = (evt.category || "").toLowerCase();
+                const catLower = (eventObj.category || evt.category || "").toLowerCase();
                 if (catLower.includes("cultural")) catBadge.classList.add("cultural");
                 else if (catLower.includes("family") || catLower.includes("outdoor")) catBadge.classList.add("family");
                 else if (catLower.includes("culinary")) catBadge.classList.add("culinary");
@@ -1970,27 +2560,91 @@
                 else if (catLower.includes("papis")) catBadge.classList.add("papis");
                 else catBadge.classList.add("tech");
             }
-            document.getElementById("modalEventDate").textContent = evt.date_formatted || evt.date || "";
-            document.getElementById("modalEventTime").textContent = evt.time_formatted || evt.time || "";
-            document.getElementById("modalEventLocation").textContent = evt.location || "";
-            document.getElementById("modalEventLocUrl").href = evt.location_url || evt.locurl || "#";
-            document.getElementById("modalEventOrganizer").textContent = evt.organizer || "MiniMexitas Community";
-            document.getElementById("modalEventDescription").textContent = evt.description || evt.desc || "";
-            document.getElementById("modalEventGcalLink").href = evt.google_calendar_link || evt.gcal || "#";
+            document.getElementById("modalEventDate").textContent = eventObj.date_formatted || eventObj.date || evt.date_formatted || evt.date || "";
+            document.getElementById("modalEventTime").textContent = eventObj.time_formatted || eventObj.time || evt.time_formatted || evt.time || "";
+            document.getElementById("modalEventLocation").textContent = eventObj.location || evt.location || "";
+            document.getElementById("modalEventLocUrl").href = eventObj.location_url || eventObj.locurl || evt.location_url || evt.locurl || "#";
+            document.getElementById("modalEventOrganizer").textContent = eventObj.organizer || evt.organizer || "MiniMexitas Community";
+            document.getElementById("modalEventDescription").textContent = eventObj.description || eventObj.desc || evt.description || evt.desc || "";
+            document.getElementById("modalEventGcalLink").href = eventObj.google_calendar_link || eventObj.gcal || evt.google_calendar_link || evt.gcal || "#";
+
+            // Update RSVP Headcount and Attendees in Modal
+            const goingCount = eventObj.going_count !== undefined ? eventObj.going_count : (evt.going_count || 0);
+            const totalAdults = eventObj.total_adults !== undefined ? eventObj.total_adults : (evt.total_adults || goingCount);
+            const totalKids = eventObj.total_kids !== undefined ? eventObj.total_kids : (evt.total_kids || 0);
+            const attendeeDetails = eventObj.attendee_details || evt.attendee_details || [];
+            const contributions = eventObj.contributions_list || evt.contributions_list || [];
+
+            const modalGoing = document.getElementById("modalGoingCount");
+            if (modalGoing) modalGoing.textContent = goingCount;
+
+            const modalHeadcount = document.getElementById("modalHeadcountSummary");
+            if (modalHeadcount) modalHeadcount.textContent = formatHeadcountSummary(totalAdults, totalKids);
+
+            const modalAttBadge = document.getElementById("modalAttendeeCountBadge");
+            if (modalAttBadge) modalAttBadge.textContent = `${attendeeDetails.length} Member${attendeeDetails.length !== 1 ? 's' : ''}`;
+
+            const modalAttList = document.getElementById("modalAttendeesList");
+            if (modalAttList) modalAttList.innerHTML = renderAttendeeCardsHtml(attendeeDetails);
+
+            const modalPotluckCont = document.getElementById("modalPotluckContainer");
+            const modalPotluckChips = document.getElementById("modalPotluckChips");
+            if (modalPotluckCont && modalPotluckChips) {
+                if (contributions && contributions.length > 0) {
+                    modalPotluckCont.classList.remove("d-none");
+                    modalPotluckChips.innerHTML = renderPotluckChipsHtml(contributions);
+                } else {
+                    modalPotluckCont.classList.add("d-none");
+                }
+            }
+
+            // User RSVP Summary in Modal
+            const modalUserRsvp = document.getElementById("modalUserRsvpIndicator");
+            if (modalUserRsvp) {
+                if (myRsvp) {
+                    modalUserRsvp.classList.remove("d-none");
+                    const statusLabel = modalUserRsvp.querySelector(".user-rsvp-status-label");
+                    if (statusLabel) {
+                        if (myRsvp === 'going') {
+                            const aText = `${myAdults} Adult${myAdults !== 1 ? 's' : ''}`;
+                            const kText = myKids > 0 ? `, ${myKids} Kid${myKids !== 1 ? 's' : ''}` : '';
+                            const cText = myContrib ? ` · <i class="bi bi-basket-fill text-warning"></i> Bringing: <em>${escapeHtml(myContrib)}</em>` : '';
+                            statusLabel.innerHTML = `Going (${aText}${kText})${cText}`;
+                        } else if (myRsvp === 'maybe') {
+                            statusLabel.textContent = 'Maybe';
+                        } else {
+                            statusLabel.textContent = "Can't Go";
+                        }
+                    }
+
+                    const editBtn = modalUserRsvp.querySelector(".btn-edit-rsvp");
+                    if (editBtn) {
+                        editBtn.dataset.eventId = eventId;
+                        editBtn.dataset.eventTitle = eventTitle;
+                        editBtn.dataset.status = myRsvp;
+                        editBtn.dataset.adults = myAdults;
+                        editBtn.dataset.kids = myKids;
+                        editBtn.dataset.contribution = myContrib;
+                        editBtn.dataset.notes = myNotes;
+                    }
+                } else {
+                    modalUserRsvp.classList.add("d-none");
+                }
+            }
 
             // Load Weather & Outfit Forecast for this event
             const modalWeatherEl = document.getElementById("modalWeatherContent");
             const modalRefreshBtn = document.getElementById("modalWeatherRefreshBtn");
             if (modalRefreshBtn) {
-                modalRefreshBtn.style.display = evt.is_past ? 'none' : '';
+                modalRefreshBtn.style.display = eventObj.is_past ? 'none' : '';
             }
-            if (modalWeatherEl && evt.location) {
-                const dtStr = `${evt.date_formatted || evt.date || ''} ${evt.time_formatted || evt.time || ''}`.trim();
-                fetchEventWeather(evt.location, dtStr, modalWeatherEl, false);
+            if (modalWeatherEl && (eventObj.location || evt.location)) {
+                const dtStr = `${eventObj.date_formatted || eventObj.date || ''} ${eventObj.time_formatted || eventObj.time || ''}`.trim();
+                fetchEventWeather(eventObj.location || evt.location, dtStr, modalWeatherEl, false);
             }
 
             // Set share URLs in modal
-            const shareUrl = evt.share_url || evt.dataset?.shareUrl || `${window.location.origin}/events/${eventId}/`;
+            const shareUrl = eventObj.share_url || evt.share_url || evt.dataset?.shareUrl || `${window.location.origin}/events/${eventId}/`;
             const modalCopyBtn = document.getElementById("modalCopyBtn");
             if (modalCopyBtn) {
                 modalCopyBtn.setAttribute("data-event-url", shareUrl);
@@ -1999,15 +2653,22 @@
 
             // Configure modal RSVP button group
             const modalRsvpGroup = document.getElementById("modalRsvpBtnGroup");
-            modalRsvpGroup.setAttribute("data-event-id", eventId);
-            modalRsvpGroup.setAttribute("data-event-title", eventTitle);
+            if (modalRsvpGroup) {
+                modalRsvpGroup.setAttribute("data-event-id", eventId);
+                modalRsvpGroup.setAttribute("data-event-title", eventTitle);
+                modalRsvpGroup.setAttribute("data-my-rsvp", myRsvp);
+                modalRsvpGroup.setAttribute("data-my-adults", myAdults);
+                modalRsvpGroup.setAttribute("data-my-kids", myKids);
+                modalRsvpGroup.setAttribute("data-my-contribution", myContrib);
+                modalRsvpGroup.setAttribute("data-my-notes", myNotes);
 
-            modalRsvpGroup.querySelectorAll(".btn-rsvp-pill").forEach(b => {
-                b.classList.remove("active-going", "active-maybe", "active-declined");
-                if (b.getAttribute("data-status") === myRsvp) {
-                    b.classList.add(`active-${myRsvp}`);
-                }
-            });
+                modalRsvpGroup.querySelectorAll(".btn-rsvp-pill").forEach(b => {
+                    b.classList.remove("active-going", "active-maybe", "active-declined");
+                    if (b.getAttribute("data-status") === myRsvp) {
+                        b.classList.add(`active-${myRsvp}`);
+                    }
+                });
+            }
 
             detailModal.show();
         }

@@ -718,12 +718,45 @@ def _get_enriched_events(member_email, force_refresh=False):
         my_rsvp_obj = next((r for r in e_rsvps if r.member_email.lower() == member_email), None)
         broadcast_obj = broadcast_map.get(e_id)
 
+        total_adults = sum(int(r.adults_count or 1) for r in going_list)
+        total_kids = sum(int(r.kids_count or 0) for r in going_list)
+        total_people = total_adults + total_kids
+
+        attendee_details = []
+        contributions_list = []
+        for r in going_list:
+            if r.member_name:
+                a_cnt = int(r.adults_count or 1)
+                k_cnt = int(r.kids_count or 0)
+                attendee_details.append({
+                    'name': r.member_name,
+                    'email': r.member_email,
+                    'adults': a_cnt,
+                    'kids': k_cnt,
+                    'total': a_cnt + k_cnt,
+                    'contribution': r.contribution or '',
+                    'notes': r.notes or '',
+                })
+                if r.contribution and r.contribution.strip():
+                    contributions_list.append({
+                        'member_name': r.member_name,
+                        'contribution': r.contribution.strip(),
+                    })
+
         e['going_count'] = len(going_list)
+        e['total_adults'] = total_adults
+        e['total_kids'] = total_kids
+        e['total_people'] = total_people
         e['maybe_count'] = len(maybe_list)
         e['declined_count'] = len(declined_list)
         e['total_rsvps'] = len(e_rsvps)
         e['attendees'] = [r.member_name for r in going_list if r.member_name]
+        e['attendee_details'] = attendee_details
+        e['contributions_list'] = contributions_list
         e['my_rsvp'] = my_rsvp_obj.status if my_rsvp_obj else None
+        e['my_rsvp_adults'] = my_rsvp_obj.adults_count if my_rsvp_obj else 1
+        e['my_rsvp_kids'] = my_rsvp_obj.kids_count if my_rsvp_obj else 0
+        e['my_rsvp_contribution'] = my_rsvp_obj.contribution if my_rsvp_obj else ''
         e['my_rsvp_notes'] = my_rsvp_obj.notes if my_rsvp_obj else ''
         e['broadcast_info'] = broadcast_obj
         e['is_broadcasted'] = broadcast_obj is not None
@@ -755,7 +788,17 @@ def _get_enriched_events(member_email, force_refresh=False):
             "google_calendar_link": e["google_calendar_link"],
             "is_past": e.get("is_past", False),
             "going_count": e.get("going_count", 0),
+            "total_adults": e.get("total_adults", 0),
+            "total_kids": e.get("total_kids", 0),
+            "total_people": e.get("total_people", 0),
+            "attendees": e.get("attendees", []),
+            "attendee_details": e.get("attendee_details", []),
+            "contributions": e.get("contributions_list", []),
             "my_rsvp": e.get("my_rsvp"),
+            "my_rsvp_adults": e.get("my_rsvp_adults", 1),
+            "my_rsvp_kids": e.get("my_rsvp_kids", 0),
+            "my_rsvp_contribution": e.get("my_rsvp_contribution", ""),
+            "my_rsvp_notes": e.get("my_rsvp_notes", ""),
             "is_broadcasted": e.get("is_broadcasted", False),
             "is_portal_event": e.get("is_portal_event", False),
             "portal_event_pk": e.get("portal_event_pk"),
@@ -994,6 +1037,30 @@ def event_rsvp_view(request):
         event_title = request.POST.get('event_title', '').strip()
         status = request.POST.get('status', 'going').strip().lower()
         notes = request.POST.get('notes', '').strip()
+        contribution = request.POST.get('contribution', '').strip()[:255]
+
+        # Parse & validate adults_count and kids_count
+        try:
+            adults_raw = request.POST.get('adults') if 'adults' in request.POST else request.POST.get('adults_count')
+            if adults_raw is None or str(adults_raw).strip() == '':
+                adults_count = 1 if status == CommunityEventRSVP.STATUS_GOING else 0
+            else:
+                adults_count = int(adults_raw)
+                if status == CommunityEventRSVP.STATUS_GOING and adults_count < 1:
+                    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == '1':
+                        return JsonResponse({'success': False, 'error': 'When RSVPing Going, at least 1 adult is required.'}, status=400)
+                    adults_count = 1
+        except (ValueError, TypeError):
+            adults_count = 1 if status == CommunityEventRSVP.STATUS_GOING else 0
+
+        try:
+            kids_raw = request.POST.get('kids') if 'kids' in request.POST else request.POST.get('kids_count')
+            if kids_raw is None or str(kids_raw).strip() == '':
+                kids_count = 0
+            else:
+                kids_count = max(0, int(kids_raw))
+        except (ValueError, TypeError):
+            kids_count = 0
 
         if not event_id or status not in [CommunityEventRSVP.STATUS_GOING, CommunityEventRSVP.STATUS_MAYBE, CommunityEventRSVP.STATUS_DECLINED]:
             if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == '1':
@@ -1007,6 +1074,9 @@ def event_rsvp_view(request):
                 'event_title': event_title,
                 'member_name': member_name,
                 'status': status,
+                'adults_count': adults_count,
+                'kids_count': kids_count,
+                'contribution': contribution,
                 'notes': notes,
             }
         )
@@ -1020,15 +1090,45 @@ def event_rsvp_view(request):
         # Compute updated stats for AJAX response
         if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == '1':
             event_rsvps = CommunityEventRSVP.objects.filter(event_id=event_id)
-            going_list = [r.member_name for r in event_rsvps if r.status == CommunityEventRSVP.STATUS_GOING and r.member_name]
+            going_rsvps = [r for r in event_rsvps if r.status == CommunityEventRSVP.STATUS_GOING and r.member_name]
+            going_list = [r.member_name for r in going_rsvps]
+            total_adults = sum(int(r.adults_count or 1) for r in going_rsvps)
+            total_kids = sum(int(r.kids_count or 0) for r in going_rsvps)
+            attendee_details = [
+                {
+                    'name': r.member_name,
+                    'email': r.member_email,
+                    'adults': int(r.adults_count or 1),
+                    'kids': int(r.kids_count or 0),
+                    'total': int(r.adults_count or 1) + int(r.kids_count or 0),
+                    'contribution': r.contribution or '',
+                    'notes': r.notes or '',
+                }
+                for r in going_rsvps
+            ]
+            contributions = [
+                {
+                    'member_name': r.member_name,
+                    'contribution': r.contribution.strip(),
+                }
+                for r in going_rsvps if r.contribution and r.contribution.strip()
+            ]
             return JsonResponse({
                 'success': True,
                 'status': status,
                 'status_display': rsvp_obj.get_status_display(),
                 'going_count': len(going_list),
+                'total_adults': total_adults,
+                'total_kids': total_kids,
+                'total_people': total_adults + total_kids,
                 'maybe_count': event_rsvps.filter(status=CommunityEventRSVP.STATUS_MAYBE).count(),
                 'declined_count': event_rsvps.filter(status=CommunityEventRSVP.STATUS_DECLINED).count(),
                 'attendees': going_list,
+                'attendee_details': attendee_details,
+                'contributions': contributions,
+                'my_rsvp_adults': rsvp_obj.adults_count,
+                'my_rsvp_kids': rsvp_obj.kids_count,
+                'my_rsvp_contribution': rsvp_obj.contribution,
             })
 
         status_text = {

@@ -1325,22 +1325,26 @@ def sync_event_rsvp_to_google_sheet(rsvp):
         worksheet = _get_worksheet_case_insensitive(sh, "Event_RSVPs")
         if not worksheet:
             logger.info("Worksheet 'Event_RSVPs' not found. Creating it automatically...")
-            worksheet = sh.add_worksheet(title="Event_RSVPs", rows="100", cols="10")
-            headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Notes', 'Updated At']
-            worksheet.update(values=[headers], range_name="A1:G1")
+            worksheet = sh.add_worksheet(title="Event_RSVPs", rows="100", cols="12")
+            headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Adults', 'Kids', 'Contribution', 'Notes', 'Updated At']
+            worksheet.update(values=[headers], range_name="A1:J1")
             headers = [h.strip() for h in headers]
             all_values = [headers]
         else:
             all_values = worksheet.get_all_values()
             if not all_values:
-                headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Notes', 'Updated At']
-                worksheet.update(values=[headers], range_name="A1:G1")
+                headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Adults', 'Kids', 'Contribution', 'Notes', 'Updated At']
+                worksheet.update(values=[headers], range_name="A1:J1")
                 all_values = [headers]
             else:
                 headers = [h.strip() for h in all_values[0]]
 
         status_display = rsvp.get_status_display() if hasattr(rsvp, 'get_status_display') else rsvp.status
         updated_at_str = rsvp.updated_at.strftime("%Y-%m-%d %H:%M") if rsvp.updated_at else datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        adults_val = str(getattr(rsvp, 'adults_count', 1) or 1)
+        kids_val = str(getattr(rsvp, 'kids_count', 0) or 0)
+        contrib_val = str(getattr(rsvp, 'contribution', '') or '')
 
         field_map = {
             'event id': str(rsvp.event_id),
@@ -1349,6 +1353,13 @@ def sync_event_rsvp_to_google_sheet(rsvp):
             'member email': rsvp.member_email or '',
             'rsvp status': status_display,
             'status': status_display,
+            'adults': adults_val,
+            'number of adults': adults_val,
+            'kids': kids_val,
+            'number of kids': kids_val,
+            'contribution': contrib_val,
+            'contribution (things i am bringing)': contrib_val,
+            'things i am bringing': contrib_val,
             'notes': rsvp.notes or '',
             'updated at': updated_at_str,
         }

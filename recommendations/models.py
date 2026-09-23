@@ -281,9 +281,16 @@ class CommunityEventRSVP(models.Model):
     member_email = models.EmailField(db_index=True, verbose_name="Member Email")
     member_name = models.CharField(max_length=150, verbose_name="Member Name")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_GOING, verbose_name="RSVP Status")
+    adults_count = models.PositiveIntegerField(default=1, verbose_name="Number of Adults")
+    kids_count = models.PositiveIntegerField(default=0, verbose_name="Number of Kids")
+    contribution = models.CharField(max_length=255, blank=True, verbose_name="Contribution (Things I am bringing)")
     notes = models.TextField(blank=True, verbose_name="Notes / Guests / Comments")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def total_people(self):
+        return (self.adults_count or 1) + (self.kids_count or 0)
 
     class Meta:
         verbose_name = "Event RSVP"
