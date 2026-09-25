@@ -1326,15 +1326,15 @@ def sync_event_rsvp_to_google_sheet(rsvp):
         if not worksheet:
             logger.info("Worksheet 'Event_RSVPs' not found. Creating it automatically...")
             worksheet = sh.add_worksheet(title="Event_RSVPs", rows="100", cols="12")
-            headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Adults', 'Kids', 'Contribution', 'Notes', 'Updated At']
-            worksheet.update(values=[headers], range_name="A1:J1")
+            headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Adults', 'Total Kids', 'Kids (0-2y)', 'Kids (2-5y)', 'Kids (5-10y)', 'Kids (10+y)', 'Contribution', 'Notes', 'Updated At']
+            worksheet.update(values=[headers], range_name="A1:N1")
             headers = [h.strip() for h in headers]
             all_values = [headers]
         else:
             all_values = worksheet.get_all_values()
             if not all_values:
-                headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Adults', 'Kids', 'Contribution', 'Notes', 'Updated At']
-                worksheet.update(values=[headers], range_name="A1:J1")
+                headers = ['Event ID', 'Event Title', 'Member Name', 'Member Email', 'RSVP Status', 'Adults', 'Total Kids', 'Kids (0-2y)', 'Kids (2-5y)', 'Kids (5-10y)', 'Kids (10+y)', 'Contribution', 'Notes', 'Updated At']
+                worksheet.update(values=[headers], range_name="A1:N1")
                 all_values = [headers]
             else:
                 headers = [h.strip() for h in all_values[0]]
@@ -1344,6 +1344,11 @@ def sync_event_rsvp_to_google_sheet(rsvp):
 
         adults_val = str(getattr(rsvp, 'adults_count', 1) or 1)
         kids_val = str(getattr(rsvp, 'kids_count', 0) or 0)
+        kids_0_2_val = str(getattr(rsvp, 'kids_0_2', 0) or 0)
+        kids_2_5_val = str(getattr(rsvp, 'kids_2_5', 0) or 0)
+        kids_5_10_val = str(getattr(rsvp, 'kids_5_10', 0) or 0)
+        kids_10_plus_val = str(getattr(rsvp, 'kids_10_plus', 0) or 0)
+        kids_breakdown_val = getattr(rsvp, 'kids_breakdown_summary', '') or ''
         contrib_val = str(getattr(rsvp, 'contribution', '') or '')
 
         field_map = {
@@ -1356,7 +1361,25 @@ def sync_event_rsvp_to_google_sheet(rsvp):
             'adults': adults_val,
             'number of adults': adults_val,
             'kids': kids_val,
+            'total kids': kids_val,
             'number of kids': kids_val,
+            'kids (0-2y)': kids_0_2_val,
+            'kids 0-2': kids_0_2_val,
+            'kids (0 <= 2)': kids_0_2_val,
+            '0 <= 2': kids_0_2_val,
+            'kids (2-5y)': kids_2_5_val,
+            'kids 2-5': kids_2_5_val,
+            'kids (2 <= 5)': kids_2_5_val,
+            '2 <= 5': kids_2_5_val,
+            'kids (5-10y)': kids_5_10_val,
+            'kids 5-10': kids_5_10_val,
+            'kids (5 < 10)': kids_5_10_val,
+            '5 < 10': kids_5_10_val,
+            'kids (10+y)': kids_10_plus_val,
+            'kids 10+': kids_10_plus_val,
+            'kids (10+)': kids_10_plus_val,
+            '10+': kids_10_plus_val,
+            'kids breakdown': kids_breakdown_val,
             'contribution': contrib_val,
             'contribution (things i am bringing)': contrib_val,
             'things i am bringing': contrib_val,
@@ -1378,6 +1401,13 @@ def sync_event_rsvp_to_google_sheet(rsvp):
 
         target_event_id = str(rsvp.event_id).strip().lower()
         target_email = str(rsvp.member_email).strip().lower()
+        target_event_ids = {target_event_id}
+        if target_event_id.startswith('event_'):
+            target_event_ids.add(target_event_id.replace('event_', 'portal_'))
+            target_event_ids.add(target_event_id.replace('event_', ''))
+        elif target_event_id.startswith('portal_'):
+            target_event_ids.add(target_event_id.replace('portal_', 'event_'))
+            target_event_ids.add(target_event_id.replace('portal_', ''))
 
         match_row_num = None
         if event_id_idx is not None and email_idx is not None:
@@ -1385,7 +1415,7 @@ def sync_event_rsvp_to_google_sheet(rsvp):
                 if len(row) > max(event_id_idx, email_idx):
                     r_ev_id = str(row[event_id_idx]).strip().lower()
                     r_email = str(row[email_idx]).strip().lower()
-                    if r_ev_id == target_event_id and r_email == target_email:
+                    if r_ev_id in target_event_ids and r_email == target_email:
                         match_row_num = row_idx
                         break
 
@@ -1438,7 +1468,7 @@ def sync_community_event_to_google_sheet(event):
         from .calendar_sync import to_pacific_time
         start_pac = to_pacific_time(event.start_datetime)
         end_pac = to_pacific_time(event.end_datetime)
-        event_id_str = f"portal_{event.id}"
+        event_id_str = f"event_{event.id}"
         start_str = start_pac.strftime("%Y-%m-%d %H:%M") if start_pac else ""
         end_str = end_pac.strftime("%Y-%m-%d %H:%M") if end_pac else ""
         created_str = to_pacific_time(event.created_at).strftime("%Y-%m-%d %H:%M") if event.created_at else ""
@@ -1477,7 +1507,7 @@ def sync_community_event_to_google_sheet(event):
             for row_idx, row in enumerate(all_values[1:], start=2):
                 if len(row) > event_id_idx:
                     r_ev_id = str(row[event_id_idx]).strip().lower()
-                    if r_ev_id in (event_id_str.lower(), str(event.id).lower()):
+                    if r_ev_id in (event_id_str.lower(), f"portal_{event.id}".lower(), str(event.id).lower()):
                         match_row_num = row_idx
                         break
 
@@ -1526,7 +1556,7 @@ def delete_community_event_from_google_sheet(event_id):
             elif h_clean == 'status':
                 status_idx = idx
 
-        target_ids = {f"portal_{event_id}".lower(), str(event_id).lower()}
+        target_ids = {f"event_{event_id}".lower(), f"portal_{event_id}".lower(), str(event_id).lower()}
         if event_id_idx is not None:
             for row_idx, row in enumerate(all_values[1:], start=2):
                 if len(row) > event_id_idx:

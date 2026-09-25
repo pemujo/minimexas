@@ -282,15 +282,42 @@ class CommunityEventRSVP(models.Model):
     member_name = models.CharField(max_length=150, verbose_name="Member Name")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_GOING, verbose_name="RSVP Status")
     adults_count = models.PositiveIntegerField(default=1, verbose_name="Number of Adults")
-    kids_count = models.PositiveIntegerField(default=0, verbose_name="Number of Kids")
+    kids_count = models.PositiveIntegerField(default=0, verbose_name="Total Kids")
+    kids_0_2 = models.PositiveIntegerField(default=0, verbose_name="Kids (0 <= 2 years)")
+    kids_2_5 = models.PositiveIntegerField(default=0, verbose_name="Kids (2 <= 5 years)")
+    kids_5_10 = models.PositiveIntegerField(default=0, verbose_name="Kids (5 < 10 years)")
+    kids_10_plus = models.PositiveIntegerField(default=0, verbose_name="Kids (10+ years)")
     contribution = models.CharField(max_length=255, blank=True, verbose_name="Contribution (Things I am bringing)")
     notes = models.TextField(blank=True, verbose_name="Notes / Guests / Comments")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        breakdown_sum = (self.kids_0_2 or 0) + (self.kids_2_5 or 0) + (self.kids_5_10 or 0) + (self.kids_10_plus or 0)
+        if breakdown_sum > 0:
+            self.kids_count = breakdown_sum
+        elif self.kids_count and breakdown_sum == 0:
+            pass  # preserve legacy total if set without range details
+        else:
+            self.kids_count = 0
+        super().save(*args, **kwargs)
+
     @property
     def total_people(self):
         return (self.adults_count or 1) + (self.kids_count or 0)
+
+    @property
+    def kids_breakdown_summary(self):
+        parts = []
+        if self.kids_0_2:
+            parts.append(f"0-2y: {self.kids_0_2}")
+        if self.kids_2_5:
+            parts.append(f"2-5y: {self.kids_2_5}")
+        if self.kids_5_10:
+            parts.append(f"5-10y: {self.kids_5_10}")
+        if self.kids_10_plus:
+            parts.append(f"10+y: {self.kids_10_plus}")
+        return ", ".join(parts)
 
     class Meta:
         verbose_name = "Event RSVP"

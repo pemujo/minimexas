@@ -506,7 +506,7 @@ class CalendarSyncTestCase(TestCase):
 
         events = fetch_community_events(force_refresh=True)
         self.assertGreaterEqual(len(events), 1)
-        created_evt = next((e for e in events if e['id'] == f"portal_{evt.id}"), None)
+        created_evt = next((e for e in events if e['id'] == f"event_{evt.id}"), None)
         self.assertIsNotNone(created_evt)
         self.assertFalse(created_evt['is_past'], "Future 5pm event should not be marked as past in Pacific Time")
         self.assertEqual(created_evt['time_formatted'], "5:00 PM - 7:00 PM")
@@ -522,7 +522,7 @@ class CalendarSyncTestCase(TestCase):
             is_active=True
         )
         events_refreshed = fetch_community_events(force_refresh=True)
-        past_found = next((e for e in events_refreshed if e['id'] == f"portal_{evt_past.id}"), None)
+        past_found = next((e for e in events_refreshed if e['id'] == f"event_{evt_past.id}"), None)
         self.assertIsNotNone(past_found)
         self.assertTrue(past_found['is_past'], "Past event should be marked as past in Pacific Time")
 
@@ -3016,7 +3016,7 @@ class EventRSVPAndBroadcastTestCase(TestCase):
         session['member_name'] = "Carlos Santana"
         session.save()
 
-        # Submit RSVP 'going' with 2 adults, 3 kids, and contribution
+        # Submit RSVP 'going' with 2 adults, 3 kids split by age ranges, and contribution
         response = self.client.post(
             reverse('event_rsvp'),
             {
@@ -3024,7 +3024,10 @@ class EventRSVPAndBroadcastTestCase(TestCase):
                 'event_title': 'Mexican Food Tour & Taco Picnic',
                 'status': 'going',
                 'adults': '2',
-                'kids': '3',
+                'kids_0_2': '1',
+                'kids_2_5': '1',
+                'kids_5_10': '1',
+                'kids_10_plus': '0',
                 'contribution': 'Guacamole & Homemade Tortilla Chips',
                 'notes': 'Looking forward to it!',
                 'ajax': '1',
@@ -3038,14 +3041,29 @@ class EventRSVPAndBroadcastTestCase(TestCase):
         self.assertEqual(data['going_count'], 1)
         self.assertEqual(data['total_adults'], 2)
         self.assertEqual(data['total_kids'], 3)
+        self.assertEqual(data['total_kids_0_2'], 1)
+        self.assertEqual(data['total_kids_2_5'], 1)
+        self.assertEqual(data['total_kids_5_10'], 1)
+        self.assertEqual(data['total_kids_10_plus'], 0)
+        self.assertIn("0-2y: 1", data['kids_breakdown_summary'])
+        self.assertIn("2-5y: 1", data['kids_breakdown_summary'])
+        self.assertIn("5-10y: 1", data['kids_breakdown_summary'])
         self.assertEqual(data['total_people'], 5)
         self.assertEqual(data['my_rsvp_adults'], 2)
         self.assertEqual(data['my_rsvp_kids'], 3)
+        self.assertEqual(data['my_rsvp_kids_0_2'], 1)
+        self.assertEqual(data['my_rsvp_kids_2_5'], 1)
+        self.assertEqual(data['my_rsvp_kids_5_10'], 1)
+        self.assertEqual(data['my_rsvp_kids_10_plus'], 0)
         self.assertEqual(data['my_rsvp_contribution'], 'Guacamole & Homemade Tortilla Chips')
         self.assertEqual(len(data['attendee_details']), 1)
         self.assertEqual(data['attendee_details'][0]['name'], 'Carlos Santana')
         self.assertEqual(data['attendee_details'][0]['adults'], 2)
         self.assertEqual(data['attendee_details'][0]['kids'], 3)
+        self.assertEqual(data['attendee_details'][0]['kids_0_2'], 1)
+        self.assertEqual(data['attendee_details'][0]['kids_2_5'], 1)
+        self.assertEqual(data['attendee_details'][0]['kids_5_10'], 1)
+        self.assertEqual(data['attendee_details'][0]['kids_10_plus'], 0)
         self.assertEqual(data['attendee_details'][0]['contribution'], 'Guacamole & Homemade Tortilla Chips')
         self.assertEqual(len(data['contributions']), 1)
         self.assertEqual(data['contributions'][0]['member_name'], 'Carlos Santana')
@@ -3056,8 +3074,33 @@ class EventRSVPAndBroadcastTestCase(TestCase):
         self.assertEqual(rsvp.status, "going")
         self.assertEqual(rsvp.adults_count, 2)
         self.assertEqual(rsvp.kids_count, 3)
+        self.assertEqual(rsvp.kids_0_2, 1)
+        self.assertEqual(rsvp.kids_2_5, 1)
+        self.assertEqual(rsvp.kids_5_10, 1)
+        self.assertEqual(rsvp.kids_10_plus, 0)
         self.assertEqual(rsvp.contribution, "Guacamole & Homemade Tortilla Chips")
         self.assertEqual(rsvp.total_people, 5)
+
+    def test_rsvp_model_kids_age_breakdown_properties(self):
+        rsvp = CommunityEventRSVP(
+            event_id="evt_kids_breakdown",
+            event_title="Family Picnic",
+            member_email="maria@minimexitas.org",
+            member_name="Maria Gonzalez",
+            status="going",
+            adults_count=2,
+            kids_0_2=1,
+            kids_2_5=2,
+            kids_5_10=0,
+            kids_10_plus=1
+        )
+        rsvp.save()
+        self.assertEqual(rsvp.kids_count, 4)
+        self.assertEqual(rsvp.total_people, 6)
+        self.assertIn("0-2y: 1", rsvp.kids_breakdown_summary)
+        self.assertIn("2-5y: 2", rsvp.kids_breakdown_summary)
+        self.assertIn("10+y: 1", rsvp.kids_breakdown_summary)
+        self.assertNotIn("5-10y", rsvp.kids_breakdown_summary)
 
     def test_event_rsvp_view_validation_mandatory_adults(self):
         session = self.client.session
@@ -3366,7 +3409,7 @@ class CommunityEventDualSourceTestCase(TestCase):
         mock_send_bcast.assert_called_once()
         
         # Verify CommunityEventBroadcast was recorded
-        bcast = CommunityEventBroadcast.objects.get(event_id=f"portal_{event.id}")
+        bcast = CommunityEventBroadcast.objects.get(event_id=f"event_{event.id}")
         self.assertEqual(bcast.recipient_count, 2)
         self.assertEqual(bcast.broadcast_by_email, "elena.organizer@minimexitas.org")
 
@@ -4329,10 +4372,10 @@ class EventDirectURLAndSharingTestCase(TestCase):
         self.assertNotContains(response, 'Share on WhatsApp')
 
     @patch('recommendations.views.fetch_community_events')
-    def test_event_detail_supports_portal_prefix_and_raw_pk(self, mock_fetch_events):
+    def test_event_detail_supports_event_prefix_and_portal_prefix_and_raw_pk(self, mock_fetch_events):
         mock_fetch_events.return_value = [
             {
-                'id': 'portal_5',
+                'id': 'event_5',
                 'title': 'Dia de Muertos Workshop',
                 'category': 'Cultural & Heritage',
                 'start_datetime': datetime.datetime(2026, 11, 1, 14, 0),
@@ -4355,7 +4398,13 @@ class EventDirectURLAndSharingTestCase(TestCase):
 
         self._login_member()
 
-        # Test lookup by portal_5
+        # Test lookup by event_5
+        res0 = self.client.get('/events/event_5/')
+        self.assertEqual(res0.status_code, 200)
+        self.assertContains(res0, 'Dia de Muertos Workshop')
+        self.assertContains(res0, 'focused-event-container')
+
+        # Test backward-compatible lookup by portal_5
         res1 = self.client.get('/events/portal_5/')
         self.assertEqual(res1.status_code, 200)
         self.assertContains(res1, 'Dia de Muertos Workshop')

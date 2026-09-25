@@ -501,7 +501,7 @@
                             </span>
                             <span class="small text-muted" style="font-size: 0.76rem;">
                                 <span class="fw-bold text-success going-count-badge">{{ target_event.going_count }}</span> Going
-                                <span class="headcount-summary-badge text-muted">({{ target_event.total_adults|default:target_event.going_count }} Adult{{ target_event.total_adults|default:target_event.going_count|pluralize }}{% if target_event.total_kids %}, {{ target_event.total_kids }} Kid{{ target_event.total_kids|pluralize }}{% endif %})</span>
+                                <span class="headcount-summary-badge text-muted">({{ target_event.total_adults|default:target_event.going_count }} Adult{{ target_event.total_adults|default:target_event.going_count|pluralize }}{% if target_event.total_kids %}, {{ target_event.total_kids }} Kid{{ target_event.total_kids|pluralize }}{% if target_event.kids_breakdown_summary %} [{{ target_event.kids_breakdown_summary }}]{% endif %}{% endif %})</span>
                             </span>
                         </div>
                         
@@ -511,6 +511,10 @@
                             data-my-rsvp="{{ target_event.my_rsvp|default:'' }}"
                             data-my-adults="{{ target_event.my_rsvp_adults|default:1 }}"
                             data-my-kids="{{ target_event.my_rsvp_kids|default:0 }}"
+                            data-my-kids-0-2="{{ target_event.my_rsvp_kids_0_2|default:0 }}"
+                            data-my-kids-2-5="{{ target_event.my_rsvp_kids_2_5|default:0 }}"
+                            data-my-kids-5-10="{{ target_event.my_rsvp_kids_5_10|default:0 }}"
+                            data-my-kids-10-plus="{{ target_event.my_rsvp_kids_10_plus|default:0 }}"
                             data-my-contribution="{{ target_event.my_rsvp_contribution|default:'' }}"
                             data-my-notes="{{ target_event.my_rsvp_notes|default:'' }}">
                             <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if target_event.my_rsvp == 'going' %}active-going{% endif %}" data-status="going">
@@ -532,7 +536,7 @@
                                     <strong>Your RSVP:</strong> 
                                     <span class="user-rsvp-status-label">
                                         {% if target_event.my_rsvp == 'going' %}
-                                            Going ({{ target_event.my_rsvp_adults|default:1 }} Adult{{ target_event.my_rsvp_adults|default:1|pluralize }}{% if target_event.my_rsvp_kids %}, {{ target_event.my_rsvp_kids }} Kid{{ target_event.my_rsvp_kids|pluralize }}{% endif %})
+                                            Going ({{ target_event.my_rsvp_adults|default:1 }} Adult{{ target_event.my_rsvp_adults|default:1|pluralize }}{% if target_event.my_rsvp_kids %}, {{ target_event.my_rsvp_kids }} Kid{{ target_event.my_rsvp_kids|pluralize }}{% if target_event.my_rsvp_kids_breakdown_summary %} [{{ target_event.my_rsvp_kids_breakdown_summary }}]{% endif %}{% endif %})
                                             {% if target_event.my_rsvp_contribution %} · <i class="bi bi-basket-fill text-warning"></i> Bringing: <em>{{ target_event.my_rsvp_contribution }}</em>{% endif %}
                                         {% elif target_event.my_rsvp == 'maybe' %}
                                             Maybe
@@ -547,6 +551,10 @@
                                     data-status="{{ target_event.my_rsvp|default:'going' }}"
                                     data-adults="{{ target_event.my_rsvp_adults|default:1 }}"
                                     data-kids="{{ target_event.my_rsvp_kids|default:0 }}"
+                                    data-kids-0-2="{{ target_event.my_rsvp_kids_0_2|default:0 }}"
+                                    data-kids-2-5="{{ target_event.my_rsvp_kids_2_5|default:0 }}"
+                                    data-kids-5-10="{{ target_event.my_rsvp_kids_5_10|default:0 }}"
+                                    data-kids-10-plus="{{ target_event.my_rsvp_kids_10_plus|default:0 }}"
                                     data-contribution="{{ target_event.my_rsvp_contribution|default:'' }}"
                                     data-notes="{{ target_event.my_rsvp_notes|default:'' }}">
                                     <i class="bi bi-pencil-square me-1"></i>Edit RSVP
@@ -562,6 +570,26 @@
                                     <span class="attendee-count-label">{{ target_event.attendees|length }}</span> Member{{ target_event.attendees|length|pluralize }}
                                 </span>
                             </div>
+
+                            <!-- Kids by Age Group Pills -->
+                            <div class="kids-breakdown-bar mb-2 {% if not target_event.total_kids %}d-none{% endif %}">
+                                <div class="p-2 rounded-2 bg-light border d-flex flex-wrap align-items-center gap-1" style="font-size: 0.72rem;">
+                                    <span class="fw-semibold text-dark me-1"><i class="bi bi-people-fill text-primary me-1"></i>Kids by Age:</span>
+                                    <span class="badge bg-white text-dark border shadow-xs px-2 py-1 kids-badge-0-2 {% if not target_event.total_kids_0_2 %}d-none{% endif %}">
+                                        👶 0-2 yrs: <strong class="val-0-2">{{ target_event.total_kids_0_2|default:0 }}</strong>
+                                    </span>
+                                    <span class="badge bg-white text-dark border shadow-xs px-2 py-1 kids-badge-2-5 {% if not target_event.total_kids_2_5 %}d-none{% endif %}">
+                                        🧒 2-5 yrs: <strong class="val-2-5">{{ target_event.total_kids_2_5|default:0 }}</strong>
+                                    </span>
+                                    <span class="badge bg-white text-dark border shadow-xs px-2 py-1 kids-badge-5-10 {% if not target_event.total_kids_5_10 %}d-none{% endif %}">
+                                        👦 5-10 yrs: <strong class="val-5-10">{{ target_event.total_kids_5_10|default:0 }}</strong>
+                                    </span>
+                                    <span class="badge bg-white text-dark border shadow-xs px-2 py-1 kids-badge-10-plus {% if not target_event.total_kids_10_plus %}d-none{% endif %}">
+                                        🧑 10+ yrs: <strong class="val-10-plus">{{ target_event.total_kids_10_plus|default:0 }}</strong>
+                                    </span>
+                                </div>
+                            </div>
+
                             <div class="attendees-details-list d-flex flex-column gap-2" id="targetEventAttendeesList">
                                 {% for att in target_event.attendee_details %}
                                 <div class="attendee-card d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -569,7 +597,7 @@
                                         <i class="bi bi-person-fill text-primary"></i>
                                         <span class="fw-semibold text-dark">{{ att.name }}</span>
                                         <span class="attendee-breakdown-badge">
-                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% endif %}
+                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% if att.kids_breakdown_summary %} ({{ att.kids_breakdown_summary }}){% endif %}{% endif %}
                                         </span>
                                     </div>
                                     {% if att.contribution %}
@@ -829,7 +857,9 @@
 
                                 <!-- Event Title -->
                                 <h5 class="fw-bold text-dark mb-2" style="font-size: 1.15rem; line-height: 1.3;">
-                                    {{ event.title }}
+                                    <a href="{% url 'event_detail' event.id %}" class="text-dark text-decoration-none hover-primary">
+                                        {{ event.title }}
+                                    </a>
                                 </h5>
 
                                 <!-- Location -->
@@ -858,7 +888,7 @@
                                                 aria-expanded="false" 
                                                 style="font-size: 0.74rem;">
                                             <span class="fw-bold text-success going-count-badge">{{ event.going_count }}</span> Going
-                                            <span class="headcount-summary-badge text-muted">({{ event.total_adults|default:event.going_count }} Adult{{ event.total_adults|default:event.going_count|pluralize }}{% if event.total_kids %}, {{ event.total_kids }} Kid{{ event.total_kids|pluralize }}{% endif %})</span>
+                                            <span class="headcount-summary-badge text-muted">({{ event.total_adults|default:event.going_count }} Adult{{ event.total_adults|default:event.going_count|pluralize }}{% if event.total_kids %}, {{ event.total_kids }} Kid{{ event.total_kids|pluralize }}{% if event.kids_breakdown_summary %} [{{ event.kids_breakdown_summary }}]{% endif %}{% endif %})</span>
                                             <i class="bi bi-chevron-down ms-1" style="font-size: 0.65rem;"></i>
                                         </button>
                                     </div>
@@ -869,6 +899,10 @@
                                         data-my-rsvp="{{ event.my_rsvp|default:'' }}"
                                         data-my-adults="{{ event.my_rsvp_adults|default:1 }}"
                                         data-my-kids="{{ event.my_rsvp_kids|default:0 }}"
+                                        data-my-kids-0-2="{{ event.my_rsvp_kids_0_2|default:0 }}"
+                                        data-my-kids-2-5="{{ event.my_rsvp_kids_2_5|default:0 }}"
+                                        data-my-kids-5-10="{{ event.my_rsvp_kids_5_10|default:0 }}"
+                                        data-my-kids-10-plus="{{ event.my_rsvp_kids_10_plus|default:0 }}"
                                         data-my-contribution="{{ event.my_rsvp_contribution|default:'' }}"
                                         data-my-notes="{{ event.my_rsvp_notes|default:'' }}">
                                         <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center {% if event.my_rsvp == 'going' %}active-going{% endif %}" data-status="going">
@@ -890,7 +924,7 @@
                                                 <strong>Your RSVP:</strong> 
                                                 <span class="user-rsvp-status-label">
                                                     {% if event.my_rsvp == 'going' %}
-                                                        Going ({{ event.my_rsvp_adults|default:1 }}A{% if event.my_rsvp_kids %}, {{ event.my_rsvp_kids }}K{% endif %})
+                                                        Going ({{ event.my_rsvp_adults|default:1 }}A{% if event.my_rsvp_kids %}, {{ event.my_rsvp_kids }}K{% if event.my_rsvp_kids_breakdown_summary %} [{{ event.my_rsvp_kids_breakdown_summary }}]{% endif %}{% endif %})
                                                         {% if event.my_rsvp_contribution %} · <i class="bi bi-basket-fill text-warning"></i> <em>{{ event.my_rsvp_contribution|truncatechars:20 }}</em>{% endif %}
                                                     {% elif event.my_rsvp == 'maybe' %}
                                                         Maybe
@@ -905,6 +939,10 @@
                                                 data-status="{{ event.my_rsvp|default:'going' }}"
                                                 data-adults="{{ event.my_rsvp_adults|default:1 }}"
                                                 data-kids="{{ event.my_rsvp_kids|default:0 }}"
+                                                data-kids-0-2="{{ event.my_rsvp_kids_0_2|default:0 }}"
+                                                data-kids-2-5="{{ event.my_rsvp_kids_2_5|default:0 }}"
+                                                data-kids-5-10="{{ event.my_rsvp_kids_5_10|default:0 }}"
+                                                data-kids-10-plus="{{ event.my_rsvp_kids_10_plus|default:0 }}"
                                                 data-contribution="{{ event.my_rsvp_contribution|default:'' }}"
                                                 data-notes="{{ event.my_rsvp_notes|default:'' }}">
                                                 <i class="bi bi-pencil-square me-1"></i>Edit
@@ -921,6 +959,26 @@
                                                     <span class="attendee-count-label">{{ event.attendees|length }}</span> Member{{ event.attendees|length|pluralize }}
                                                 </span>
                                             </div>
+
+                                            <!-- Kids by Age Group Pills -->
+                                            <div class="kids-breakdown-bar mb-2 {% if not event.total_kids %}d-none{% endif %}">
+                                                <div class="p-1 px-2 rounded-2 bg-light border d-flex flex-wrap align-items-center gap-1" style="font-size: 0.7rem;">
+                                                    <span class="fw-semibold text-dark me-1"><i class="bi bi-people-fill text-primary me-1"></i>Kids:</span>
+                                                    <span class="badge bg-white text-dark border shadow-xs px-1 py-1 kids-badge-0-2 {% if not event.total_kids_0_2 %}d-none{% endif %}" style="font-size: 0.65rem;">
+                                                        0-2y: <strong class="val-0-2">{{ event.total_kids_0_2|default:0 }}</strong>
+                                                    </span>
+                                                    <span class="badge bg-white text-dark border shadow-xs px-1 py-1 kids-badge-2-5 {% if not event.total_kids_2_5 %}d-none{% endif %}" style="font-size: 0.65rem;">
+                                                        2-5y: <strong class="val-2-5">{{ event.total_kids_2_5|default:0 }}</strong>
+                                                    </span>
+                                                    <span class="badge bg-white text-dark border shadow-xs px-1 py-1 kids-badge-5-10 {% if not event.total_kids_5_10 %}d-none{% endif %}" style="font-size: 0.65rem;">
+                                                        5-10y: <strong class="val-5-10">{{ event.total_kids_5_10|default:0 }}</strong>
+                                                    </span>
+                                                    <span class="badge bg-white text-dark border shadow-xs px-1 py-1 kids-badge-10-plus {% if not event.total_kids_10_plus %}d-none{% endif %}" style="font-size: 0.65rem;">
+                                                        10+y: <strong class="val-10-plus">{{ event.total_kids_10_plus|default:0 }}</strong>
+                                                    </span>
+                                                </div>
+                                            </div>
+
                                             <div class="attendees-details-list d-flex flex-column gap-1 mb-2">
                                                 {% for att in event.attendee_details %}
                                                 <div class="attendee-card p-1 px-2 d-flex flex-wrap align-items-center justify-content-between gap-1">
@@ -928,7 +986,7 @@
                                                         <i class="bi bi-person text-primary" style="font-size: 0.75rem;"></i>
                                                         <span class="fw-semibold text-dark" style="font-size: 0.74rem;">{{ att.name }}</span>
                                                         <span class="attendee-breakdown-badge" style="font-size: 0.65rem;">
-                                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% endif %}
+                                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% if att.kids_breakdown_summary %} ({{ att.kids_breakdown_summary }}){% endif %}{% endif %}
                                                         </span>
                                                     </div>
                                                     {% if att.contribution %}
@@ -980,22 +1038,9 @@
                                         data-event-id="{{ event.id }}">
                                         <i class="bi bi-link-45deg"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-primary-action px-3 view-details-btn" 
-                                            data-id="{{ event.id }}"
-                                            data-title="{{ event.title }}"
-                                            data-date="{{ event.date_formatted }}"
-                                            data-time="{{ event.time_formatted }}"
-                                            data-location="{{ event.location }}"
-                                            data-locurl="{{ event.location_url }}"
-                                            data-category="{{ event.category }}"
-                                            data-desc="{{ event.description }}"
-                                            data-organizer="{{ event.organizer }}"
-                                            data-gcal="{{ event.google_calendar_link }}"
-                                            data-my-rsvp="{{ event.my_rsvp|default:'' }}"
-                                            data-going-count="{{ event.going_count }}"
-                                            data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}">
+                                    <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-primary-action px-3" title="View details for {{ event.title }}">
                                         Details
-                                    </button>
+                                    </a>
                                 </div>
                             </div>
 
@@ -1104,7 +1149,9 @@
 
                                 <!-- Event Title -->
                                 <h5 class="fw-bold text-dark mb-2" style="font-size: 1.15rem; line-height: 1.3;">
-                                    {{ event.title }}
+                                    <a href="{% url 'event_detail' event.id %}" class="text-dark text-decoration-none hover-primary">
+                                        {{ event.title }}
+                                    </a>
                                 </h5>
 
                                 <!-- Location -->
@@ -1125,20 +1172,9 @@
                             <!-- Footer Actions -->
                             <div class="pt-3 border-top d-flex align-items-center justify-content-between gap-2">
                                 <span class="text-muted small"><i class="bi bi-check2-circle text-success me-1"></i> Concluded</span>
-                                <button type="button" class="btn btn-sm btn-outline-secondary px-3 view-details-btn" 
-                                        data-id="{{ event.id }}"
-                                        data-title="{{ event.title }}"
-                                        data-date="{{ event.date_formatted }}"
-                                        data-time="{{ event.time_formatted }}"
-                                        data-location="{{ event.location }}"
-                                        data-locurl="{{ event.location_url }}"
-                                        data-category="{{ event.category }}"
-                                        data-desc="{{ event.description }}"
-                                        data-organizer="{{ event.organizer }}"
-                                        data-gcal="{{ event.google_calendar_link }}"
-                                        data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' event.id %}">
-                                    View Details
-                                </button>
+                                <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-outline-secondary px-3" title="View details for {{ event.title }}">
+                                    Details
+                                </a>
                             </div>
 
                         </div>
@@ -1218,11 +1254,11 @@
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'event_create' %}" style="border-radius: var(--radius-xl); overflow: hidden;">
                 {% csrf_token %}
-                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
-                    <h5 class="modal-title fw-bold" id="createEventModalLabel">
-                        <i class="bi bi-calendar-plus-fill me-2 text-warning"></i> Create Community Event
+                <div class="modal-header bg-light border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold text-dark mb-0 fs-5" id="createEventModalLabel">
+                        <i class="bi bi-calendar-plus-fill me-2 text-primary"></i> Create Community Event
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
@@ -1309,11 +1345,11 @@
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <form class="modal-content border-0 shadow-lg" method="POST" id="editEventForm" action="" style="border-radius: var(--radius-xl); overflow: hidden;">
                 {% csrf_token %}
-                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
-                    <h5 class="modal-title fw-bold" id="editEventModalLabel">
-                        <i class="bi bi-pencil-square me-2 text-warning"></i> Edit Community Event
+                <div class="modal-header bg-light border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold text-dark mb-0 fs-5" id="editEventModalLabel">
+                        <i class="bi bi-pencil-square me-2 text-primary"></i> Edit Community Event
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
@@ -1387,11 +1423,11 @@
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <form class="modal-content border-0 shadow-lg" method="POST" id="deleteEventForm" action="" style="border-radius: var(--radius-xl); overflow: hidden;">
                 {% csrf_token %}
-                <div class="modal-header text-white bg-danger">
-                    <h5 class="modal-title fw-bold" id="deleteEventModalLabel">
-                        <i class="bi bi-trash3-fill me-2"></i> Delete Community Event
+                <div class="modal-header bg-light border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold text-danger mb-0 fs-5" id="deleteEventModalLabel">
+                        <i class="bi bi-trash3-fill me-2 text-danger"></i> Delete Community Event
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4 text-center">
                     <div class="mb-3">
@@ -1435,11 +1471,11 @@
                 <input type="hidden" name="description" id="bcastEventDesc">
                 <input type="hidden" name="google_calendar_link" id="bcastEventGcal">
 
-                <div class="modal-header text-white" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
-                    <h5 class="modal-title fw-bold" id="broadcastModalLabel">
-                        <i class="bi bi-megaphone-fill me-2"></i> Broadcast Event Announcement
+                <div class="modal-header bg-light border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold text-dark mb-0 fs-5" id="broadcastModalLabel">
+                        <i class="bi bi-megaphone-fill me-2 text-primary"></i> Broadcast Event Announcement
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4">
@@ -1489,160 +1525,20 @@
     </div>
     {% endif %}
 
-    <!-- EVENT DETAILS MODAL -->
-    <div class="modal fade" id="eventDetailModal" tabindex="-1" aria-labelledby="eventDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-xl); overflow: hidden;">
-                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
-                    <h5 class="modal-title fw-bold" id="modalEventTitle">Event Details</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <span id="modalEventCategory" class="badge category-tag tech mb-2">Category</span>
-                        <h4 class="fw-bold text-dark mb-1" id="modalEventHeading"></h4>
-                    </div>
 
-                    <div class="d-flex flex-column gap-2 mb-4 bg-light p-3 rounded-3 border">
-                        <div class="d-flex align-items-center text-secondary small">
-                            <i class="bi bi-calendar-date text-primary me-2 fs-6"></i>
-                            <span id="modalEventDate" class="fw-semibold text-dark"></span>
-                        </div>
-                        <div class="d-flex align-items-center text-secondary small">
-                            <i class="bi bi-clock text-primary me-2 fs-6"></i>
-                            <span id="modalEventTime"></span>
-                        </div>
-                        <div class="d-flex align-items-start text-secondary small">
-                            <i class="bi bi-geo-alt-fill text-danger me-2 fs-6 mt-1 flex-shrink-0"></i>
-                            <a id="modalEventLocUrl" href="#" target="_blank" rel="noopener" class="text-decoration-none text-dark fw-semibold">
-                                <span id="modalEventLocation"></span> <i class="bi bi-box-arrow-up-right ms-1 text-muted" style="font-size: 0.75rem;"></i>
-                            </a>
-                        </div>
-                        <div class="d-flex align-items-center text-secondary small">
-                            <i class="bi bi-person-circle text-primary me-2 fs-6"></i>
-                            <span>Organized by: <strong id="modalEventOrganizer" class="text-dark"></strong></span>
-                        </div>
-                    </div>
-
-                    <h6 class="fw-bold text-dark mb-2">About This Event</h6>
-                    <p class="text-muted small mb-3" id="modalEventDescription" style="line-height: 1.6;"></p>
-
-                    <!-- Modal Weather Forecast & Outfit Advisor -->
-                    <div class="weather-card-container mb-4 p-3 rounded-3 border shadow-xs" style="background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%); border-color: #bfdbfe !important;">
-                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom" style="border-color: rgba(191, 219, 254, 0.6) !important;">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-primary rounded-pill px-2 py-1 shadow-xs" style="font-size: 0.72rem; background: linear-gradient(135deg, #1e40af, #2563eb) !important;">
-                                    <i class="bi bi-cloud-sun-fill me-1"></i> Weather
-                                </span>
-                                <span class="fw-bold text-dark small" style="font-size: 0.85rem;">
-                                    Forecast & Outfit Advisor
-                                </span>
-                            </div>
-                            {% if is_admin %}
-                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1" id="modalWeatherRefreshBtn" style="font-size: 0.72rem;">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                            </button>
-                            {% endif %}
-                        </div>
-                        <div id="modalWeatherContent" class="weather-content-area">
-                            <div class="d-flex align-items-center gap-2 text-muted small py-2">
-                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                                <span>Loading weather forecast & outfit recommendations...</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Modal RSVP Box -->
-                    <div class="p-3 bg-light rounded-3 border mb-4" id="modalRsvpContainer">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="small fw-bold text-dark">🎟️ Your Attendance (RSVP)</span>
-                            <span class="small text-muted" style="font-size: 0.74rem;">
-                                <span class="fw-bold text-success going-count-badge" id="modalGoingCount">0</span> Going
-                                <span class="headcount-summary-badge text-muted" id="modalHeadcountSummary"></span>
-                            </span>
-                        </div>
-
-                        <div class="rsvp-btn-group w-100 justify-content-between mb-2" id="modalRsvpBtnGroup" data-event-id="" data-event-title="">
-                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="going">
-                                <i class="bi bi-check-circle-fill"></i> Going
-                            </button>
-                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="maybe">
-                                <i class="bi bi-question-circle-fill"></i> Maybe
-                            </button>
-                            <button type="button" class="btn-rsvp-pill rsvp-trigger-btn flex-fill text-center" data-status="declined">
-                                <i class="bi bi-x-circle-fill"></i> Can't Go
-                            </button>
-                        </div>
-
-                        <!-- User RSVP Summary in Modal -->
-                        <div class="user-rsvp-indicator-box mb-3 d-none" id="modalUserRsvpIndicator">
-                            <div class="p-2 px-3 rounded-2 border d-flex align-items-center justify-content-between bg-success-subtle border-success-subtle text-success-emphasis" style="font-size: 0.76rem;">
-                                <div class="user-rsvp-summary-text">
-                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
-                                    <strong>Your RSVP:</strong> <span class="user-rsvp-status-label"></span>
-                                </div>
-                                <button type="button" class="btn btn-xs btn-outline-dark rounded-pill py-0 px-2 btn-edit-rsvp" style="font-size: 0.7rem;">
-                                    <i class="bi bi-pencil-square me-1"></i>Edit
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Confirmed Attendees in Modal -->
-                        <div class="pt-2 border-top">
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="small fw-semibold text-dark" style="font-size: 0.74rem;">Confirmed Attendees & Guests:</span>
-                                <span class="badge bg-white text-muted border small" style="font-size: 0.68rem;" id="modalAttendeeCountBadge">
-                                    0 Members
-                                </span>
-                            </div>
-                            <div class="attendees-details-list d-flex flex-column gap-2 mb-2" id="modalAttendeesList">
-                                <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">Be the first to confirm!</span>
-                            </div>
-
-                            <!-- Potluck Contributions in Modal -->
-                            <div class="potluck-board-container d-none" id="modalPotluckContainer">
-                                <div class="potluck-board mt-2">
-                                    <div class="small fw-bold text-dark mb-2 d-flex align-items-center gap-1">
-                                        <i class="bi bi-basket2-fill text-warning fs-6"></i>
-                                        <span>Things Members Are Bringing:</span>
-                                    </div>
-                                    <div class="d-flex flex-wrap gap-2 contributions-chips-list" id="modalPotluckChips"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center pt-3 border-top gap-2 flex-wrap">
-                        <div class="d-flex align-items-center gap-2">
-                            <a id="modalEventGcalLink" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-google py-2 px-3 rounded-pill fw-semibold">
-                                <i class="bi bi-google me-1 text-primary"></i> Add to Calendar
-                            </a>
-                            <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 py-2 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm copy-event-link-btn" id="modalCopyBtn"
-                                data-event-url=""
-                                data-event-id="" title="Copy Event Link">
-                                <i class="bi bi-link-45deg me-1"></i>
-                                <span class="copy-label small">Copy Link</span>
-                            </button>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-secondary rounded-pill px-4 py-2" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- EVENT RSVP MODAL -->
     <div class="modal fade" id="eventRsvpModal" tabindex="-1" aria-labelledby="eventRsvpModalLabel" aria-hidden="true" style="z-index: 1070;">
         <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content border-0 shadow-lg" id="eventRsvpForm" style="border-radius: var(--radius-xl); overflow: hidden;">
-                <div class="modal-header text-white" style="background: linear-gradient(135deg, var(--brand-navy-900), var(--brand-primary));">
+                <div class="modal-header bg-light border-bottom px-4 py-3">
                     <div>
-                        <span class="badge bg-white-subtle text-white border border-white-subtle rounded-pill px-2 py-0 mb-1" style="font-size: 0.7rem;">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1 mb-1" style="font-size: 0.72rem;">
                             🎟️ Event RSVP
                         </span>
-                        <h5 class="modal-title fw-bold mb-0" id="eventRsvpModalTitle">Confirm Attendance</h5>
+                        <h5 class="modal-title fw-bold text-dark mb-0 fs-5" id="eventRsvpModalTitle">Confirm Attendance</h5>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <input type="hidden" name="event_id" id="rsvpModalEventId" value="">
@@ -1671,28 +1567,109 @@
                     <!-- Attendance Details (shown when Going or Maybe) -->
                     <div id="rsvpAttendanceDetailsSection">
                         <div class="row g-3 mb-3">
-                            <div class="col-6">
+                            <div class="col-12">
                                 <label for="rsvpModalAdults" class="form-label fw-bold text-dark small mb-1">
                                     Number of Adults *
                                 </label>
-                                <div class="input-group">
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpAdultsDecBtn"><i class="bi bi-dash"></i></button>
-                                    <input type="number" class="form-control form-control-sm text-center fw-bold" id="rsvpModalAdults" name="adults" min="1" max="50" value="1" required>
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpAdultsIncBtn"><i class="bi bi-plus"></i></button>
+                                <div class="input-group" style="max-width: 220px;">
+                                    <button class="btn btn-outline-secondary btn-sm px-3" type="button" id="rsvpAdultsDecBtn"><i class="bi bi-dash fs-6"></i></button>
+                                    <input type="number" class="form-control form-control-sm text-center fw-bold fs-6" id="rsvpModalAdults" name="adults" min="1" max="50" value="1" required>
+                                    <button class="btn btn-outline-secondary btn-sm px-3" type="button" id="rsvpAdultsIncBtn"><i class="bi bi-plus fs-6"></i></button>
                                 </div>
-                                <div class="form-text text-muted" style="font-size: 0.72rem;">Incl. yourself (min 1)</div>
+                                <div class="form-text text-muted" style="font-size: 0.72rem;">Including yourself (minimum 1 adult)</div>
                             </div>
-                            <div class="col-6">
-                                <label for="rsvpModalKids" class="form-label fw-bold text-dark small mb-1">
-                                    Number of Kids <span class="text-muted fw-normal">(optional)</span>
+                        </div>
+
+                        <!-- Kids by Age Range Breakdown Section -->
+                        <div class="mb-3 p-3 bg-light rounded-3 border">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
+                                <label class="form-label fw-bold text-dark small mb-0">
+                                    <i class="bi bi-people-fill text-primary me-1"></i> Number of Kids by Age Range <span class="text-muted fw-normal">(optional)</span>
                                 </label>
-                                <div class="input-group">
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpKidsDecBtn"><i class="bi bi-dash"></i></button>
-                                    <input type="number" class="form-control form-control-sm text-center fw-bold" id="rsvpModalKids" name="kids" min="0" max="50" value="0">
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rsvpKidsIncBtn"><i class="bi bi-plus"></i></button>
+                                <div class="d-flex flex-wrap align-items-center gap-1">
+                                    <span class="badge bg-white text-dark border small fw-bold">
+                                        Total Kids: <span id="rsvpTotalKidsCount" class="text-primary">0</span>
+                                    </span>
+                                    <span class="badge bg-white text-muted border small rsvp-cat-pill" id="rsvpBadge0_2">
+                                        👶 0-2y: <strong class="val-count" id="rsvpCount0_2">0</strong>
+                                    </span>
+                                    <span class="badge bg-white text-muted border small rsvp-cat-pill" id="rsvpBadge2_5">
+                                        🧒 2-5y: <strong class="val-count" id="rsvpCount2_5">0</strong>
+                                    </span>
+                                    <span class="badge bg-white text-muted border small rsvp-cat-pill" id="rsvpBadge5_10">
+                                        👦 5-10y: <strong class="val-count" id="rsvpCount5_10">0</strong>
+                                    </span>
+                                    <span class="badge bg-white text-muted border small rsvp-cat-pill" id="rsvpBadge10_plus">
+                                        🧑 10+y: <strong class="val-count" id="rsvpCount10_plus">0</strong>
+                                    </span>
                                 </div>
-                                <div class="form-text text-muted" style="font-size: 0.72rem;">Children attending</div>
                             </div>
+                            <div class="row g-2">
+                                <!-- 0 <= 2 years -->
+                                <div class="col-6 col-md-3">
+                                    <div class="p-2 bg-white rounded-2 border text-center h-100 d-flex flex-column justify-content-between shadow-xs age-box" id="ageBox0_2">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="fw-bold text-dark" style="font-size: 0.76rem;">👶 0-2 yrs</span>
+                                            <span class="badge rounded-pill bg-light text-muted border px-2 py-0 age-pill-counter" id="boxCounter0_2" style="font-size: 0.68rem;">0</span>
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.66rem; margin-bottom: 4px;">0 &le; 2 years</div>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-dec-btn" type="button" data-target="rsvpKids0_2"><i class="bi bi-dash"></i></button>
+                                            <input type="number" class="form-control text-center fw-bold p-1 age-count-input" id="rsvpKids0_2" name="kids_0_2" min="0" max="20" value="0">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-inc-btn" type="button" data-target="rsvpKids0_2"><i class="bi bi-plus"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2 <= 5 years -->
+                                <div class="col-6 col-md-3">
+                                    <div class="p-2 bg-white rounded-2 border text-center h-100 d-flex flex-column justify-content-between shadow-xs age-box" id="ageBox2_5">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="fw-bold text-dark" style="font-size: 0.76rem;">🧒 2-5 yrs</span>
+                                            <span class="badge rounded-pill bg-light text-muted border px-2 py-0 age-pill-counter" id="boxCounter2_5" style="font-size: 0.68rem;">0</span>
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.66rem; margin-bottom: 4px;">2 &le; 5 years</div>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-dec-btn" type="button" data-target="rsvpKids2_5"><i class="bi bi-dash"></i></button>
+                                            <input type="number" class="form-control text-center fw-bold p-1 age-count-input" id="rsvpKids2_5" name="kids_2_5" min="0" max="20" value="0">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-inc-btn" type="button" data-target="rsvpKids2_5"><i class="bi bi-plus"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 5 < 10 years -->
+                                <div class="col-6 col-md-3">
+                                    <div class="p-2 bg-white rounded-2 border text-center h-100 d-flex flex-column justify-content-between shadow-xs age-box" id="ageBox5_10">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="fw-bold text-dark" style="font-size: 0.76rem;">👦 5-10 yrs</span>
+                                            <span class="badge rounded-pill bg-light text-muted border px-2 py-0 age-pill-counter" id="boxCounter5_10" style="font-size: 0.68rem;">0</span>
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.66rem; margin-bottom: 4px;">5 &lt; 10 years</div>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-dec-btn" type="button" data-target="rsvpKids5_10"><i class="bi bi-dash"></i></button>
+                                            <input type="number" class="form-control text-center fw-bold p-1 age-count-input" id="rsvpKids5_10" name="kids_5_10" min="0" max="20" value="0">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-inc-btn" type="button" data-target="rsvpKids5_10"><i class="bi bi-plus"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 10+ years -->
+                                <div class="col-6 col-md-3">
+                                    <div class="p-2 bg-white rounded-2 border text-center h-100 d-flex flex-column justify-content-between shadow-xs age-box" id="ageBox10_plus">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="fw-bold text-dark" style="font-size: 0.76rem;">🧑 10+ yrs</span>
+                                            <span class="badge rounded-pill bg-light text-muted border px-2 py-0 age-pill-counter" id="boxCounter10_plus" style="font-size: 0.68rem;">0</span>
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.66rem; margin-bottom: 4px;">10+ years</div>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-dec-btn" type="button" data-target="rsvpKids10_plus"><i class="bi bi-dash"></i></button>
+                                            <input type="number" class="form-control text-center fw-bold p-1 age-count-input" id="rsvpKids10_plus" name="kids_10_plus" min="0" max="20" value="0">
+                                            <button class="btn btn-outline-secondary py-0 px-2 age-inc-btn" type="button" data-target="rsvpKids10_plus"><i class="bi bi-plus"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="rsvpModalKids" name="kids" value="0">
                         </div>
 
                         <div class="mb-3">
@@ -1987,7 +1964,20 @@
                 const adults = parseInt(att.adults) || 1;
                 const kids = parseInt(att.kids) || 0;
                 const adultText = `${adults} Adult${adults !== 1 ? 's' : ''}`;
-                const kidText = kids > 0 ? `, ${kids} Kid${kids !== 1 ? 's' : ''}` : '';
+                
+                let kidBreakdownText = '';
+                if (att.kids_breakdown_summary) {
+                    kidBreakdownText = ` (${att.kids_breakdown_summary})`;
+                } else if (kids > 0) {
+                    const parts = [];
+                    if (att.kids_0_2) parts.push(`0-2y: ${att.kids_0_2}`);
+                    if (att.kids_2_5) parts.push(`2-5y: ${att.kids_2_5}`);
+                    if (att.kids_5_10) parts.push(`5-10y: ${att.kids_5_10}`);
+                    if (att.kids_10_plus) parts.push(`10+y: ${att.kids_10_plus}`);
+                    if (parts.length > 0) kidBreakdownText = ` (${parts.join(', ')})`;
+                }
+
+                const kidText = kids > 0 ? `, ${kids} Kid${kids !== 1 ? 's' : ''}${kidBreakdownText}` : '';
                 const contribHtml = att.contribution ? `
                     <div class="contribution-tag">
                         <i class="bi bi-basket-fill text-warning"></i>
@@ -2019,10 +2009,11 @@
             `).join("");
         }
 
-        function formatHeadcountSummary(totalAdults, totalKids) {
+        function formatHeadcountSummary(totalAdults, totalKids, breakdownSummary) {
             if (!totalAdults && !totalKids) return '';
-            const adultText = `${totalAdults} Adult${totalAdults !== 1 ? 's' : ''}`;
-            const kidText = totalKids > 0 ? `, ${totalKids} Kid${totalKids !== 1 ? 's' : ''}` : '';
+            const adultText = `${totalAdults || 0} Adult${totalAdults !== 1 ? 's' : ''}`;
+            const kBreak = breakdownSummary ? ` [${breakdownSummary}]` : '';
+            const kidText = totalKids > 0 ? `, ${totalKids} Kid${totalKids !== 1 ? 's' : ''}${kBreak}` : '';
             return `(${adultText}${kidText})`;
         }
 
@@ -2055,16 +2046,97 @@
             const inp = document.getElementById("rsvpModalAdults");
             if (inp) inp.value = Math.max(1, (parseInt(inp.value) || 1) - 1);
         });
-        document.getElementById("rsvpKidsIncBtn")?.addEventListener("click", () => {
-            const inp = document.getElementById("rsvpModalKids");
-            if (inp) inp.value = Math.min(50, (parseInt(inp.value) || 0) + 1);
-        });
-        document.getElementById("rsvpKidsDecBtn")?.addEventListener("click", () => {
-            const inp = document.getElementById("rsvpModalKids");
-            if (inp) inp.value = Math.max(0, (parseInt(inp.value) || 0) - 1);
+
+        function updateTotalKidsDisplay() {
+            const k0_2 = Math.max(0, parseInt(document.getElementById("rsvpKids0_2")?.value) || 0);
+            const k2_5 = Math.max(0, parseInt(document.getElementById("rsvpKids2_5")?.value) || 0);
+            const k5_10 = Math.max(0, parseInt(document.getElementById("rsvpKids5_10")?.value) || 0);
+            const k10_p = Math.max(0, parseInt(document.getElementById("rsvpKids10_plus")?.value) || 0);
+            const total = k0_2 + k2_5 + k5_10 + k10_p;
+
+            // Total Kids Badge
+            const badge = document.getElementById("rsvpTotalKidsCount");
+            if (badge) badge.textContent = total;
+
+            // Individual Category Badges & Box Counters
+            const setCatDisplay = (badgeId, countId, boxId, boxCounterId, count) => {
+                const countEl = document.getElementById(countId);
+                if (countEl) countEl.textContent = count;
+
+                const badgeEl = document.getElementById(badgeId);
+                if (badgeEl) {
+                    if (count > 0) {
+                        badgeEl.classList.remove("bg-white", "text-muted");
+                        badgeEl.classList.add("bg-primary-subtle", "text-primary-emphasis", "border-primary-subtle");
+                    } else {
+                        badgeEl.classList.remove("bg-primary-subtle", "text-primary-emphasis", "border-primary-subtle");
+                        badgeEl.classList.add("bg-white", "text-muted");
+                    }
+                }
+
+                const boxCounterEl = document.getElementById(boxCounterId);
+                if (boxCounterEl) {
+                    boxCounterEl.textContent = count;
+                    if (count > 0) {
+                        boxCounterEl.classList.remove("bg-light", "text-muted");
+                        boxCounterEl.classList.add("bg-primary", "text-white");
+                    } else {
+                        boxCounterEl.classList.remove("bg-primary", "text-white");
+                        boxCounterEl.classList.add("bg-light", "text-muted");
+                    }
+                }
+
+                const boxEl = document.getElementById(boxId);
+                if (boxEl) {
+                    if (count > 0) {
+                        boxEl.classList.add("border-primary", "bg-primary-subtle");
+                        boxEl.classList.remove("bg-white");
+                    } else {
+                        boxEl.classList.remove("border-primary", "bg-primary-subtle");
+                        boxEl.classList.add("bg-white");
+                    }
+                }
+            };
+
+            setCatDisplay("rsvpBadge0_2", "rsvpCount0_2", "ageBox0_2", "boxCounter0_2", k0_2);
+            setCatDisplay("rsvpBadge2_5", "rsvpCount2_5", "ageBox2_5", "boxCounter2_5", k2_5);
+            setCatDisplay("rsvpBadge5_10", "rsvpCount5_10", "ageBox5_10", "boxCounter5_10", k5_10);
+            setCatDisplay("rsvpBadge10_plus", "rsvpCount10_plus", "ageBox10_plus", "boxCounter10_plus", k10_p);
+
+            const hiddenKids = document.getElementById("rsvpModalKids");
+            if (hiddenKids) hiddenKids.value = total;
+        }
+
+        document.querySelectorAll(".age-inc-btn").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const targetId = this.dataset.target;
+                const input = document.getElementById(targetId);
+                if (input) {
+                    input.value = Math.min(20, (parseInt(input.value) || 0) + 1);
+                    updateTotalKidsDisplay();
+                }
+            });
         });
 
-        function openRsvpModal(eventId, eventTitle, initialStatus, adults, kids, contribution, notes) {
+        document.querySelectorAll(".age-dec-btn").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const targetId = this.dataset.target;
+                const input = document.getElementById(targetId);
+                if (input) {
+                    input.value = Math.max(0, (parseInt(input.value) || 0) - 1);
+                    updateTotalKidsDisplay();
+                }
+            });
+        });
+
+        document.querySelectorAll(".age-count-input").forEach(inp => {
+            inp.addEventListener("input", function() {
+                if (parseInt(this.value) < 0) this.value = 0;
+                updateTotalKidsDisplay();
+            });
+        });
+
+        function openRsvpModal(eventId, eventTitle, initialStatus, adults, kids, contribution, notes, k0_2, k2_5, k5_10, k10_p) {
             document.getElementById("rsvpModalEventId").value = eventId || "";
             document.getElementById("rsvpModalEventTitle").value = eventTitle || "";
             document.getElementById("eventRsvpModalTitle").textContent = eventTitle ? `RSVP: ${eventTitle}` : "Confirm Attendance";
@@ -2074,9 +2146,24 @@
             if (radioBtn) radioBtn.checked = true;
 
             const adultsVal = Math.max(1, parseInt(adults) || 1);
-            const kidsVal = Math.max(0, parseInt(kids) || 0);
             document.getElementById("rsvpModalAdults").value = adultsVal;
-            document.getElementById("rsvpModalKids").value = kidsVal;
+
+            const k0_2Val = Math.max(0, parseInt(k0_2) || 0);
+            const k2_5Val = Math.max(0, parseInt(k2_5) || 0);
+            const k5_10Val = Math.max(0, parseInt(k5_10) || 0);
+            const k10_pVal = Math.max(0, parseInt(k10_p) || 0);
+
+            const input0_2 = document.getElementById("rsvpKids0_2");
+            if (input0_2) input0_2.value = k0_2Val;
+            const input2_5 = document.getElementById("rsvpKids2_5");
+            if (input2_5) input2_5.value = k2_5Val;
+            const input5_10 = document.getElementById("rsvpKids5_10");
+            if (input5_10) input5_10.value = k5_10Val;
+            const input10_p = document.getElementById("rsvpKids10_plus");
+            if (input10_p) input10_p.value = k10_pVal;
+
+            updateTotalKidsDisplay();
+
             document.getElementById("rsvpModalContribution").value = contribution || "";
             document.getElementById("rsvpModalNotes").value = notes || "";
 
@@ -2094,17 +2181,31 @@
                 const clickedStatus = rsvpTrigger.getAttribute("data-status") || "going";
                 const currentAdults = group?.getAttribute("data-my-adults") || "1";
                 const currentKids = group?.getAttribute("data-my-kids") || "0";
+                const currentKids0_2 = group?.getAttribute("data-my-kids-0-2") || "0";
+                const currentKids2_5 = group?.getAttribute("data-my-kids-2-5") || "0";
+                const currentKids5_10 = group?.getAttribute("data-my-kids-5-10") || "0";
+                const currentKids10Plus = group?.getAttribute("data-my-kids-10-plus") || "0";
                 const currentContrib = group?.getAttribute("data-my-contribution") || "";
                 const currentNotes = group?.getAttribute("data-my-notes") || "";
 
-                openRsvpModal(eventId, eventTitle, clickedStatus, currentAdults, currentKids, currentContrib, currentNotes);
+                openRsvpModal(eventId, eventTitle, clickedStatus, currentAdults, currentKids, currentContrib, currentNotes, currentKids0_2, currentKids2_5, currentKids5_10, currentKids10Plus);
                 return;
             }
 
             const editRsvpBtn = e.target.closest(".btn-edit-rsvp");
             if (editRsvpBtn) {
-                const d = editRsvpBtn.dataset;
-                openRsvpModal(d.eventId, d.eventTitle, d.status || "going", d.adults || "1", d.kids || "0", d.contribution || "", d.notes || "");
+                const eventId = editRsvpBtn.getAttribute("data-event-id") || editRsvpBtn.dataset.eventId || "";
+                const eventTitle = editRsvpBtn.getAttribute("data-event-title") || editRsvpBtn.dataset.eventTitle || "";
+                const status = editRsvpBtn.getAttribute("data-status") || editRsvpBtn.dataset.status || "going";
+                const adults = editRsvpBtn.getAttribute("data-adults") || editRsvpBtn.dataset.adults || "1";
+                const kids = editRsvpBtn.getAttribute("data-kids") || editRsvpBtn.dataset.kids || "0";
+                const k0_2 = editRsvpBtn.getAttribute("data-kids-0-2") || editRsvpBtn.dataset.kids_0_2 || "0";
+                const k2_5 = editRsvpBtn.getAttribute("data-kids-2-5") || editRsvpBtn.dataset.kids_2_5 || "0";
+                const k5_10 = editRsvpBtn.getAttribute("data-kids-5-10") || editRsvpBtn.dataset.kids_5_10 || "0";
+                const k10_p = editRsvpBtn.getAttribute("data-kids-10-plus") || editRsvpBtn.dataset.kids_10_plus || "0";
+                const contribution = editRsvpBtn.getAttribute("data-contribution") || editRsvpBtn.dataset.contribution || "";
+                const notes = editRsvpBtn.getAttribute("data-notes") || editRsvpBtn.dataset.notes || "";
+                openRsvpModal(eventId, eventTitle, status, adults, kids, contribution, notes, k0_2, k2_5, k5_10, k10_p);
                 return;
             }
         });
@@ -2155,10 +2256,20 @@
                             evtItem.my_rsvp = data.status;
                             evtItem.my_rsvp_adults = data.my_rsvp_adults;
                             evtItem.my_rsvp_kids = data.my_rsvp_kids;
+                            evtItem.my_rsvp_kids_0_2 = data.my_rsvp_kids_0_2;
+                            evtItem.my_rsvp_kids_2_5 = data.my_rsvp_kids_2_5;
+                            evtItem.my_rsvp_kids_5_10 = data.my_rsvp_kids_5_10;
+                            evtItem.my_rsvp_kids_10_plus = data.my_rsvp_kids_10_plus;
+                            evtItem.my_rsvp_kids_breakdown_summary = data.my_rsvp_kids_breakdown_summary;
                             evtItem.my_rsvp_contribution = data.my_rsvp_contribution;
                             evtItem.going_count = data.going_count;
                             evtItem.total_adults = data.total_adults;
                             evtItem.total_kids = data.total_kids;
+                            evtItem.total_kids_0_2 = data.total_kids_0_2;
+                            evtItem.total_kids_2_5 = data.total_kids_2_5;
+                            evtItem.total_kids_5_10 = data.total_kids_5_10;
+                            evtItem.total_kids_10_plus = data.total_kids_10_plus;
+                            evtItem.kids_breakdown_summary = data.kids_breakdown_summary;
                             evtItem.total_people = data.total_people;
                             evtItem.attendees = data.attendees;
                             evtItem.attendee_details = data.attendee_details;
@@ -2170,6 +2281,10 @@
                             group.setAttribute("data-my-rsvp", data.status);
                             group.setAttribute("data-my-adults", data.my_rsvp_adults);
                             group.setAttribute("data-my-kids", data.my_rsvp_kids);
+                            group.setAttribute("data-my-kids-0-2", data.my_rsvp_kids_0_2 || 0);
+                            group.setAttribute("data-my-kids-2-5", data.my_rsvp_kids_2_5 || 0);
+                            group.setAttribute("data-my-kids-5-10", data.my_rsvp_kids_5_10 || 0);
+                            group.setAttribute("data-my-kids-10-plus", data.my_rsvp_kids_10_plus || 0);
                             group.setAttribute("data-my-contribution", data.my_rsvp_contribution || "");
 
                             group.querySelectorAll(".btn-rsvp-pill").forEach(b => {
@@ -2193,7 +2308,8 @@
                                     if (labelEl) {
                                         if (data.status === 'going') {
                                             const aText = `${data.my_rsvp_adults} Adult${data.my_rsvp_adults !== 1 ? 's' : ''}`;
-                                            const kText = data.my_rsvp_kids > 0 ? `, ${data.my_rsvp_kids} Kid${data.my_rsvp_kids !== 1 ? 's' : ''}` : '';
+                                            const kBreak = data.my_rsvp_kids_breakdown_summary ? ` [${data.my_rsvp_kids_breakdown_summary}]` : '';
+                                            const kText = data.my_rsvp_kids > 0 ? `, ${data.my_rsvp_kids} Kid${data.my_rsvp_kids !== 1 ? 's' : ''}${kBreak}` : '';
                                             const cText = data.my_rsvp_contribution ? ` · <i class="bi bi-basket-fill text-warning"></i> Bringing: <em>${escapeHtml(data.my_rsvp_contribution)}</em>` : '';
                                             labelEl.innerHTML = `Going (${aText}${kText})${cText}`;
                                         } else if (data.status === 'maybe') {
@@ -2205,10 +2321,15 @@
 
                                     const editBtn = indicatorBox.querySelector(".btn-edit-rsvp");
                                     if (editBtn) {
-                                        editBtn.dataset.status = data.status;
-                                        editBtn.dataset.adults = data.my_rsvp_adults;
-                                        editBtn.dataset.kids = data.my_rsvp_kids;
-                                        editBtn.dataset.contribution = data.my_rsvp_contribution || "";
+                                        editBtn.setAttribute("data-status", data.status);
+                                        editBtn.setAttribute("data-adults", data.my_rsvp_adults);
+                                        editBtn.setAttribute("data-kids", data.my_rsvp_kids);
+                                        editBtn.setAttribute("data-kids-0-2", data.my_rsvp_kids_0_2 || 0);
+                                        editBtn.setAttribute("data-kids-2-5", data.my_rsvp_kids_2_5 || 0);
+                                        editBtn.setAttribute("data-kids-5-10", data.my_rsvp_kids_5_10 || 0);
+                                        editBtn.setAttribute("data-kids-10-plus", data.my_rsvp_kids_10_plus || 0);
+                                        editBtn.setAttribute("data-contribution", data.my_rsvp_contribution || "");
+                                        editBtn.setAttribute("data-notes", data.my_rsvp_notes || "");
                                     }
                                 } else {
                                     indicatorBox.classList.add("d-none");
@@ -2220,10 +2341,44 @@
                             if (goingBadge) goingBadge.textContent = data.going_count;
 
                             const headcountBadge = container.querySelector(".headcount-summary-badge");
-                            if (headcountBadge) headcountBadge.textContent = formatHeadcountSummary(data.total_adults, data.total_kids);
+                            if (headcountBadge) headcountBadge.textContent = formatHeadcountSummary(data.total_adults, data.total_kids, data.kids_breakdown_summary);
 
                             const attCountBadge = container.querySelector(".attendee-count-label");
                             if (attCountBadge) attCountBadge.textContent = data.attendees.length;
+
+                            // Update Kids Breakdown Bar
+                            const kidsBar = container.querySelector(".kids-breakdown-bar");
+                            if (kidsBar) {
+                                if (data.total_kids > 0) {
+                                    kidsBar.classList.remove("d-none");
+                                    const b0_2 = kidsBar.querySelector(".kids-badge-0-2");
+                                    if (b0_2) {
+                                        b0_2.classList.toggle("d-none", !data.total_kids_0_2);
+                                        const v0_2 = b0_2.querySelector(".val-0-2");
+                                        if (v0_2) v0_2.textContent = data.total_kids_0_2 || 0;
+                                    }
+                                    const b2_5 = kidsBar.querySelector(".kids-badge-2-5");
+                                    if (b2_5) {
+                                        b2_5.classList.toggle("d-none", !data.total_kids_2_5);
+                                        const v2_5 = b2_5.querySelector(".val-2-5");
+                                        if (v2_5) v2_5.textContent = data.total_kids_2_5 || 0;
+                                    }
+                                    const b5_10 = kidsBar.querySelector(".kids-badge-5-10");
+                                    if (b5_10) {
+                                        b5_10.classList.toggle("d-none", !data.total_kids_5_10);
+                                        const v5_10 = b5_10.querySelector(".val-5-10");
+                                        if (v5_10) v5_10.textContent = data.total_kids_5_10 || 0;
+                                    }
+                                    const b10_p = kidsBar.querySelector(".kids-badge-10-plus");
+                                    if (b10_p) {
+                                        b10_p.classList.toggle("d-none", !data.total_kids_10_plus);
+                                        const v10_p = b10_p.querySelector(".val-10-plus");
+                                        if (v10_p) v10_p.textContent = data.total_kids_10_plus || 0;
+                                    }
+                                } else {
+                                    kidsBar.classList.add("d-none");
+                                }
+                            }
 
                             // Update Attendees List
                             const attendeesList = container.querySelector(".attendees-details-list");
@@ -2244,32 +2399,9 @@
                             }
                         });
 
-                        // 4. Update Event Detail Modal if currently viewing this event
-                        if (activeModalEvent && String(activeModalEvent.id) === String(eventId)) {
-                            const modalGoing = document.getElementById("modalGoingCount");
-                            if (modalGoing) modalGoing.textContent = data.going_count;
-
-                            const modalHeadcount = document.getElementById("modalHeadcountSummary");
-                            if (modalHeadcount) modalHeadcount.textContent = formatHeadcountSummary(data.total_adults, data.total_kids);
-
-                            const modalAttList = document.getElementById("modalAttendeesList");
-                            if (modalAttList) modalAttList.innerHTML = renderAttendeeCardsHtml(data.attendee_details);
-
-                            const modalPotluckCont = document.getElementById("modalPotluckContainer");
-                            const modalPotluckChp = document.getElementById("modalPotluckChips");
-                            if (modalPotluckCont && modalPotluckChp) {
-                                if (data.contributions && data.contributions.length > 0) {
-                                    modalPotluckCont.classList.remove("d-none");
-                                    modalPotluckChp.innerHTML = renderPotluckChipsHtml(data.contributions);
-                                } else {
-                                    modalPotluckCont.classList.add("d-none");
-                                }
-                            }
-                        }
-
-                        // 5. Toast Feedback
+                        // 4. Toast Feedback
                         const statusDisplayNames = {
-                            'going': `🎟️ RSVP Confirmed: Going (${data.my_rsvp_adults} Adult${data.my_rsvp_adults !== 1 ? 's' : ''}${data.my_rsvp_kids ? ', ' + data.my_rsvp_kids + ' Kid' + (data.my_rsvp_kids !== 1 ? 's' : '') : ''})${data.my_rsvp_contribution ? ' · Bringing: ' + data.my_rsvp_contribution : ''}`,
+                            'going': `🎟️ RSVP Confirmed: Going (${data.my_rsvp_adults} Adult${data.my_rsvp_adults !== 1 ? 's' : ''}${data.my_rsvp_kids ? ', ' + data.my_rsvp_kids + ' Kid' + (data.my_rsvp_kids !== 1 ? 's' : '') + (data.my_rsvp_kids_breakdown_summary ? ' [' + data.my_rsvp_kids_breakdown_summary + ']' : '') : ''})${data.my_rsvp_contribution ? ' · Bringing: ' + data.my_rsvp_contribution : ''}`,
                             'maybe': '🟡 RSVP Updated: Maybe',
                             'declined': '❌ RSVP Updated: Can\'t Go'
                         };
@@ -2280,7 +2412,6 @@
                 }
             } catch (err) {
                 console.error("RSVP Submission Error:", err);
-                alert("Network error saving RSVP. Please try again.");
             } finally {
                 if (submitBtn) submitBtn.disabled = false;
                 if (spinner) spinner.classList.add("d-none");
@@ -2288,7 +2419,6 @@
         });
 
         // --- Gemini AI Weather Forecast & Outfit Advisor ---
-        let activeModalEvent = null;
 
         function formatInlineMarkdown(str) {
             return str
@@ -2532,156 +2662,6 @@
             }
         }
 
-        // --- Modal Event Details ---
-        const detailModal = new bootstrap.Modal(document.getElementById("eventDetailModal"));
-        const detailButtons = document.querySelectorAll(".view-details-btn");
-
-        function openModalForEvent(evt) {
-            activeModalEvent = evt;
-            const eventId = evt.id || evt.dataset?.id || "";
-            const eventObj = eventsData.find(e => String(e.id) === String(eventId)) || evt;
-            const eventTitle = eventObj.title || evt.title || "";
-            const myRsvp = eventObj.my_rsvp || evt.my_rsvp || evt.dataset?.myRsvp || "";
-            const myAdults = eventObj.my_rsvp_adults || evt.dataset?.myAdults || 1;
-            const myKids = eventObj.my_rsvp_kids || evt.dataset?.myKids || 0;
-            const myContrib = eventObj.my_rsvp_contribution || evt.dataset?.myContribution || "";
-            const myNotes = eventObj.my_rsvp_notes || evt.dataset?.myNotes || "";
-
-            document.getElementById("modalEventHeading").textContent = eventTitle;
-            const catBadge = document.getElementById("modalEventCategory");
-            if (catBadge) {
-                catBadge.textContent = eventObj.category || evt.category || "";
-                catBadge.className = "badge category-tag mb-2";
-                const catLower = (eventObj.category || evt.category || "").toLowerCase();
-                if (catLower.includes("cultural")) catBadge.classList.add("cultural");
-                else if (catLower.includes("family") || catLower.includes("outdoor")) catBadge.classList.add("family");
-                else if (catLower.includes("culinary")) catBadge.classList.add("culinary");
-                else if (catLower.includes("mamis")) catBadge.classList.add("mamis");
-                else if (catLower.includes("papis")) catBadge.classList.add("papis");
-                else catBadge.classList.add("tech");
-            }
-            document.getElementById("modalEventDate").textContent = eventObj.date_formatted || eventObj.date || evt.date_formatted || evt.date || "";
-            document.getElementById("modalEventTime").textContent = eventObj.time_formatted || eventObj.time || evt.time_formatted || evt.time || "";
-            document.getElementById("modalEventLocation").textContent = eventObj.location || evt.location || "";
-            document.getElementById("modalEventLocUrl").href = eventObj.location_url || eventObj.locurl || evt.location_url || evt.locurl || "#";
-            document.getElementById("modalEventOrganizer").textContent = eventObj.organizer || evt.organizer || "MiniMexitas Community";
-            document.getElementById("modalEventDescription").textContent = eventObj.description || eventObj.desc || evt.description || evt.desc || "";
-            document.getElementById("modalEventGcalLink").href = eventObj.google_calendar_link || eventObj.gcal || evt.google_calendar_link || evt.gcal || "#";
-
-            // Update RSVP Headcount and Attendees in Modal
-            const goingCount = eventObj.going_count !== undefined ? eventObj.going_count : (evt.going_count || 0);
-            const totalAdults = eventObj.total_adults !== undefined ? eventObj.total_adults : (evt.total_adults || goingCount);
-            const totalKids = eventObj.total_kids !== undefined ? eventObj.total_kids : (evt.total_kids || 0);
-            const attendeeDetails = eventObj.attendee_details || evt.attendee_details || [];
-            const contributions = eventObj.contributions_list || evt.contributions_list || [];
-
-            const modalGoing = document.getElementById("modalGoingCount");
-            if (modalGoing) modalGoing.textContent = goingCount;
-
-            const modalHeadcount = document.getElementById("modalHeadcountSummary");
-            if (modalHeadcount) modalHeadcount.textContent = formatHeadcountSummary(totalAdults, totalKids);
-
-            const modalAttBadge = document.getElementById("modalAttendeeCountBadge");
-            if (modalAttBadge) modalAttBadge.textContent = `${attendeeDetails.length} Member${attendeeDetails.length !== 1 ? 's' : ''}`;
-
-            const modalAttList = document.getElementById("modalAttendeesList");
-            if (modalAttList) modalAttList.innerHTML = renderAttendeeCardsHtml(attendeeDetails);
-
-            const modalPotluckCont = document.getElementById("modalPotluckContainer");
-            const modalPotluckChips = document.getElementById("modalPotluckChips");
-            if (modalPotluckCont && modalPotluckChips) {
-                if (contributions && contributions.length > 0) {
-                    modalPotluckCont.classList.remove("d-none");
-                    modalPotluckChips.innerHTML = renderPotluckChipsHtml(contributions);
-                } else {
-                    modalPotluckCont.classList.add("d-none");
-                }
-            }
-
-            // User RSVP Summary in Modal
-            const modalUserRsvp = document.getElementById("modalUserRsvpIndicator");
-            if (modalUserRsvp) {
-                if (myRsvp) {
-                    modalUserRsvp.classList.remove("d-none");
-                    const statusLabel = modalUserRsvp.querySelector(".user-rsvp-status-label");
-                    if (statusLabel) {
-                        if (myRsvp === 'going') {
-                            const aText = `${myAdults} Adult${myAdults !== 1 ? 's' : ''}`;
-                            const kText = myKids > 0 ? `, ${myKids} Kid${myKids !== 1 ? 's' : ''}` : '';
-                            const cText = myContrib ? ` · <i class="bi bi-basket-fill text-warning"></i> Bringing: <em>${escapeHtml(myContrib)}</em>` : '';
-                            statusLabel.innerHTML = `Going (${aText}${kText})${cText}`;
-                        } else if (myRsvp === 'maybe') {
-                            statusLabel.textContent = 'Maybe';
-                        } else {
-                            statusLabel.textContent = "Can't Go";
-                        }
-                    }
-
-                    const editBtn = modalUserRsvp.querySelector(".btn-edit-rsvp");
-                    if (editBtn) {
-                        editBtn.dataset.eventId = eventId;
-                        editBtn.dataset.eventTitle = eventTitle;
-                        editBtn.dataset.status = myRsvp;
-                        editBtn.dataset.adults = myAdults;
-                        editBtn.dataset.kids = myKids;
-                        editBtn.dataset.contribution = myContrib;
-                        editBtn.dataset.notes = myNotes;
-                    }
-                } else {
-                    modalUserRsvp.classList.add("d-none");
-                }
-            }
-
-            // Load Weather & Outfit Forecast for this event
-            const modalWeatherEl = document.getElementById("modalWeatherContent");
-            const modalRefreshBtn = document.getElementById("modalWeatherRefreshBtn");
-            if (modalRefreshBtn) {
-                modalRefreshBtn.style.display = eventObj.is_past ? 'none' : '';
-            }
-            if (modalWeatherEl && (eventObj.location || evt.location)) {
-                const dtStr = `${eventObj.date_formatted || eventObj.date || ''} ${eventObj.time_formatted || eventObj.time || ''}`.trim();
-                fetchEventWeather(eventObj.location || evt.location, dtStr, modalWeatherEl, false);
-            }
-
-            // Set share URLs in modal
-            const shareUrl = eventObj.share_url || evt.share_url || evt.dataset?.shareUrl || `${window.location.origin}/events/${eventId}/`;
-            const modalCopyBtn = document.getElementById("modalCopyBtn");
-            if (modalCopyBtn) {
-                modalCopyBtn.setAttribute("data-event-url", shareUrl);
-                modalCopyBtn.setAttribute("data-event-id", eventId);
-            }
-
-            // Configure modal RSVP button group
-            const modalRsvpGroup = document.getElementById("modalRsvpBtnGroup");
-            if (modalRsvpGroup) {
-                modalRsvpGroup.setAttribute("data-event-id", eventId);
-                modalRsvpGroup.setAttribute("data-event-title", eventTitle);
-                modalRsvpGroup.setAttribute("data-my-rsvp", myRsvp);
-                modalRsvpGroup.setAttribute("data-my-adults", myAdults);
-                modalRsvpGroup.setAttribute("data-my-kids", myKids);
-                modalRsvpGroup.setAttribute("data-my-contribution", myContrib);
-                modalRsvpGroup.setAttribute("data-my-notes", myNotes);
-
-                modalRsvpGroup.querySelectorAll(".btn-rsvp-pill").forEach(b => {
-                    b.classList.remove("active-going", "active-maybe", "active-declined");
-                    if (b.getAttribute("data-status") === myRsvp) {
-                        b.classList.add(`active-${myRsvp}`);
-                    }
-                });
-            }
-
-            detailModal.show();
-        }
-
-        // Modal Weather Refresh Button
-        document.getElementById("modalWeatherRefreshBtn")?.addEventListener("click", function() {
-            if (activeModalEvent && activeModalEvent.location) {
-                const dtStr = `${activeModalEvent.date_formatted || activeModalEvent.date || ''} ${activeModalEvent.time_formatted || activeModalEvent.time || ''}`.trim();
-                const modalWeatherEl = document.getElementById("modalWeatherContent");
-                fetchEventWeather(activeModalEvent.location, dtStr, modalWeatherEl, true);
-            }
-        });
-
         // Focused Weather Refresh Buttons
         document.querySelectorAll(".refresh-weather-btn").forEach(btn => {
             btn.addEventListener("click", function() {
@@ -2704,24 +2684,6 @@
                 fetchEventWeather(loc, dt, focusedWeatherEl, false);
             }
         }
-
-        detailButtons.forEach(btn => {
-            btn.addEventListener("click", function() {
-                openModalForEvent({
-                    id: this.dataset.id,
-                    title: this.dataset.title,
-                    date_formatted: this.dataset.date,
-                    time_formatted: this.dataset.time,
-                    location: this.dataset.location,
-                    location_url: this.dataset.locurl,
-                    category: this.dataset.category,
-                    description: this.dataset.desc,
-                    organizer: this.dataset.organizer,
-                    google_calendar_link: this.dataset.gcal,
-                    my_rsvp: this.dataset.myRsvp,
-                });
-            });
-        });
 
         // --- Monthly Calendar Grid Engine ---
         let currentCalDate = new Date();
@@ -2777,20 +2739,11 @@
                     else if (catLower.includes("mamis")) catClass = "mamis";
                     else if (catLower.includes("papis")) catClass = "papis";
 
-                    html += `<a href="javascript:void(0)" class="calendar-event-chip ${catClass}" title="${e.title} (${e.time_formatted})">${e.title}</a>`;
+                    const eventUrl = `/events/${encodeURIComponent(e.id)}/`;
+                    html += `<a href="${eventUrl}" class="calendar-event-chip ${catClass}" title="${escapeHtml(e.title)} (${escapeHtml(e.time_formatted || '')})">${escapeHtml(e.title)}</a>`;
                 });
 
                 cell.innerHTML = html;
-
-                // Add click listener for chips in this day cell
-                const chips = cell.querySelectorAll(".calendar-event-chip");
-                chips.forEach((chip, idx) => {
-                    chip.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        openModalForEvent(dayEvents[idx]);
-                    });
-                });
-
                 gridBody.appendChild(cell);
             }
 

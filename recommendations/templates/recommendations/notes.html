@@ -725,13 +725,13 @@
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <form action="{% url 'recommendations:recommendation_create' %}" method="POST" id="createRecommendationForm" class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
                 {% csrf_token %}
-                <div class="modal-header bg-dark text-white p-4">
+                <div class="modal-header bg-light border-bottom px-4 py-3">
                     <div>
-                        <h5 class="modal-title fw-bold" id="createRecommendationModalLabel">
-                            <i class="bi bi-plus-circle-fill me-2 text-warning"></i> Add Community Recommendation
+                        <h5 class="modal-title fw-bold text-dark mb-0 fs-5" id="createRecommendationModalLabel">
+                            <i class="bi bi-plus-circle-fill me-2 text-primary"></i> Add Community Recommendation
                         </h5>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4">
@@ -822,13 +822,13 @@
                 <input type="hidden" name="original_recommendation" id="editModalOriginalRecommendation">
                 <input type="hidden" name="created_by_email" id="editModalCreatedByEmail">
 
-                <div class="modal-header bg-dark text-white p-4">
+                <div class="modal-header bg-light border-bottom px-4 py-3">
                     <div>
-                        <h5 class="modal-title fw-bold" id="editRecommendationModalLabel">
-                            <i class="bi bi-pencil-square me-2 text-warning"></i> Edit Community Recommendation
+                        <h5 class="modal-title fw-bold text-dark mb-0 fs-5" id="editRecommendationModalLabel">
+                            <i class="bi bi-pencil-square me-2 text-primary"></i> Edit Community Recommendation
                         </h5>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4">
@@ -919,11 +919,11 @@
                 <input type="hidden" name="recommendation" id="deleteModalRecommendation">
                 <input type="hidden" name="created_by_email" id="deleteModalCreatedByEmail">
 
-                <div class="modal-header bg-danger text-white p-4">
-                    <h5 class="modal-title fw-bold" id="deleteRecommendationModalLabel">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Delete Recommendation
+                <div class="modal-header bg-light border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold text-danger mb-0 fs-5" id="deleteRecommendationModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i> Delete Recommendation
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4">

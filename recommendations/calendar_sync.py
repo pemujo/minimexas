@@ -201,7 +201,7 @@ def _fetch_from_database():
                 loc_url = f"https://www.google.com/maps/search/?api=1&query={quote_plus(evt.location)}"
 
             events.append({
-                "id": f"portal_{evt.id}",
+                "id": f"event_{evt.id}",
                 "title": evt.title,
                 "start_datetime": start_dt,
                 "end_datetime": end_dt,
