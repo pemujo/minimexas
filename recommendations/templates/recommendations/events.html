@@ -401,11 +401,7 @@
                                     <span class="badge {% if 'Cultural' in target_event.category %}category-tag cultural{% elif 'Tech' in target_event.category or 'Network' in target_event.category %}category-tag tech{% elif 'Family' in target_event.category or 'Outdoor' in target_event.category %}category-tag family{% elif 'mamis' in target_event.category|lower %}category-tag mamis{% elif 'papis' in target_event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                         {{ target_event.category }}
                                     </span>
-                                    {% if target_event.is_portal_event %}
-                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Created directly in MiniMexitas portal">
-                                        <i class="bi bi-stars me-1"></i>Portal
-                                    </span>
-                                    {% else %}
+                                    {% if not target_event.is_portal_event %}
                                     <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
                                         <i class="bi bi-google me-1"></i>Google Cal
                                     </span>
@@ -766,11 +762,7 @@
                                                 <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% elif 'mamis' in event.category|lower %}category-tag mamis{% elif 'papis' in event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                                     {{ event.category }}
                                                 </span>
-                                                {% if event.is_portal_event %}
-                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Created directly in MiniMexitas portal">
-                                                    <i class="bi bi-stars me-1"></i>Portal
-                                                </span>
-                                                {% else %}
+                                                {% if not event.is_portal_event %}
                                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
                                                     <i class="bi bi-google me-1"></i>Google Cal
                                                 </span>
@@ -1093,11 +1085,7 @@
                                                 <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% elif 'mamis' in event.category|lower %}category-tag mamis{% elif 'papis' in event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                                     {{ event.category }}
                                                 </span>
-                                                {% if event.is_portal_event %}
-                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Created directly in MiniMexitas portal">
-                                                    <i class="bi bi-stars me-1"></i>Portal
-                                                </span>
-                                                {% else %}
+                                                {% if not event.is_portal_event %}
                                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
                                                     <i class="bi bi-google me-1"></i>Google Cal
                                                 </span>
