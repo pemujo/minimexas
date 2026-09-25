@@ -1435,10 +1435,13 @@ def sync_community_event_to_google_sheet(event):
             else:
                 headers = [h.strip() for h in all_values[0]]
 
+        from .calendar_sync import to_pacific_time
+        start_pac = to_pacific_time(event.start_datetime)
+        end_pac = to_pacific_time(event.end_datetime)
         event_id_str = f"portal_{event.id}"
-        start_str = event.start_datetime.strftime("%Y-%m-%d %H:%M") if event.start_datetime else ""
-        end_str = event.end_datetime.strftime("%Y-%m-%d %H:%M") if event.end_datetime else ""
-        created_str = event.created_at.strftime("%Y-%m-%d %H:%M") if event.created_at else datetime.now().strftime("%Y-%m-%d %H:%M")
+        start_str = start_pac.strftime("%Y-%m-%d %H:%M") if start_pac else ""
+        end_str = end_pac.strftime("%Y-%m-%d %H:%M") if end_pac else ""
+        created_str = to_pacific_time(event.created_at).strftime("%Y-%m-%d %H:%M") if event.created_at else ""
         status_str = "Active" if event.is_active else "Inactive / Cancelled"
 
         field_map = {

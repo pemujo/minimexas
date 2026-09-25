@@ -451,12 +451,16 @@ class CalendarSyncTestCase(TestCase):
         self.assertIn("Golden+Gate+Park%2C+SF", url)
 
     def test_parse_event_datetime_formats(self):
-        # ISO string with UTC Z
+        # ISO string with UTC Z (14:00 UTC is 7:00 AM Pacific in PDT)
         dt = _parse_event_datetime("2026-09-15T14:00:00Z")
         self.assertEqual(dt.year, 2026)
         self.assertEqual(dt.month, 9)
         self.assertEqual(dt.day, 15)
-        self.assertEqual(dt.hour, 14)
+        self.assertEqual(dt.hour, 7)
+
+        # ISO string with Pacific offset
+        dt_pt = _parse_event_datetime("2026-09-15T14:00:00-07:00")
+        self.assertEqual(dt_pt.hour, 14)
 
         # Date only (YYYY-MM-DD)
         dt_date = _parse_event_datetime("2026-10-31")
@@ -479,6 +483,49 @@ class CalendarSyncTestCase(TestCase):
                 # Cache check
                 cached_events = cache.get("community_events_cache")
                 self.assertEqual(cached_events, [])
+
+    def test_event_timezone_pacific_formatting_and_upcoming_classification(self):
+        # Create an event in Pacific Time for 5:00 PM (17:00) today / future
+        from django.utils import timezone
+        import zoneinfo
+        from recommendations.models import CommunityEvent
+        from recommendations.calendar_sync import to_pacific_time, PACIFIC_TZ, fetch_community_events
+
+        now_pac = datetime.datetime.now(PACIFIC_TZ)
+        # Explicit 5:00 PM Pacific Time tomorrow
+        tomorrow_5pm = (now_pac + datetime.timedelta(days=1)).replace(hour=17, minute=0, second=0, microsecond=0)
+
+        evt = CommunityEvent.objects.create(
+            title="Tacos & Tech Pacific Evening",
+            start_datetime=tomorrow_5pm,
+            end_datetime=tomorrow_5pm + datetime.timedelta(hours=2),
+            location="Mission District, SF",
+            created_by_name="Admin Test",
+            is_active=True
+        )
+
+        events = fetch_community_events(force_refresh=True)
+        self.assertGreaterEqual(len(events), 1)
+        created_evt = next((e for e in events if e['id'] == f"portal_{evt.id}"), None)
+        self.assertIsNotNone(created_evt)
+        self.assertFalse(created_evt['is_past'], "Future 5pm event should not be marked as past in Pacific Time")
+        self.assertEqual(created_evt['time_formatted'], "5:00 PM - 7:00 PM")
+
+        # Check past event
+        past_dt = now_pac - datetime.timedelta(days=2)
+        evt_past = CommunityEvent.objects.create(
+            title="Old Event",
+            start_datetime=past_dt,
+            end_datetime=past_dt + datetime.timedelta(hours=2),
+            location="SF",
+            created_by_name="Admin Test",
+            is_active=True
+        )
+        events_refreshed = fetch_community_events(force_refresh=True)
+        past_found = next((e for e in events_refreshed if e['id'] == f"portal_{evt_past.id}"), None)
+        self.assertIsNotNone(past_found)
+        self.assertTrue(past_found['is_past'], "Past event should be marked as past in Pacific Time")
+
 
 
 class AuthenticationAndAccessViewsTestCase(TestCase):

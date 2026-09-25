@@ -1,25 +1,44 @@
 import datetime
 import logging
 import os
+import zoneinfo
 from urllib.parse import quote_plus
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 CACHE_KEY_EVENTS = "community_events_cache"
 CACHE_TIMEOUT_EVENTS = 120  # 2 minutes for timely sync with Google Calendar
 
+PACIFIC_TZ = zoneinfo.ZoneInfo("America/Los_Angeles")
+
+
+def to_pacific_time(dt):
+    """
+    Converts any datetime (aware or naive) or date to US Pacific Time (America/Los_Angeles).
+    """
+    if dt is None:
+        return None
+    if isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
+        dt = datetime.datetime.combine(dt, datetime.time(0, 0))
+    if timezone.is_aware(dt):
+        return dt.astimezone(PACIFIC_TZ)
+    return timezone.make_aware(dt, PACIFIC_TZ)
 
 
 def get_google_calendar_add_url(title, start_dt, end_dt, description="", location=""):
     """
     Builds a direct 'Add to Google Calendar' template link.
     Format: https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...&details=...&location=...
+    Converts datetime to UTC formatted as YYYYMMDDTHHMMSSZ for standard Google Calendar parsing.
     """
     def _format_dt(dt):
         if isinstance(dt, datetime.datetime):
-            return dt.strftime("%Y%m%dT%H%M%SZ")
+            pac_dt = to_pacific_time(dt)
+            utc_dt = pac_dt.astimezone(datetime.timezone.utc)
+            return utc_dt.strftime("%Y%m%dT%H%M%SZ")
         elif isinstance(dt, datetime.date):
             return dt.strftime("%Y%m%d")
         return ""
@@ -37,26 +56,28 @@ def get_google_calendar_add_url(title, start_dt, end_dt, description="", locatio
 
 def _parse_event_datetime(dt_str, default_date=None):
     """
-    Parses various datetime and date formats into datetime object.
+    Parses various datetime and date formats into datetime object in US Pacific Time.
     """
     if not dt_str:
-        return default_date or datetime.datetime.now()
+        return default_date or datetime.datetime.now(PACIFIC_TZ)
     
     # ISO 8601 strings (e.g., 2026-09-15T14:00:00Z or 2026-09-15T14:00:00-07:00)
     try:
         clean_str = dt_str.replace("Z", "+00:00")
-        return datetime.datetime.fromisoformat(clean_str)
+        dt = datetime.datetime.fromisoformat(clean_str)
+        return to_pacific_time(dt)
     except Exception:
         pass
 
-    # YYYY-MM-DD format
+    # YYYY-MM-DD format (all day event)
     try:
         d = datetime.date.fromisoformat(dt_str[:10])
-        return datetime.datetime.combine(d, datetime.time(12, 0))
+        dt = datetime.datetime.combine(d, datetime.time(9, 0))
+        return to_pacific_time(dt)
     except Exception:
         pass
 
-    return default_date or datetime.datetime.now()
+    return default_date or datetime.datetime.now(PACIFIC_TZ)
 
 
 def _fetch_from_google_calendar_api(calendar_id, sa_info):
@@ -77,13 +98,13 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
         token = credentials.token
 
         # Fetch from up to 1 year in the past to allow viewing past events
-        past_window = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)
+        past_window = datetime.datetime.now(PACIFIC_TZ) - datetime.timedelta(days=365)
         api_url = f"https://www.googleapis.com/calendar/v3/calendars/{quote_plus(calendar_id)}/events"
         headers = {"Authorization": f"Bearer {token}"}
         params = {
             "singleEvents": "true",
             "orderBy": "startTime",
-            "timeMin": past_window.isoformat(),
+            "timeMin": past_window.astimezone(datetime.timezone.utc).isoformat(),
             "maxResults": 250,
         }
 
@@ -95,13 +116,13 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
         data = response.json()
         items = data.get("items", [])
         events = []
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        now_pacific = datetime.datetime.now(PACIFIC_TZ)
 
         for idx, item in enumerate(items):
             start_raw = item.get("start", {}).get("dateTime") or item.get("start", {}).get("date")
             end_raw = item.get("end", {}).get("dateTime") or item.get("end", {}).get("date")
-            start_dt = _parse_event_datetime(start_raw)
-            end_dt = _parse_event_datetime(end_raw, default_date=start_dt + datetime.timedelta(hours=2))
+            start_dt = to_pacific_time(_parse_event_datetime(start_raw))
+            end_dt = to_pacific_time(_parse_event_datetime(end_raw, default_date=start_dt + datetime.timedelta(hours=2)))
 
             summary = item.get("summary", "Community Event")
             location = item.get("location", "San Francisco Bay Area")
@@ -122,12 +143,8 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
             elif any(k in summary.lower() for k in ["papi", "papis", "papa", "papas", "padre", "padres"]):
                 category = "Salidas solo papis"
 
-            # Check if event has ended
-            is_past = False
-            if hasattr(end_dt, 'tzinfo') and end_dt.tzinfo is not None:
-                is_past = end_dt < now_utc
-            elif isinstance(end_dt, datetime.datetime):
-                is_past = end_dt < datetime.datetime.now()
+            # Check if event has ended in US Pacific Time
+            is_past = end_dt < now_pacific
 
             events.append({
                 "id": item.get("id", f"gcal_{idx}"),
@@ -159,23 +176,19 @@ def _fetch_from_google_calendar_api(calendar_id, sa_info):
 
 def _fetch_from_database():
     """
-    Fetches active community events created directly in the portal database.
+    Fetches active community events created directly in the portal database in US Pacific Time.
     """
     try:
         from .models import CommunityEvent
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        now_pacific = datetime.datetime.now(PACIFIC_TZ)
         events = []
         db_events = list(CommunityEvent.objects.filter(is_active=True).order_by('start_datetime'))
 
         for evt in db_events:
-            start_dt = evt.start_datetime
-            end_dt = evt.end_datetime or (start_dt + datetime.timedelta(hours=2))
+            start_dt = to_pacific_time(evt.start_datetime)
+            end_dt = to_pacific_time(evt.end_datetime) if evt.end_datetime else (start_dt + datetime.timedelta(hours=2))
 
-            is_past = False
-            if hasattr(end_dt, 'tzinfo') and end_dt.tzinfo is not None:
-                is_past = end_dt < now_utc
-            elif isinstance(end_dt, datetime.datetime):
-                is_past = end_dt < datetime.datetime.now()
+            is_past = end_dt < now_pacific
 
             # Time formatted
             if evt.end_datetime:
@@ -218,9 +231,8 @@ def _fetch_from_database():
 def _normalize_for_sort(dt):
     if dt is None:
         return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
-    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
-        return dt.astimezone(datetime.timezone.utc)
-    return dt.replace(tzinfo=datetime.timezone.utc)
+    pac_dt = to_pacific_time(dt)
+    return pac_dt.astimezone(datetime.timezone.utc)
 
 
 def fetch_community_events(force_refresh=False):
@@ -251,3 +263,4 @@ def fetch_community_events(force_refresh=False):
 
     cache.set(CACHE_KEY_EVENTS, all_events, CACHE_TIMEOUT_EVENTS)
     return all_events
+

@@ -684,7 +684,7 @@ organizer_create_recommendation_view = create_recommendation_view
 organizer_edit_recommendation_view = edit_recommendation_view
 
 
-from .calendar_sync import fetch_community_events
+from .calendar_sync import fetch_community_events, to_pacific_time, PACIFIC_TZ
 import json
 import datetime
 
@@ -803,10 +803,10 @@ def _get_enriched_events(member_email, force_refresh=False):
             "is_portal_event": e.get("is_portal_event", False),
             "portal_event_pk": e.get("portal_event_pk"),
             "source": e.get("source", "portal" if e.get("is_portal_event") else "google_calendar"),
-            "start_date_input": start_dt.strftime("%Y-%m-%d") if hasattr(start_dt, 'strftime') else "",
-            "start_time_input": start_dt.strftime("%H:%M") if hasattr(start_dt, 'strftime') else "",
-            "end_date_input": end_dt.strftime("%Y-%m-%d") if hasattr(end_dt, 'strftime') else "",
-            "end_time_input": end_dt.strftime("%H:%M") if hasattr(end_dt, 'strftime') else "",
+            "start_date_input": to_pacific_time(start_dt).strftime("%Y-%m-%d") if start_dt else "",
+            "start_time_input": to_pacific_time(start_dt).strftime("%H:%M") if start_dt else "",
+            "end_date_input": to_pacific_time(end_dt).strftime("%Y-%m-%d") if end_dt else "",
+            "end_time_input": to_pacific_time(end_dt).strftime("%H:%M") if end_dt else "",
         })
 
     return all_events, upcoming_events, past_events, events_payload, total_members_count, subscribed_members_count
@@ -1251,7 +1251,7 @@ def organizer_create_event_view(request):
     try:
         start_str = f"{start_date} {start_time}"
         naive_start = datetime.datetime.strptime(start_str, "%Y-%m-%d %H:%M")
-        start_dt = timezone.make_aware(naive_start) if timezone.is_naive(naive_start) else naive_start
+        start_dt = timezone.make_aware(naive_start, PACIFIC_TZ)
     except Exception as e:
         logger.warning(f"Error parsing start datetime: {e}")
         request.session['event_error_message'] = "Invalid start date or time format."
@@ -1262,14 +1262,14 @@ def organizer_create_event_view(request):
         try:
             end_str = f"{end_date} {end_time}"
             naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
-            end_dt = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+            end_dt = timezone.make_aware(naive_end, PACIFIC_TZ)
         except Exception:
             end_dt = start_dt + datetime.timedelta(hours=2)
     elif end_time:
         try:
             end_str = f"{start_date} {end_time}"
             naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
-            end_dt = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+            end_dt = timezone.make_aware(naive_end, PACIFIC_TZ)
         except Exception:
             end_dt = start_dt + datetime.timedelta(hours=2)
     else:
@@ -1292,13 +1292,14 @@ def organizer_create_event_view(request):
     cache.delete(CACHE_KEY_EVENTS)
 
     # Audit log
+    start_pac = to_pacific_time(start_dt)
     audit_entry = MembershipAuditLog.objects.create(
         action=MembershipAuditLog.ACTION_EVENT_CREATED,
         target_name=f"Event: {event.title}",
         target_email=f"portal_evt_{event.id}",
         actor_name=admin_name,
         actor_email=admin_email,
-        notes=f"Created in-portal community event '{event.title}' scheduled for {start_dt.strftime('%Y-%m-%d %H:%M')}."
+        notes=f"Created in-portal community event '{event.title}' scheduled for {start_pac.strftime('%Y-%m-%d %H:%M')} (PT)."
     )
 
     try:
@@ -1313,11 +1314,12 @@ def organizer_create_event_view(request):
 
     # If immediate broadcast requested
     if broadcast_now:
+        end_pac = to_pacific_time(end_dt)
         event_data = {
             'id': f"portal_{event.id}",
             'title': event.title,
-            'date_formatted': start_dt.strftime("%A, %B %d, %Y"),
-            'time_formatted': f"{start_dt.strftime('%I:%M %p').lstrip('0')} - {end_dt.strftime('%I:%M %p').lstrip('0')}",
+            'date_formatted': start_pac.strftime("%A, %B %d, %Y"),
+            'time_formatted': f"{start_pac.strftime('%I:%M %p').lstrip('0')} - {end_pac.strftime('%I:%M %p').lstrip('0')}",
             'location': event.location,
             'location_url': event.location_url or f"https://www.google.com/maps/search/?api=1&query={quote_plus(event.location)}",
             'category': event.category,
@@ -1379,7 +1381,7 @@ def organizer_edit_event_view(request, event_id):
         try:
             start_str = f"{start_date} {start_time}"
             naive_start = datetime.datetime.strptime(start_str, "%Y-%m-%d %H:%M")
-            event.start_datetime = timezone.make_aware(naive_start) if timezone.is_naive(naive_start) else naive_start
+            event.start_datetime = timezone.make_aware(naive_start, PACIFIC_TZ)
         except Exception as e:
             logger.warning(f"Error parsing edit start datetime: {e}")
 
@@ -1387,14 +1389,14 @@ def organizer_edit_event_view(request, event_id):
         try:
             end_str = f"{end_date} {end_time}"
             naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
-            event.end_datetime = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+            event.end_datetime = timezone.make_aware(naive_end, PACIFIC_TZ)
         except Exception:
             pass
     elif end_time and start_date:
         try:
             end_str = f"{start_date} {end_time}"
             naive_end = datetime.datetime.strptime(end_str, "%Y-%m-%d %H:%M")
-            event.end_datetime = timezone.make_aware(naive_end) if timezone.is_naive(naive_end) else naive_end
+            event.end_datetime = timezone.make_aware(naive_end, PACIFIC_TZ)
         except Exception:
             pass
 
