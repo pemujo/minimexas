@@ -4366,6 +4366,7 @@ class EventDirectURLAndSharingTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'focused-event-container')
         self.assertContains(response, 'Mexican Food Tour')
+        self.assertContains(response, 'Active')
         self.assertContains(response, 'View All Events')
         self.assertContains(response, 'copy-event-link-btn')
         self.assertContains(response, 'data-event-url=')
@@ -4474,6 +4475,69 @@ class EventDirectURLAndSharingTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # Should render normal events page with alert
         self.assertContains(response, 'could not be found or has concluded')
+
+    @patch('recommendations.views.fetch_community_events')
+    def test_past_event_detail_and_list_renders_rsvps_and_shared_items(self, mock_fetch_events):
+        past_evt = {
+            'id': 'evt_past_picnic',
+            'title': 'Summer Picnic 2025',
+            'category': 'Family & Kids',
+            'start_datetime': datetime.datetime(2025, 7, 10, 11, 0),
+            'year': 2025,
+            'month': 7,
+            'day': '10',
+            'date_formatted': 'Jul 10, 2025',
+            'time_formatted': '11:00 AM',
+            'location': 'Golden Gate Park, SF',
+            'location_url': 'https://maps.google.com/?q=Golden+Gate+Park',
+            'description': 'Our past summer gathering with lots of food and fun games.',
+            'google_calendar_link': 'https://calendar.google.com',
+            'organizer': 'Comunidad MiniMexitas',
+            'is_past': True,
+            'source': 'portal',
+            'is_portal_event': True,
+            'portal_event_pk': 99,
+        }
+        mock_fetch_events.return_value = [past_evt]
+
+        # Create an RSVP record for this past event
+        CommunityEventRSVP.objects.create(
+            event_id="evt_past_picnic",
+            event_title="Summer Picnic 2025",
+            member_email="sofia.member@minimexitas.org",
+            member_name="Sofia Garcia",
+            status="going",
+            adults_count=2,
+            kids_count=2,
+            kids_0_2=1,
+            kids_2_5=1,
+            kids_5_10=0,
+            kids_10_plus=0,
+            contribution="Guacamole & Homemade Tortillas",
+            notes="Excited to join!",
+        )
+
+        self._login_member()
+
+        # 1. Test direct focused event view
+        detail_res = self.client.get(reverse('event_detail', kwargs={'event_id': 'evt_past_picnic'}))
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertContains(detail_res, 'Summer Picnic 2025')
+        self.assertContains(detail_res, 'Concluded')
+        self.assertContains(detail_res, 'Sofia Garcia')
+        self.assertContains(detail_res, 'Guacamole &amp; Homemade Tortillas')
+        self.assertContains(detail_res, 'Items Shared / Brought by Members')
+        self.assertContains(detail_res, '0-2 yrs')
+        self.assertContains(detail_res, '2-5 yrs')
+
+        # 2. Test main events list view (past events grid)
+        list_res = self.client.get(reverse('events'))
+        self.assertEqual(list_res.status_code, 200)
+        self.assertContains(list_res, 'Summer Picnic 2025')
+        self.assertContains(list_res, 'Concluded')
+        self.assertContains(list_res, 'Sofia Garcia')
+        self.assertContains(list_res, 'Guacamole &amp; Homemade Tortillas')
+        self.assertContains(list_res, 'Things Members Shared')
 
     @patch('recommendations.views.sync_event_rsvp_to_google_sheet', return_value=True)
     def test_event_rsvp_token_redirects_to_event_detail(self, mock_sync_sheet):

@@ -312,21 +312,8 @@
                     <i class="bi bi-arrow-left me-1"></i> View All Events
                 </a>
 
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 fw-semibold" style="font-size: 0.75rem;">
-                        <i class="bi bi-box-arrow-in-up-right me-1"></i> Shared Event Direct Link
-                    </span>
-
-                    <!-- Copy Direct Link Button -->
-                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 py-1 text-secondary share-btn d-flex align-items-center gap-1 shadow-sm copy-event-link-btn"
-                        data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' target_event.id %}"
-                        data-event-id="{{ target_event.id }}" title="Copy Direct Link">
-                        <i class="bi bi-link-45deg text-secondary fs-6"></i>
-                        <span class="small copy-label">Copy Link</span>
-                    </button>
-
-                    {% if is_admin %}
-                    <div class="d-flex align-items-center gap-1">
+                {% if is_admin %}
+                <div class="d-flex align-items-center gap-1">
                         {% if target_event.is_portal_event %}
                         <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle btn-open-edit-event"
                                 style="width: 30px; height: 30px; padding: 0; line-height: 1;"
@@ -401,13 +388,17 @@
                                     <span class="badge {% if 'Cultural' in target_event.category %}category-tag cultural{% elif 'Tech' in target_event.category or 'Network' in target_event.category %}category-tag tech{% elif 'Family' in target_event.category or 'Outdoor' in target_event.category %}category-tag family{% elif 'mamis' in target_event.category|lower %}category-tag mamis{% elif 'papis' in target_event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                         {{ target_event.category }}
                                     </span>
+                                    {% if target_event.is_past %}
+                                    <span class="badge bg-light text-secondary border" style="font-size: 0.68rem;">Concluded</span>
+                                    {% else %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.68rem;">
+                                        <i class="bi bi-record-circle me-1"></i>Active
+                                    </span>
+                                    {% endif %}
                                     {% if not target_event.is_portal_event %}
                                     <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
                                         <i class="bi bi-google me-1"></i>Google Cal
                                     </span>
-                                    {% endif %}
-                                    {% if target_event.is_past %}
-                                    <span class="badge bg-light text-secondary border" style="font-size: 0.68rem;">Concluded</span>
                                     {% endif %}
                                 </div>
                                 <div class="text-muted small">
@@ -629,8 +620,121 @@
                         </div>
                     </div>
                     {% else %}
-                    <div class="p-3 bg-light rounded-3 border mb-3 text-center text-muted small">
-                        <i class="bi bi-check2-circle text-success me-1"></i> This event has concluded.
+                    <!-- Past Event Attendance & Contributions Display -->
+                    <div class="rsvp-card-container mb-3 p-3 bg-light rounded-3 border">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-muted small fw-semibold" style="font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                                <i class="bi bi-check2-circle text-success me-1"></i> Event Concluded &middot; Attendance Record:
+                            </span>
+                            <span class="small text-muted" style="font-size: 0.76rem;">
+                                <span class="fw-bold text-dark">{{ target_event.going_count }}</span> Attended
+                                <span class="headcount-summary-badge text-muted">({{ target_event.total_adults|default:target_event.going_count }} Adult{{ target_event.total_adults|default:target_event.going_count|pluralize }}{% if target_event.total_kids %}, {{ target_event.total_kids }} Kid{{ target_event.total_kids|pluralize }}{% if target_event.kids_breakdown_summary %} [{{ target_event.kids_breakdown_summary }}]{% endif %}{% endif %})</span>
+                            </span>
+                        </div>
+
+                        <!-- User Past RSVP indicator if responded -->
+                        {% if target_event.my_rsvp %}
+                        <div class="user-rsvp-indicator-box mb-3">
+                            <div class="p-2 px-3 rounded-2 border d-flex align-items-center justify-content-between {% if target_event.my_rsvp == 'going' %}bg-success-subtle border-success-subtle text-success-emphasis{% elif target_event.my_rsvp == 'maybe' %}bg-warning-subtle border-warning-subtle text-warning-emphasis{% else %}bg-secondary-subtle border-secondary-subtle text-secondary-emphasis{% endif %}" style="font-size: 0.76rem;">
+                                <div class="user-rsvp-summary-text">
+                                    <i class="bi {% if target_event.my_rsvp == 'going' %}bi-check-circle-fill text-success{% elif target_event.my_rsvp == 'maybe' %}bi-question-circle-fill text-warning{% else %}bi-x-circle-fill text-secondary{% endif %} me-1"></i>
+                                    <strong>Your Past RSVP:</strong> 
+                                    <span class="user-rsvp-status-label">
+                                        {% if target_event.my_rsvp == 'going' %}
+                                            Attended ({{ target_event.my_rsvp_adults|default:1 }} Adult{{ target_event.my_rsvp_adults|default:1|pluralize }}{% if target_event.my_rsvp_kids %}, {{ target_event.my_rsvp_kids }} Kid{{ target_event.my_rsvp_kids|pluralize }}{% if target_event.my_rsvp_kids_breakdown_summary %} [{{ target_event.my_rsvp_kids_breakdown_summary }}]{% endif %}{% endif %})
+                                            {% if target_event.my_rsvp_contribution %} · <i class="bi bi-basket-fill text-warning"></i> Brought: <em>{{ target_event.my_rsvp_contribution }}</em>{% endif %}
+                                        {% elif target_event.my_rsvp == 'maybe' %}
+                                            Maybe
+                                        {% elif target_event.my_rsvp == 'declined' %}
+                                            Couldn't Attend
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Confirmed Attendees List -->
+                        <div class="pt-2 border-top">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="small fw-semibold text-dark" style="font-size: 0.74rem;">Attendees & Guests:</span>
+                                <span class="badge bg-white text-muted border small" style="font-size: 0.68rem;">
+                                    <span class="attendee-count-label">{{ target_event.attendees|length }}</span> Member{{ target_event.attendees|length|pluralize }}
+                                </span>
+                            </div>
+
+                            <!-- Kids by Age Group Pills -->
+                            {% if target_event.total_kids %}
+                            <div class="kids-breakdown-bar mb-2">
+                                <div class="p-2 rounded-2 bg-white border d-flex flex-wrap align-items-center gap-1" style="font-size: 0.72rem;">
+                                    <span class="fw-semibold text-dark me-1"><i class="bi bi-people-fill text-primary me-1"></i>Kids by Age:</span>
+                                    {% if target_event.total_kids_0_2 %}
+                                    <span class="badge bg-light text-dark border px-2 py-1">
+                                        👶 0-2 yrs: <strong>{{ target_event.total_kids_0_2 }}</strong>
+                                    </span>
+                                    {% endif %}
+                                    {% if target_event.total_kids_2_5 %}
+                                    <span class="badge bg-light text-dark border px-2 py-1">
+                                        🧒 2-5 yrs: <strong>{{ target_event.total_kids_2_5 }}</strong>
+                                    </span>
+                                    {% endif %}
+                                    {% if target_event.total_kids_5_10 %}
+                                    <span class="badge bg-light text-dark border px-2 py-1">
+                                        👦 5-10 yrs: <strong>{{ target_event.total_kids_5_10 }}</strong>
+                                    </span>
+                                    {% endif %}
+                                    {% if target_event.total_kids_10_plus %}
+                                    <span class="badge bg-light text-dark border px-2 py-1">
+                                        🧑 10+ yrs: <strong>{{ target_event.total_kids_10_plus }}</strong>
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div class="attendees-details-list d-flex flex-column gap-2" id="targetEventAttendeesList">
+                                {% for att in target_event.attendee_details %}
+                                <div class="attendee-card d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-person-fill text-primary"></i>
+                                        <span class="fw-semibold text-dark">{{ att.name }}</span>
+                                        <span class="attendee-breakdown-badge">
+                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% if att.kids_breakdown_summary %} ({{ att.kids_breakdown_summary }}){% endif %}{% endif %}
+                                        </span>
+                                    </div>
+                                    {% if att.contribution %}
+                                    <div class="contribution-tag">
+                                        <i class="bi bi-basket-fill text-warning"></i>
+                                        <span>Brought: <strong>{{ att.contribution }}</strong></span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% empty %}
+                                <span class="text-muted small fst-italic no-attendees-text" style="font-size: 0.72rem;">No member RSVPs recorded for this event.</span>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Community Potluck / Contributions Board -->
+                            {% if target_event.contributions_list %}
+                            <div class="potluck-board-container mt-3">
+                                <div class="potluck-board">
+                                    <div class="small fw-bold text-dark mb-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-basket2-fill text-warning fs-6"></i>
+                                        <span>Items Shared / Brought by Members:</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 contributions-chips-list">
+                                        {% for item in target_event.contributions_list %}
+                                        <span class="badge bg-white text-dark border shadow-xs p-2 d-inline-flex align-items-center gap-1" style="font-size: 0.76rem;">
+                                            <i class="bi bi-gift-fill text-primary me-1"></i>
+                                            <strong>{{ item.contribution }}</strong>
+                                            <span class="text-muted small ms-1">({{ item.member_name }})</span>
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                     {% endif %}
 
@@ -641,14 +745,6 @@
                     <a href="{{ target_event.google_calendar_link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-pill" title="Add event to your Google Calendar">
                         <i class="bi bi-calendar-plus text-primary me-1"></i> Add to Calendar
                     </a>
-
-                    <div>
-                        <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 copy-event-link-btn shadow-sm"
-                            data-event-url="{{ request.scheme }}://{{ request.get_host }}{% url 'event_detail' target_event.id %}"
-                            data-event-id="{{ target_event.id }}">
-                            <i class="bi bi-link-45deg me-1"></i> <span class="copy-label">Copy Link</span>
-                        </button>
-                    </div>
                 </div>
 
             </div>
@@ -761,6 +857,9 @@
                                             <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
                                                 <span class="badge {% if 'Cultural' in event.category %}category-tag cultural{% elif 'Tech' in event.category or 'Network' in event.category %}category-tag tech{% elif 'Family' in event.category or 'Outdoor' in event.category %}category-tag family{% elif 'mamis' in event.category|lower %}category-tag mamis{% elif 'papis' in event.category|lower %}category-tag papis{% else %}category-tag culinary{% endif %}">
                                                     {{ event.category }}
+                                                </span>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.68rem;">
+                                                    <i class="bi bi-record-circle me-1"></i>Active
                                                 </span>
                                                 {% if not event.is_portal_event %}
                                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill" style="font-size: 0.68rem;" title="Synced from Google Calendar">
@@ -1151,9 +1250,118 @@
                                 </div>
 
                                 <!-- Description -->
-                                <p class="text-muted small mb-4" style="line-height: 1.5;">
+                                <p class="text-muted small mb-3" style="line-height: 1.5;">
                                     {{ event.description|truncatewords:24 }}
                                 </p>
+
+                                <!-- Past Event RSVP / Attendees Summary & List -->
+                                <div class="rsvp-card-container mb-3 p-2 bg-light rounded-3 border">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted small fw-semibold" style="font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                                            👥 Attendance:
+                                        </span>
+                                        {% if event.attendees %}
+                                        <button class="btn btn-link p-0 text-decoration-none small text-muted" 
+                                                type="button" 
+                                                data-bs-toggle="collapse" 
+                                                data-bs-target="#past-attendees-{{ forloop.counter }}" 
+                                                aria-expanded="false" 
+                                                style="font-size: 0.74rem;">
+                                            <span class="fw-bold text-dark going-count-badge">{{ event.going_count }}</span> Attended
+                                            <span class="headcount-summary-badge text-muted">({{ event.total_adults|default:event.going_count }} Adult{{ event.total_adults|default:event.going_count|pluralize }}{% if event.total_kids %}, {{ event.total_kids }} Kid{{ event.total_kids|pluralize }}{% if event.kids_breakdown_summary %} [{{ event.kids_breakdown_summary }}]{% endif %}{% endif %})</span>
+                                            <i class="bi bi-chevron-down ms-1" style="font-size: 0.65rem;"></i>
+                                        </button>
+                                        {% else %}
+                                        <span class="small text-muted" style="font-size: 0.74rem;">
+                                            <span class="fw-bold text-dark">0</span> Attended
+                                        </span>
+                                        {% endif %}
+                                    </div>
+
+                                    {% if event.attendees %}
+                                    <!-- Collapsible Attendees List -->
+                                    <div class="collapse mt-2 attendees-collapse-box" id="past-attendees-{{ forloop.counter }}">
+                                        <div class="pt-2 border-top">
+                                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                                <span class="small fw-semibold text-dark" style="font-size: 0.72rem;">Attendees & Guests:</span>
+                                                <span class="badge bg-white text-muted border small" style="font-size: 0.65rem;">
+                                                    <span class="attendee-count-label">{{ event.attendees|length }}</span> Member{{ event.attendees|length|pluralize }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Kids by Age Group Pills -->
+                                            {% if event.total_kids %}
+                                            <div class="kids-breakdown-bar mb-2">
+                                                <div class="p-1 px-2 rounded-2 bg-white border d-flex flex-wrap align-items-center gap-1" style="font-size: 0.7rem;">
+                                                    <span class="fw-semibold text-dark me-1"><i class="bi bi-people-fill text-primary me-1"></i>Kids:</span>
+                                                    {% if event.total_kids_0_2 %}
+                                                    <span class="badge bg-light text-dark border px-1 py-1" style="font-size: 0.65rem;">
+                                                        0-2y: <strong>{{ event.total_kids_0_2 }}</strong>
+                                                    </span>
+                                                    {% endif %}
+                                                    {% if event.total_kids_2_5 %}
+                                                    <span class="badge bg-light text-dark border px-1 py-1" style="font-size: 0.65rem;">
+                                                        2-5y: <strong>{{ event.total_kids_2_5 }}</strong>
+                                                    </span>
+                                                    {% endif %}
+                                                    {% if event.total_kids_5_10 %}
+                                                    <span class="badge bg-light text-dark border px-1 py-1" style="font-size: 0.65rem;">
+                                                        5-10y: <strong>{{ event.total_kids_5_10 }}</strong>
+                                                    </span>
+                                                    {% endif %}
+                                                    {% if event.total_kids_10_plus %}
+                                                    <span class="badge bg-light text-dark border px-1 py-1" style="font-size: 0.65rem;">
+                                                        10+y: <strong>{{ event.total_kids_10_plus }}</strong>
+                                                    </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            <div class="attendees-details-list d-flex flex-column gap-1 mb-2">
+                                                {% for att in event.attendee_details %}
+                                                <div class="attendee-card p-1 px-2 d-flex flex-wrap align-items-center justify-content-between gap-1">
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <i class="bi bi-person text-primary" style="font-size: 0.75rem;"></i>
+                                                        <span class="fw-semibold text-dark" style="font-size: 0.74rem;">{{ att.name }}</span>
+                                                        <span class="attendee-breakdown-badge" style="font-size: 0.65rem;">
+                                                            {{ att.adults }} Adult{{ att.adults|pluralize }}{% if att.kids %}, {{ att.kids }} Kid{{ att.kids|pluralize }}{% if att.kids_breakdown_summary %} ({{ att.kids_breakdown_summary }}){% endif %}{% endif %}
+                                                        </span>
+                                                    </div>
+                                                    {% if att.contribution %}
+                                                    <div class="contribution-tag" style="font-size: 0.68rem; padding: 1px 6px;">
+                                                        <i class="bi bi-basket-fill text-warning"></i>
+                                                        <span><strong>{{ att.contribution }}</strong></span>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+
+                                            <!-- Potluck items on card -->
+                                            {% if event.contributions_list %}
+                                            <div class="potluck-board-container">
+                                                <div class="potluck-board p-2 rounded-2">
+                                                    <div class="fw-semibold text-dark d-flex align-items-center gap-1 mb-1" style="font-size: 0.7rem;">
+                                                        <i class="bi bi-basket2-fill text-warning"></i>
+                                                        <span>Things Members Shared:</span>
+                                                    </div>
+                                                    <div class="d-flex flex-wrap gap-1 contributions-chips-list">
+                                                        {% for item in event.contributions_list %}
+                                                        <span class="badge bg-white text-dark border p-1 px-2" style="font-size: 0.68rem;">
+                                                            <i class="bi bi-gift-fill text-primary me-1"></i>
+                                                            <strong>{{ item.contribution }}</strong>
+                                                            <span class="text-muted small ms-1">({{ item.member_name }})</span>
+                                                        </span>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
 
                             </div>
 
@@ -1519,6 +1727,7 @@
     <div class="modal fade" id="eventRsvpModal" tabindex="-1" aria-labelledby="eventRsvpModalLabel" aria-hidden="true" style="z-index: 1070;">
         <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content border-0 shadow-lg" id="eventRsvpForm" style="border-radius: var(--radius-xl); overflow: hidden;">
+                {% csrf_token %}
                 <div class="modal-header bg-light border-bottom px-4 py-3">
                     <div>
                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1 mb-1" style="font-size: 0.72rem;">
@@ -2203,13 +2412,12 @@
             e.preventDefault();
 
             const submitBtn = document.getElementById("rsvpModalSubmitBtn");
-            const spinner = submitBtn?.querySelector(".spinner-border");
-            const submitText = submitBtn?.querySelector(".submit-text");
+            const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '<span class="submit-text"><i class="bi bi-check2-circle me-1"></i> Save RSVP</span>';
 
             const formData = new FormData(eventRsvpForm);
             formData.append("ajax", "1");
 
-            const eventId = formData.get("event_id");
+            const eventId = (formData.get("event_id") || "").trim();
             const status = formData.get("status");
             const adults = parseInt(formData.get("adults")) || 1;
             const kids = parseInt(formData.get("kids")) || 0;
@@ -2220,14 +2428,21 @@
                 return;
             }
 
-            if (submitBtn) submitBtn.disabled = true;
-            if (spinner) spinner.classList.remove("d-none");
+            // Extract CSRF Token from form or cookie
+            const csrfToken = formData.get("csrfmiddlewaretoken") || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie("csrftoken") || "";
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add("disabled");
+                submitBtn.style.pointerEvents = "none";
+                submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Saving...`;
+            }
 
             try {
                 const response = await fetch("{% url 'event_rsvp' %}", {
                     method: "POST",
                     headers: {
-                        "X-CSRFToken": getCookie("csrftoken"),
+                        "X-CSRFToken": csrfToken,
                         "X-Requested-With": "XMLHttpRequest"
                     },
                     body: formData
@@ -2236,36 +2451,58 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
-                        eventRsvpModal?.hide();
+                        // Close modal cleanly
+                        if (eventRsvpModal) {
+                            eventRsvpModal.hide();
+                        } else if (eventRsvpModalEl && typeof bootstrap !== 'undefined') {
+                            const inst = bootstrap.Modal.getInstance(eventRsvpModalEl) || new bootstrap.Modal(eventRsvpModalEl);
+                            inst?.hide();
+                        }
 
-                        // 1. Update eventsData array
-                        const evtItem = eventsData.find(e => String(e.id) === String(eventId));
-                        if (evtItem) {
-                            evtItem.my_rsvp = data.status;
-                            evtItem.my_rsvp_adults = data.my_rsvp_adults;
-                            evtItem.my_rsvp_kids = data.my_rsvp_kids;
-                            evtItem.my_rsvp_kids_0_2 = data.my_rsvp_kids_0_2;
-                            evtItem.my_rsvp_kids_2_5 = data.my_rsvp_kids_2_5;
-                            evtItem.my_rsvp_kids_5_10 = data.my_rsvp_kids_5_10;
-                            evtItem.my_rsvp_kids_10_plus = data.my_rsvp_kids_10_plus;
-                            evtItem.my_rsvp_kids_breakdown_summary = data.my_rsvp_kids_breakdown_summary;
-                            evtItem.my_rsvp_contribution = data.my_rsvp_contribution;
-                            evtItem.going_count = data.going_count;
-                            evtItem.total_adults = data.total_adults;
-                            evtItem.total_kids = data.total_kids;
-                            evtItem.total_kids_0_2 = data.total_kids_0_2;
-                            evtItem.total_kids_2_5 = data.total_kids_2_5;
-                            evtItem.total_kids_5_10 = data.total_kids_5_10;
-                            evtItem.total_kids_10_plus = data.total_kids_10_plus;
-                            evtItem.kids_breakdown_summary = data.kids_breakdown_summary;
-                            evtItem.total_people = data.total_people;
-                            evtItem.attendees = data.attendees;
-                            evtItem.attendee_details = data.attendee_details;
-                            evtItem.contributions_list = data.contributions;
+                        // Helper for event ID matching (handles aliases event_X, portal_X, X)
+                        function matchesEventId(id1, id2) {
+                            if (!id1 || !id2) return false;
+                            const s1 = String(id1).toLowerCase().trim();
+                            const s2 = String(id2).toLowerCase().trim();
+                            if (s1 === s2) return true;
+                            const r1 = s1.replace(/^(event_|portal_)/, '');
+                            const r2 = s2.replace(/^(event_|portal_)/, '');
+                            return r1 === r2;
+                        }
+
+                        // 1. Update eventsData array if present
+                        if (typeof eventsData !== 'undefined' && Array.isArray(eventsData)) {
+                            const evtItem = eventsData.find(e => matchesEventId(e.id, eventId));
+                            if (evtItem) {
+                                evtItem.my_rsvp = data.status;
+                                evtItem.my_rsvp_adults = data.my_rsvp_adults;
+                                evtItem.my_rsvp_kids = data.my_rsvp_kids;
+                                evtItem.my_rsvp_kids_0_2 = data.my_rsvp_kids_0_2;
+                                evtItem.my_rsvp_kids_2_5 = data.my_rsvp_kids_2_5;
+                                evtItem.my_rsvp_kids_5_10 = data.my_rsvp_kids_5_10;
+                                evtItem.my_rsvp_kids_10_plus = data.my_rsvp_kids_10_plus;
+                                evtItem.my_rsvp_kids_breakdown_summary = data.my_rsvp_kids_breakdown_summary;
+                                evtItem.my_rsvp_contribution = data.my_rsvp_contribution;
+                                evtItem.going_count = data.going_count;
+                                evtItem.total_adults = data.total_adults;
+                                evtItem.total_kids = data.total_kids;
+                                evtItem.total_kids_0_2 = data.total_kids_0_2;
+                                evtItem.total_kids_2_5 = data.total_kids_2_5;
+                                evtItem.total_kids_5_10 = data.total_kids_5_10;
+                                evtItem.total_kids_10_plus = data.total_kids_10_plus;
+                                evtItem.kids_breakdown_summary = data.kids_breakdown_summary;
+                                evtItem.total_people = data.total_people;
+                                evtItem.attendees = data.attendees;
+                                evtItem.attendee_details = data.attendee_details;
+                                evtItem.contributions_list = data.contributions;
+                            }
                         }
 
                         // 2. Update all button groups for this event
-                        document.querySelectorAll(`.rsvp-btn-group[data-event-id="${eventId}"]`).forEach(group => {
+                        document.querySelectorAll(`.rsvp-btn-group`).forEach(group => {
+                            const gId = group.getAttribute("data-event-id");
+                            if (!matchesEventId(gId, eventId)) return;
+
                             group.setAttribute("data-my-rsvp", data.status);
                             group.setAttribute("data-my-adults", data.my_rsvp_adults);
                             group.setAttribute("data-my-kids", data.my_rsvp_kids);
@@ -2285,8 +2522,8 @@
 
                         // 3. Update User RSVP Indicator boxes everywhere
                         document.querySelectorAll(`.rsvp-card-container`).forEach(container => {
-                            const group = container.querySelector(`.rsvp-btn-group[data-event-id="${eventId}"]`);
-                            if (!group) return;
+                            const group = container.querySelector(`.rsvp-btn-group`);
+                            if (!group || !matchesEventId(group.getAttribute("data-event-id"), eventId)) return;
 
                             const indicatorBox = container.querySelector(".user-rsvp-indicator-box");
                             if (indicatorBox) {
@@ -2332,7 +2569,7 @@
                             if (headcountBadge) headcountBadge.textContent = formatHeadcountSummary(data.total_adults, data.total_kids, data.kids_breakdown_summary);
 
                             const attCountBadge = container.querySelector(".attendee-count-label");
-                            if (attCountBadge) attCountBadge.textContent = data.attendees.length;
+                            if (attCountBadge) attCountBadge.textContent = data.attendees ? data.attendees.length : 0;
 
                             // Update Kids Breakdown Bar
                             const kidsBar = container.querySelector(".kids-breakdown-bar");
@@ -2394,15 +2631,34 @@
                             'declined': '❌ RSVP Updated: Can\'t Go'
                         };
                         showRsvpToast(statusDisplayNames[data.status] || 'RSVP Updated!');
+                    } else {
+                        alert(data.error || "Error saving RSVP. Please try again.");
                     }
                 } else {
-                    alert("Error saving RSVP. Please try again.");
+                    const errData = await response.json().catch(() => null);
+                    alert((errData && errData.error) || "Error saving RSVP. Please try again.");
                 }
             } catch (err) {
                 console.error("RSVP Submission Error:", err);
+                alert("Network error while saving RSVP. Please check your connection and try again.");
             } finally {
-                if (submitBtn) submitBtn.disabled = false;
-                if (spinner) spinner.classList.add("d-none");
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove("disabled");
+                    submitBtn.style.pointerEvents = "auto";
+                    submitBtn.innerHTML = originalBtnHtml;
+                }
+            }
+        });
+
+        // Ensure submit button is always reset when modal closes
+        eventRsvpModalEl?.addEventListener("hidden.bs.modal", function () {
+            const submitBtn = document.getElementById("rsvpModalSubmitBtn");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove("disabled");
+                submitBtn.style.pointerEvents = "auto";
+                submitBtn.innerHTML = '<span class="submit-text"><i class="bi bi-check2-circle me-1"></i> Save RSVP</span><span class="spinner-border spinner-border-sm d-none ms-1" role="status"></span>';
             }
         });
 
@@ -2761,9 +3017,10 @@
             renderCalendarMonth();
         });
 
-        // --- Instant Acknowledgment & Submit Button Loading Indicator ---
-        document.querySelectorAll('form').forEach(form => {
+        // --- Instant Acknowledgment & Submit Button Loading Indicator for Standard Navigation Forms ---
+        document.querySelectorAll('form:not(#eventRsvpForm)').forEach(form => {
             form.addEventListener('submit', function (e) {
+                if (e.defaultPrevented) return;
                 if (form.checkValidity && !form.checkValidity()) {
                     return; // Let browser HTML5 validation fire
                 }
